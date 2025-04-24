@@ -1,0 +1,13 @@
+[workspace]
+members = ["aic-sdk-sys"]
+
+[workspace.dependencies]
+aic-sdk-sys = { path = "aic-sdk-sys" }
+
+[package]
+name = "aic-sdk"
+version = "0.4.0"
+edition = "2024"
+
+[dependencies]
+aic-sdk-sys = { workspace = true }
