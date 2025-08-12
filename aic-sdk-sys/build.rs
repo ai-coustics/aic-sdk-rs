@@ -7,6 +7,11 @@ fn main() {
     panic!("This platform is currently not supported.")
 }
 
+/// When compiling a static library, the Rust compiler includes
+/// non-exported symbols. The following code curates the symbols
+/// to only include aic_* symbols in the library.
+///
+/// Issue: https://github.com/rust-lang/rust/issues/104707
 #[cfg(target_os = "linux")]
 fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
