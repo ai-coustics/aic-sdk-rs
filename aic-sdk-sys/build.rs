@@ -18,6 +18,7 @@ fn main() {
     let lib_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("libs");
 
     let lib_name = "aic";
+    let lib_name_curated = "aic_curated";
     let global_symbols_wildcard = "aic_*";
 
     let static_lib = lib_path.join(format!("lib{}.a", lib_name));
@@ -30,10 +31,10 @@ fn main() {
     let intermediate_obj = out_dir.join(format!("lib{}.o", lib_name));
 
     // modified .o file
-    let final_obj = out_dir.join(format!("lib{}_curated.o", lib_name));
+    let final_obj = out_dir.join(format!("lib{}.o", lib_name_curated));
 
     // .a file
-    let final_lib = out_dir.join(format!("lib{}_curated.a", lib_name));
+    let final_lib = out_dir.join(format!("lib{}.a", lib_name_curated));
 
     // partially link
     let ld_status = Command::new("ld")
@@ -79,7 +80,7 @@ fn main() {
     println!("cargo:rustc-link-search=native={}", out_dir.display());
     println!(
         "cargo:rustc-link-lib=static={}",
-        format!("{}_curated", lib_name)
+        format!("{}", lib_name_curated)
     );
 
     // Rerun this script if the static library changes.
