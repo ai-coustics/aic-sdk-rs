@@ -51,53 +51,96 @@ pub fn handle_error(error_code: core::ffi::c_uint) -> Result<(), AicError> {
     }
 }
 
-/// Supported model types for audio enhancement.
-///
-/// Each model type provides different levels of quality and computational requirements.
-/// Quail models are the newer generation, while Legacy models are provided for compatibility.
+/// Available model types for audio enhancement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModelType {
-    /// Quail Large - highest quality, most computationally intensive
-    QuailL,
-    /// Quail Small - good balance of quality and performance
-    QuailS,
-    /// Quail Extra Small - optimized for lower-end devices
+    /// **Specifications:**
+    /// - Native sample rate: 48 kHz
+    /// - Native num frames: 480
+    /// - Processing latency: 30ms
+    QuailL48,
+    /// **Specifications:**
+    /// - Native sample rate: 16 kHz
+    /// - Native num frames: 160
+    /// - Processing latency: 30ms
+    QuailL16,
+    /// **Specifications:**
+    /// - Native sample rate: 8 kHz
+    /// - Native num frames: 80
+    /// - Processing latency: 30ms
+    QuailL8,
+    /// **Specifications:**
+    /// - Native sample rate: 48 kHz
+    /// - Native num frames: 480
+    /// - Processing latency: 30ms
+    QuailS48,
+    /// **Specifications:**
+    /// - Native sample rate: 16 kHz
+    /// - Native num frames: 160
+    /// - Processing latency: 30ms
+    QuailS16,
+    /// **Specifications:**
+    /// - Native sample rate: 8 kHz
+    /// - Native num frames: 80
+    /// - Processing latency: 30ms
+    QuailS8,
+    /// **Specifications:**
+    /// - Native sample rate: 48 kHz
+    /// - Native num frames: 480
+    /// - Processing latency: 10ms
     QuailXS,
-    /// Quail Extra Extra Small - minimal computational requirements
+    /// **Specifications:**
+    /// - Native sample rate: 48 kHz
+    /// - Native num frames: 480
+    /// - Processing latency: 10ms
     QuailXXS,
-    /// Legacy Large - older generation model, high quality
-    LegacyL,
-    /// Legacy Small - older generation model, good performance
-    LegacyS,
 }
 
 impl From<ModelType> for u32 {
     fn from(model_type: ModelType) -> Self {
         match model_type {
-            ModelType::QuailL => AIC_MODEL_TYPE_QUAIL_L,
-            ModelType::QuailS => AIC_MODEL_TYPE_QUAIL_S,
+            ModelType::QuailL48 => AIC_MODEL_TYPE_QUAIL_L48,
+            ModelType::QuailL16 => AIC_MODEL_TYPE_QUAIL_L16,
+            ModelType::QuailL8 => AIC_MODEL_TYPE_QUAIL_L8,
+            ModelType::QuailS48 => AIC_MODEL_TYPE_QUAIL_S48,
+            ModelType::QuailS16 => AIC_MODEL_TYPE_QUAIL_S16,
+            ModelType::QuailS8 => AIC_MODEL_TYPE_QUAIL_S8,
             ModelType::QuailXS => AIC_MODEL_TYPE_QUAIL_XS,
             ModelType::QuailXXS => AIC_MODEL_TYPE_QUAIL_XXS,
-            ModelType::LegacyL => AIC_MODEL_TYPE_LEGACY_L,
-            ModelType::LegacyS => AIC_MODEL_TYPE_LEGACY_S,
         }
     }
 }
 
-/// Audio enhancement parameters that can be adjusted at runtime.
-///
-/// These parameters allow fine-tuning of the audio enhancement behavior
-/// according to specific use cases and preferences.
+/// Configurable parameters for audio enhancement
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Parameter {
-    /// Enhancement level controls the strength of audio enhancement.
-    /// Higher values provide more aggressive enhancement but may introduce artifacts.
+    /// Controls the intensity of speech enhancement processing.
+    ///
+    /// **Range:** 0.0 to 1.0
+    /// - **0.0:** Bypass mode - original signal passes through unchanged
+    /// - **1.0:** Full enhancement - maximum noise reduction but also more audible artifacts
+    ///
+    /// **Default:** 1.0
     EnhancementLevel,
-    /// Voice gain adjusts the amplification of voice components in the audio.
-    /// Positive values increase voice prominence, negative values reduce it.
+    /// Compensates for perceived volume reduction after noise removal.
+    ///
+    /// **Range:** 0.1 to 4.0 (linear amplitude multiplier)
+    /// - **0.1:** Significant volume reduction (-20 dB)
+    /// - **1.0:** No gain change (0 dB, default)
+    /// - **2.0:** Double amplitude (+6 dB)
+    /// - **4.0:** Maximum boost (+12 dB)
+    ///
+    /// **Formula:** Gain (dB) = 20 × log₁₀(value)
+    /// **Default:** 1.0
     VoiceGain,
-    /// Noise gate enable controls whether background noise suppression is active.
-    /// When enabled, very quiet background noise is eliminated.
+    /// Enables/disables a noise gate as a post-processing step,
+    /// before passing the audio buffer to the model.
+    ///
+    /// **Valid values:** 0.0 or 1.0
+    /// - **0.0:** Noise gate disabled
+    /// - **1.0:** Noise gate enabled
+    ///
+    /// **Default:** 0.0
     NoiseGateEnable,
 }
 
@@ -123,7 +166,7 @@ impl From<Parameter> for u32 {
 /// use aic_sdk::{Model, ModelType};
 ///
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-/// let mut model = Model::new(ModelType::QuailS, &license_key).unwrap();
+/// let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
 ///
 /// model.initialize(48000, 1, 1024).unwrap();
 ///
@@ -137,23 +180,26 @@ pub struct Model {
 }
 
 impl Model {
-    /// Creates a new AIC model instance of the specified type.
+    /// Creates a new audio enhancement model instance.
+    ///
+    /// Multiple models can be created to process different audio streams simultaneously
+    /// or to switch between different enhancement algorithms during runtime.
     ///
     /// # Arguments
     ///
-    /// * `model_type` - The type of model to create
+    /// * `model_type` - Selects the enhancement algorithm variant
     /// * `license_key` - Valid license key for the AIC SDK
     ///
     /// # Returns
     ///
-    /// Returns a `Result` containing the new `Model` instance or an `Error` if creation fails.
+    /// Returns a `Result` containing the new `Model` instance or an `AicError` if creation fails.
     ///
     /// # Example
     ///
     /// ```rust
     /// # use aic_sdk::{Model, ModelType};
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// let model = Model::new(ModelType::QuailS, &license_key).unwrap();
+    /// let model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// ```
     pub fn new(model_type: ModelType, license_key: &str) -> Result<Self, AicError> {
         let mut model_ptr: *mut AicModel = ptr::null_mut();
@@ -173,26 +219,35 @@ impl Model {
         Ok(Self { inner: model_ptr })
     }
 
-    /// Initializes the model with the specified audio configuration.
+    /// Configures the model for a specific audio format.
     ///
-    /// This must be called before any audio processing can occur.
+    /// This function must be called before processing any audio.
+    /// For the lowest delay use the sample rate and frame size returned by
+    /// `optimal_sample_rate` and `optimal_num_frames`.
     ///
     /// # Arguments
     ///
-    /// * `sample_rate` - Audio sample rate in Hz (e.g., 48000)
-    /// * `num_channels` - Number of audio channels (typically 1 for mono, 2 for stereo)
-    /// * `num_frames` - Number of frames per processing block
+    /// * `sample_rate` - Audio sample rate in Hz (8000 - 192000)
+    /// * `num_channels` - Number of audio channels (1 for mono, 2 for stereo, etc.)
+    /// * `num_frames` - Number of samples per channel in each process call
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `Error` if initialization fails.
+    /// Returns `Ok(())` on success or an `AicError` if initialization fails.
+    ///
+    /// # Warning
+    /// Do not call from audio processing threads as this allocates memory.
+    ///
+    /// # Note
+    /// All channels are mixed to mono for processing. To process channels
+    /// independently, create separate model instances.
     ///
     /// # Example
     ///
     /// ```rust
     /// # use aic_sdk::{Model, ModelType};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS, &license_key).unwrap();
+    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// model.initialize(48000, 1, 1024).unwrap();
     /// ```
     pub fn initialize(
@@ -208,21 +263,26 @@ impl Model {
         Ok(())
     }
 
-    /// Resets the internal state of the model.
+    /// Clears all internal state and buffers.
     ///
-    /// This clears any internal buffers and history, returning the model
-    /// to its initial state. The model remains initialized and configured.
+    /// Call this when the audio stream is interrupted or when seeking
+    /// to prevent artifacts from previous audio content.
+    ///
+    /// The model stays initialized to the configured settings.
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `Error` if the reset fails.
+    /// Returns `Ok(())` on success or an `AicError` if the reset fails.
+    ///
+    /// # Thread Safety
+    /// Real-time safe. Can be called from audio processing threads.
     ///
     /// # Example
     ///
     /// ```rust
     /// # use aic_sdk::{Model, ModelType};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS, &license_key).unwrap();
+    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// model.reset().unwrap();
     /// ```
     pub fn reset(&mut self) -> Result<(), AicError> {
@@ -230,28 +290,26 @@ impl Model {
         handle_error(error_code)
     }
 
-    /// Processes planar audio data (separate arrays for each channel) in-place.
+    /// Processes audio with separate buffers for each channel (planar layout).
     ///
-    /// In planar format, each channel's data is stored in a separate contiguous array.
-    /// For stereo audio, you would have two separate arrays: one for left channel
-    /// and one for right channel. The audio is enhanced in-place.
+    /// Enhances speech in the provided audio buffers in-place.
+    ///
+    /// The planar function allows a maximum of 16 channels.
     ///
     /// # Arguments
     ///
-    /// * `audio` - Mutable slice of audio channel buffers to be enhanced in-place
-    /// * `num_channels` - Number of audio channels
-    /// * `num_frames` - Number of frames to process
+    /// * `audio` - Array of channel buffer pointers to be enhanced in-place
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `Error` if processing fails.
+    /// Returns `Ok(())` on success or an `AicError` if processing fails.
     ///
     /// # Example
     ///
     /// ```rust
     /// # use aic_sdk::{Model, ModelType};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS, &license_key).unwrap();
+    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
     /// let mut audio_refs: Vec<&mut [f32]> = audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
     /// model.initialize(48000, 2, 480).unwrap();
@@ -268,9 +326,6 @@ impl Model {
             audio_ptrs[i] = channel.as_mut_ptr();
         }
 
-        dbg!(num_channels);
-        dbg!(num_frames);
-
         let error_code = unsafe {
             aic_model_process_planar(self.inner, audio_ptrs.as_ptr(), num_channels, num_frames)
         };
@@ -278,28 +333,26 @@ impl Model {
         handle_error(error_code)
     }
 
-    /// Processes interleaved audio data (samples from all channels mixed together) in-place.
+    /// Processes audio with interleaved channel data.
     ///
-    /// In interleaved format, samples from different channels are stored alternately.
-    /// For stereo audio: [L1, R1, L2, R2, L3, R3, ...] where L = left, R = right.
-    /// The audio is enhanced in-place.
+    /// Enhances speech in the provided audio buffer in-place.
     ///
     /// # Arguments
     ///
-    /// * `audio` - Mutable slice of interleaved audio samples to be enhanced in-place
-    /// * `num_channels` - Number of audio channels
-    /// * `num_frames` - Number of frames to process
+    /// * `audio` - Interleaved audio buffer to be enhanced in-place. Must be exactly of size `num_channels` * `num_frames`
+    /// * `num_channels` - Number of channels (must match initialization)
+    /// * `num_frames` - Number of frames (must match initialization)
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `Error` if processing fails.
+    /// Returns `Ok(())` on success or an `AicError` if processing fails.
     ///
     /// # Example
     ///
     /// ```rust
     /// # use aic_sdk::{Model, ModelType};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS, &license_key).unwrap();
+    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
     /// model.initialize(48000, 2, 480).unwrap();
     /// model.process_interleaved(&mut audio, 2, 480).unwrap();
@@ -317,26 +370,26 @@ impl Model {
         handle_error(error_code)
     }
 
-    /// Sets a parameter value for the model.
+    /// Modifies a model parameter.
     ///
-    /// Parameters control various aspects of the audio enhancement behavior
-    /// and can be adjusted in real-time during processing.
+    /// All parameters can be changed during audio processing.
+    /// This function can be called from any thread.
     ///
     /// # Arguments
     ///
-    /// * `parameter` - The parameter to set
-    /// * `value` - The new value for the parameter
+    /// * `parameter` - Parameter to modify
+    /// * `value` - New parameter value. See parameter documentation for ranges
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `Error` if the parameter cannot be set.
+    /// Returns `Ok(())` on success or an `AicError` if the parameter cannot be set.
     ///
     /// # Example
     ///
     /// ```rust
     /// # use aic_sdk::{Model, ModelType, Parameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS, &license_key).unwrap();
+    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// model.set_parameter(Parameter::EnhancementLevel, 0.8).unwrap();
     /// model.set_parameter(Parameter::NoiseGateEnable, 1.0).unwrap(); // 1.0 = enabled
     /// ```
@@ -345,22 +398,24 @@ impl Model {
         handle_error(error_code)
     }
 
-    /// Gets the current value of a parameter.
+    /// Retrieves the current value of a parameter.
+    ///
+    /// This function can be called from any thread.
     ///
     /// # Arguments
     ///
-    /// * `parameter` - The parameter to query
+    /// * `parameter` - Parameter to query
     ///
     /// # Returns
     ///
-    /// Returns `Ok(value)` containing the current parameter value, or an `Error` if the query fails.
+    /// Returns `Ok(value)` containing the current parameter value, or an `AicError` if the query fails.
     ///
     /// # Example
     ///
     /// ```rust
     /// # use aic_sdk::{Model, ModelType, Parameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS, &license_key).unwrap();
+    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// let enhancement_level = model.get_parameter(Parameter::EnhancementLevel).unwrap();
     /// println!("Current enhancement level: {}", enhancement_level);
     /// ```
@@ -372,47 +427,83 @@ impl Model {
         Ok(value)
     }
 
-    /// Gets the processing latency for this model instance.
+    /// Returns the total output delay in samples for the current audio configuration.
     ///
-    /// The latency represents the delay introduced by the audio processing in samples.
-    /// This can be useful for applications that need to compensate for processing delay.
+    /// This function provides the complete end-to-end latency introduced by the model,
+    /// which includes both algorithmic processing delay and any buffering overhead.
+    /// Use this value to synchronize enhanced audio with other streams or to implement
+    /// delay compensation in your application.
+    ///
+    /// **Delay behavior:**
+    /// - **Before initialization:** Returns the base processing delay using the model's
+    ///   optimal frame size at its native sample rate
+    /// - **After initialization:** Returns the actual delay for your specific configuration,
+    ///   including any additional buffering introduced by non-optimal frame sizes
+    ///
+    /// **Important:** The delay value is always expressed in samples at the sample rate
+    /// you configured during `initialize`. To convert to time units:
+    /// `delay_ms = (delay_samples * 1000) / sample_rate`
+    ///
+    /// **Note:** Using frame sizes different from the optimal value returned by
+    /// `optimal_num_frames` will increase the delay beyond the model's base latency.
     ///
     /// # Returns
     ///
-    /// Returns `Ok(latency_samples)` or an `Error` if the query fails.
+    /// Returns `Ok(delay_samples)` or an `AicError` if the query fails.
     ///
     /// # Example
     ///
     /// ```rust
     /// # use aic_sdk::{Model, ModelType};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS, &license_key).unwrap();
-    /// let latency = model.processing_latency().unwrap();
-    /// println!("Processing latency: {} samples", latency);
+    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// let delay = model.output_delay().unwrap();
+    /// println!("Output delay: {} samples", delay);
     /// ```
-    pub fn processing_latency(&self) -> Result<usize, AicError> {
-        let mut latency: usize = 0;
-        let error_code = unsafe { aic_get_processing_latency(self.inner, &mut latency) };
+    pub fn output_delay(&self) -> Result<usize, AicError> {
+        let mut delay: usize = 0;
+        let error_code = unsafe { aic_get_output_delay(self.inner, &mut delay) };
         handle_error(error_code)?;
-        Ok(latency)
+        Ok(delay)
     }
 
-    /// Gets the optimal sample rate for this model instance.
+    /// Retrieves the native sample rate of the selected model.
     ///
-    /// Using the optimal sample rate can improve both quality and performance.
-    /// While other sample rates may be supported, the optimal rate is recommended
-    /// for best results.
+    /// Each model is optimized for a specific sample rate, which determines the frequency
+    /// range of the enhanced audio output. While you can process audio at any sample rate,
+    /// understanding the model's native rate helps predict the enhancement quality.
+    ///
+    /// **How sample rate affects enhancement:**
+    /// - Models trained at lower sample rates (e.g., 8 kHz) can only enhance frequencies
+    ///   up to their Nyquist limit (4 kHz for 8 kHz models)
+    /// - When processing higher sample rate input (e.g., 48 kHz) with a lower-rate model,
+    ///   only the lower frequency components will be enhanced
+    ///
+    /// **Enhancement blending:**
+    /// When enhancement strength is set below 1.0, the enhanced signal is blended with
+    /// the original, maintaining the full frequency spectrum of your input while adding
+    /// the model's noise reduction capabilities to the lower frequencies.
+    ///
+    /// **Sample rate and optimal frames relationship:**
+    /// When using different sample rates than the model's native rate, the optimal number
+    /// of frames (returned by `optimal_num_frames`) will change. The model's output
+    /// delay remains constant regardless of sample rate as long as you use the optimal frame
+    /// count for that rate.
+    ///
+    /// **Recommendation:**
+    /// For maximum enhancement quality across the full frequency spectrum, match your
+    /// input sample rate to the model's native rate when possible.
     ///
     /// # Returns
     ///
-    /// Returns `Ok(sample_rate)` or an `Error` if the query fails.
+    /// Returns `Ok(sample_rate)` or an `AicError` if the query fails.
     ///
     /// # Example
     ///
     /// ```rust
     /// # use aic_sdk::{Model, ModelType};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS, &license_key).unwrap();
+    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// let optimal_rate = model.optimal_sample_rate().unwrap();
     /// println!("Optimal sample rate: {} Hz", optimal_rate);
     /// ```
@@ -423,22 +514,32 @@ impl Model {
         Ok(sample_rate)
     }
 
-    /// Gets the optimal number of frames per processing block for this model instance.
+    /// Retrieves the native number of frames for the selected model and sample rate.
     ///
-    /// Using the optimal frame count can improve processing efficiency and reduce latency.
-    /// The frame count determines how many audio samples are processed in each call
-    /// to the processing functions.
+    /// Using the optimal number of frames minimizes latency by avoiding internal buffering.
+    /// **When you use a different frame count than the optimal value, the model will
+    /// introduce additional buffering latency on top of its base processing delay.**
+    ///
+    /// The optimal frame count adjusts dynamically based on the sample rate used during
+    /// initialization. Each time you call `initialize` with a different sample rate,
+    /// the optimal number of frames will update accordingly. Before initialization is called,
+    /// this function returns the optimal frame count for the model's native sample rate.
+    ///
+    /// Each model operates on a fixed time window duration, so the required number of frames
+    /// varies with sample rate. For example, a model designed for 10 ms processing windows
+    /// requires 480 frames at 48 kHz, but only 160 frames at 16 kHz to capture the same
+    /// duration of audio.
     ///
     /// # Returns
     ///
-    /// Returns `Ok(num_frames)` or an `Error` if the query fails.
+    /// Returns `Ok(num_frames)` or an `AicError` if the query fails.
     ///
     /// # Example
     ///
     /// ```rust
     /// # use aic_sdk::{Model, ModelType};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS, &license_key).unwrap();
+    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// let optimal_frames = model.optimal_num_frames().unwrap();
     /// println!("Optimal frame count: {}", optimal_frames);
     /// ```
@@ -451,7 +552,10 @@ impl Model {
 }
 
 impl Drop for Model {
-    /// Automatically cleans up the model when it goes out of scope.
+    /// Releases all resources associated with a model instance.
+    ///
+    /// After calling this function, the model handle becomes invalid.
+    /// This function is safe to call with NULL.
     fn drop(&mut self) {
         if !self.inner.is_null() {
             unsafe {
@@ -465,7 +569,11 @@ impl Drop for Model {
 unsafe impl Send for Model {}
 unsafe impl Sync for Model {}
 
-/// Gets the version string of the underlying C library.
+/// Returns the version of the SDK.
+///
+/// # Safety
+/// The returned pointer points to a static string and remains valid
+/// for the lifetime of the program. The caller should NOT free this pointer.
 ///
 /// # Returns
 ///
@@ -480,7 +588,7 @@ unsafe impl Sync for Model {}
 /// }
 /// ```
 pub fn aic_sdk_version() -> Option<String> {
-    let version_ptr = unsafe { aic_get_library_version() };
+    let version_ptr = unsafe { aic_get_sdk_version() };
     if version_ptr.is_null() {
         return None;
     }
@@ -505,10 +613,10 @@ mod tests {
         let license_key = std::env::var("AIC_SDK_LICENSE")
             .expect("AIC_SDK_LICENSE environment variable must be set for tests");
 
-        // Test model creation with QuailL at optimal settings
-        let mut model = Model::new(ModelType::QuailL, &license_key)?;
+        // Test model creation with QuailL48 at optimal settings
+        let mut model = Model::new(ModelType::QuailL48, &license_key)?;
 
-        // Test initialization with QuailL optimal settings (48000 Hz, 480 frames)
+        // Test initialization with QuailL48 optimal settings (48000 Hz, 480 frames)
         model.initialize(48000, 2, 480)?;
 
         let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
@@ -523,7 +631,7 @@ mod tests {
     #[test]
     fn processing() {
         let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-        let mut model = Model::new(ModelType::QuailS, &license_key).unwrap();
+        let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
         let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
         model.initialize(48000, 2, 480).unwrap();
         model.process_interleaved(&mut audio, 2, 480).unwrap();
