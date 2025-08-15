@@ -1,27 +1,34 @@
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
-#[cfg(not(target_os = "linux"))]
 fn main() {
-    panic!("This platform is currently not supported.")
+    // Check if we're on Linux
+    if !cfg!(target_os = "linux") {
+        panic!("This build script only supports Linux for now");
+    }
+
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+
+    let lib_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("libs");
+    let lib_name = "aic";
+    let lib_name_patched = "aic_patched";
+
+    patch_lib(&lib_path, lib_name, lib_name_patched);
+
+    // link with the curated library
+    println!("cargo:rustc-link-search=native={}", out_dir.display());
+    println!("cargo:rustc-link-lib=static={lib_name_patched}");
+
+    generate_bindings();
 }
 
-/// When compiling a static library, the Rust compiler includes
-/// non-exported symbols. The following code curates the symbols
-/// to only include aic_* symbols in the library.
-///
-/// Issue: https://github.com/rust-lang/rust/issues/104707
-#[cfg(target_os = "linux")]
-fn main() {
+fn patch_lib(lib_path: &Path, lib_name: &str, lib_name_patched: &str) {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    let lib_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("libs");
-
-    let lib_name = "aic";
-    let lib_name_curated = "aic_curated";
-    let global_symbols_wildcard = "aic_*";
 
     let static_lib = lib_path.join(format!("lib{}.a", lib_name));
+
+    let global_symbols_wildcard = "aic_*";
 
     if !static_lib.exists() {
         panic!("Please provide the SDK at {}", static_lib.display());
@@ -31,10 +38,10 @@ fn main() {
     let intermediate_obj = out_dir.join(format!("lib{}.o", lib_name));
 
     // modified .o file
-    let final_obj = out_dir.join(format!("lib{}.o", lib_name_curated));
+    let final_obj = out_dir.join(format!("lib{}.o", lib_name_patched));
 
     // .a file
-    let final_lib = out_dir.join(format!("lib{}.a", lib_name_curated));
+    let final_lib = out_dir.join(format!("lib{}.a", lib_name_patched));
 
     // partially link
     let ld_status = Command::new("ld")
@@ -76,13 +83,36 @@ fn main() {
         panic!("objcopy command failed for {}", final_obj.display());
     }
 
-    // link with the curated library
-    println!("cargo:rustc-link-search=native={}", out_dir.display());
-    println!(
-        "cargo:rustc-link-lib=static={}",
-        format!("{}", lib_name_curated)
-    );
-
     // Rerun this script if the static library changes.
     println!("cargo:rerun-if-changed={}", static_lib.display());
+}
+
+fn generate_bindings() {
+    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    let header_path = manifest_dir.join("include").join("aic.h");
+
+    // Generate bindings using bindgen
+    let bindings = bindgen::Builder::default()
+        // The input header we would like to generate bindings for.
+        .header(header_path.to_str().unwrap())
+        // Tell cargo to invalidate the built crate whenever any of the
+        // included header files changed.
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+        // Generate constified enums to avoid name repetition
+        .constified_enum_module("AicErrorCode")
+        .constified_enum_module("AicParameter")
+        .constified_enum_module("AicModelType")
+        // Finish the builder and generate the bindings.
+        .generate()
+        // Unwrap the Result and panic on failure.
+        .expect("Unable to generate bindings");
+
+    // Write the bindings to the $OUT_DIR/bindings.rs file.
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    bindings
+        .write_to_file(out_path.join("bindings.rs"))
+        .expect("Couldn't write bindings!");
+
+    // Tell cargo to rerun the build script if the library or header changes.
+    println!("cargo:rerun-if-changed={}", header_path.display());
 }
