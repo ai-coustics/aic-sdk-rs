@@ -13,9 +13,9 @@ fn main() {
     }
 
     if env::var("DOCS_RS").is_ok() {
-		// On docs.rs we don't need to link, and B) we don't have network, so we couldn't download anything if we wanted to
-		return;
-	}
+        // On docs.rs we don't need to link, and B) we don't have network, so we couldn't download anything if we wanted to
+        return;
+    }
 
     #[cfg(feature = "download-lib")]
     let lib_path = {
@@ -24,7 +24,9 @@ fn main() {
     };
 
     #[cfg(not(feature = "download-lib"))]
-    let lib_path = PathBuf::from(env::var("AIC_LIB_PATH").expect("Environment variable `AIC_LIB_PATH` not set"));
+    let lib_path = PathBuf::from(
+        env::var("AIC_LIB_PATH").expect("Environment variable `AIC_LIB_PATH` not set"),
+    );
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
