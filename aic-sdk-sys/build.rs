@@ -2,15 +2,32 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[cfg(feature = "download-lib")]
+#[path = "build-utils/downloader.rs"]
+mod downloader;
+
 fn main() {
     // Check if we're on Linux
     if !cfg!(target_os = "linux") {
         panic!("This build script only supports Linux for now");
     }
 
+    if env::var("DOCS_RS").is_ok() {
+		// On docs.rs we don't need to link, and B) we don't have network, so we couldn't download anything if we wanted to
+		return;
+	}
+
+    #[cfg(feature = "download-lib")]
+    let lib_path = {
+        let downloaded_path = download_lib();
+        downloaded_path.join("lib")
+    };
+
+    #[cfg(not(feature = "download-lib"))]
+    let lib_path = PathBuf::from(env::var("AIC_LIB_PATH").expect("Environment variable `AIC_LIB_PATH` not set"));
+
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    let lib_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("libs");
     let lib_name = "aic";
     let lib_name_patched = "aic_patched";
 
@@ -21,6 +38,17 @@ fn main() {
     println!("cargo:rustc-link-lib=static={lib_name_patched}");
 
     generate_bindings();
+}
+
+#[cfg(feature = "download-lib")]
+fn download_lib() -> PathBuf {
+    use downloader::Downloader;
+
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let version = env::var("CARGO_PKG_VERSION").unwrap();
+
+    let downloader = Downloader::new(&out_dir);
+    downloader.download(&version)
 }
 
 fn patch_lib(lib_path: &Path, lib_name: &str, lib_name_patched: &str) {

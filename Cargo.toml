@@ -6,9 +6,14 @@ aic-sdk-sys = { path = "aic-sdk-sys" }
 
 [package]
 name = "aic-sdk"
-version = "0.6.0"
+version = "0.6.2"
 edition = "2024"
 
 [dependencies]
 aic-sdk-sys = { workspace = true }
-thiserror = "2.0.14"
+thiserror = "2.0.15"
+
+[features]
+download-lib = [
+    "aic-sdk-sys/download-lib",
+]
