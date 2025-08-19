@@ -11,7 +11,7 @@ pub struct Downloader {
 
 impl Downloader {
     pub fn new(output_path: &Path) -> Self {
-        let base_url = format!("https://github.com/ai-coustics/aic-sdk-c/releases/download",);
+        let base_url = "https://github.com/ai-coustics/aic-sdk-c/releases/download".to_string();
 
         let artifact_sha = HashMap::from([
             (
@@ -61,7 +61,7 @@ impl Downloader {
         let expected_hash = self
             .artifact_sha
             .get(&file_name)
-            .expect(&format!("Invalid artifact name {}", file_name));
+            .unwrap_or_else(|| panic!("Invalid artifact name {}", file_name));
         let url = format!("{}/{}/{}", self.base_url, version, file_name);
 
         let downloaded_file = fetch_file(&url);
