@@ -69,7 +69,7 @@ impl Downloader {
         let extracted_path = self.output_path.join(&file_prefix);
 
         if file_extension == "zip" {
-            unimplemented!("ZIP extraction not implemented yet");
+            extract_zip(&downloaded_file, &extracted_path);
         } else {            
             extract_tgz(&downloaded_file, &extracted_path);
         }
@@ -107,4 +107,38 @@ fn extract_tgz(buf: &[u8], output: &Path) {
     let tar = flate2::read::GzDecoder::new(buf);
     let mut archive = tar::Archive::new(tar);
     archive.unpack(output).expect("Failed to extract .tgz file");
+}
+
+fn extract_zip(buf: &[u8], output: &Path) {
+    let cursor = std::io::Cursor::new(buf);
+    let mut archive = zip::ZipArchive::new(cursor).expect("Failed to read ZIP archive");
+
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).expect("Failed to get file from ZIP archive");
+        let file_path = output.join(file.name());
+
+        if file.is_dir() {
+            // This is a directory
+            std::fs::create_dir_all(&file_path).expect("Failed to create directory");
+        } else {
+            // This is a file
+            if let Some(parent) = file_path.parent() {
+                std::fs::create_dir_all(parent).expect("Failed to create parent directory");
+            }
+
+            let mut output_file = std::fs::File::create(&file_path).expect("Failed to create output file");
+            std::io::copy(&mut file, &mut output_file).expect("Failed to extract file");
+
+            // Set file permissions on Unix systems
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Some(mode) = file.unix_mode() {
+                    let permissions = std::fs::Permissions::from_mode(mode);
+                    std::fs::set_permissions(&file_path, permissions)
+                        .expect("Failed to set file permissions");
+                }
+            }
+        }
+    }
 }
