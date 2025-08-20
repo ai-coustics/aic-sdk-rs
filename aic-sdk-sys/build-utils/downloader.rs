@@ -55,10 +55,15 @@ impl Downloader {
             os => os.to_string(),
         };
 
+        let triplet = format!("{arch}-{vendor}-{os}");
+        
         let file_extension = if os == "windows" { "zip" } else { "tar.gz" };
+        let file_prefix = if vendor == "apple" {
+            format!("aic-sdk-{triplet}-{version}")
+        } else {
+            format!("aic-sdk-{triplet}-{abi}-{version}")
+        };
 
-        let triplet = format!("{arch}-{vendor}-{os}-{abi}");
-        let file_prefix = format!("aic-sdk-{triplet}-{version}");
         let file_name = format!("{file_prefix}.{file_extension}");
 
         let expected_hash = self
