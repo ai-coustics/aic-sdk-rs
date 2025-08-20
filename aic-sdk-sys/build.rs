@@ -340,6 +340,8 @@ fn create_macos_symbols_file(obj_file: &Path, symbols_file: &Path) -> Result<usi
 fn patch_lib_windows(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_patched: &str, _global_symbols_wildcard: &str, final_lib: &Path) {
     // Windows approach: try to use available tools to manipulate the library
     
+    println!("cargo:warning=Windows library processing: input={}, output={}", static_lib.display(), final_lib.display());
+    
     // First, try to find available tools
     let has_llvm_lib = Command::new("llvm-lib")
         .arg("--help")
@@ -351,9 +353,13 @@ fn patch_lib_windows(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name
         .output()
         .is_ok();
     
+    println!("cargo:warning=Tool availability: llvm-lib={}, lib.exe={}", has_llvm_lib, has_lib_exe);
+    
     if has_llvm_lib {
+        println!("cargo:warning=Using LLVM toolchain for Windows library processing");
         patch_lib_windows_llvm(static_lib, out_dir, lib_name, lib_name_patched, final_lib);
     } else if has_lib_exe {
+        println!("cargo:warning=Using MSVC toolchain for Windows library processing");
         patch_lib_windows_msvc(static_lib, out_dir, lib_name, lib_name_patched, final_lib);
     } else {
         // Fallback: copy the library as-is
@@ -362,6 +368,14 @@ fn patch_lib_windows(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name
         
         fs::copy(static_lib, final_lib)
             .expect("Failed to copy library for Windows");
+    }
+    
+    // Verify the final library was created
+    if final_lib.exists() {
+        let metadata = fs::metadata(final_lib).unwrap();
+        println!("cargo:warning=Created Windows library: {} bytes", metadata.len());
+    } else {
+        panic!("Windows library was not created: {}", final_lib.display());
     }
 }
 
@@ -410,6 +424,16 @@ fn patch_lib_windows_llvm(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
     // For Windows, we'll apply a simpler approach - just rebuild the library
     // Full symbol filtering would require more complex tooling
     
+    println!("cargo:warning=LLVM: Found {} object files to rebuild library", extracted_files.len());
+    
+    if extracted_files.is_empty() {
+        println!("cargo:warning=No object files found, copying original library");
+        fs::copy(static_lib, final_lib)
+            .expect("Failed to copy library for Windows LLVM");
+        let _ = fs::remove_dir_all(&extract_dir);
+        return;
+    }
+    
     // Use a response file to avoid command line length limits on Windows
     let response_file = out_dir.join("llvm_lib_response.txt");
     let mut response_content = String::new();
@@ -426,13 +450,20 @@ fn patch_lib_windows_llvm(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
     fs::write(&response_file, response_content)
         .expect("Failed to write llvm-lib response file");
 
-    let lib_status = Command::new("llvm-lib")
+    println!("cargo:warning=Running llvm-lib with response file: {}", response_file.display());
+    
+    let lib_output = Command::new("llvm-lib")
         .arg(&format!("@{}", response_file.display()))
-        .status()
+        .output()
         .expect("Failed to execute llvm-lib command");
 
-    if !lib_status.success() {
-        panic!("llvm-lib command failed when creating {}", final_lib.display());
+    if !lib_output.status.success() {
+        let stderr = String::from_utf8_lossy(&lib_output.stderr);
+        let stdout = String::from_utf8_lossy(&lib_output.stdout);
+        println!("cargo:warning=llvm-lib stdout: {}", stdout);
+        println!("cargo:warning=llvm-lib stderr: {}", stderr);
+        panic!("llvm-lib command failed when creating {}: exit code {}", 
+               final_lib.display(), lib_output.status.code().unwrap_or(-1));
     }
     
     // Cleanup response file
@@ -494,6 +525,8 @@ fn patch_lib_windows_msvc(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
 
     // Recreate the library with the extracted objects
     // Use a response file to avoid command line length limits on Windows
+    println!("cargo:warning=MSVC: Found {} object files to rebuild library", extracted_files.len());
+    
     let response_file = out_dir.join("msvc_lib_response.txt");
     let mut response_content = String::new();
     
@@ -509,13 +542,20 @@ fn patch_lib_windows_msvc(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
     fs::write(&response_file, response_content)
         .expect("Failed to write MSVC lib response file");
 
-    let lib_status = Command::new("lib")
+    println!("cargo:warning=Running MSVC lib with response file: {}", response_file.display());
+    
+    let lib_output = Command::new("lib")
         .arg(&format!("@{}", response_file.display()))
-        .status()
+        .output()
         .expect("Failed to execute lib command");
 
-    if !lib_status.success() {
-        panic!("lib command failed when creating {}", final_lib.display());
+    if !lib_output.status.success() {
+        let stderr = String::from_utf8_lossy(&lib_output.stderr);
+        let stdout = String::from_utf8_lossy(&lib_output.stdout);
+        println!("cargo:warning=lib stdout: {}", stdout);
+        println!("cargo:warning=lib stderr: {}", stderr);
+        panic!("lib command failed when creating {}: exit code {}", 
+               final_lib.display(), lib_output.status.code().unwrap_or(-1));
     }
     
     // Cleanup response file
@@ -592,6 +632,22 @@ fn generate_bindings() {
         .constified_enum_module("AicErrorCode")
         .constified_enum_module("AicParameter")
         .constified_enum_module("AicModelType")
+        // Force consistent types for enums to avoid Windows/Unix differences
+        .default_enum_style(bindgen::EnumVariation::Consts)
+        // Prepend type aliases to force consistent types across platforms
+        .raw_line("// Force consistent types across platforms")
+        .raw_line("// Windows tends to generate i32, Unix tends to generate u32")
+        .raw_line("// We'll alias the generated constants to u32 for consistency")
+        // Make sure C int types are mapped consistently
+        .size_t_is_usize(true)
+        // Ensure unsigned types are used where appropriate
+        .ctypes_prefix("core::ffi")
+        // Additional type consistency options
+        .raw_line("use core::ffi::{c_uint, c_int, c_char, c_void};")
+        // Allow all types, functions, and variables
+        .allowlist_type(".*")
+        .allowlist_function(".*")
+        .allowlist_var(".*")
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.
