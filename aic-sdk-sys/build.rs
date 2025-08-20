@@ -36,7 +36,32 @@ fn main() {
     println!("cargo:rustc-link-search=native={}", out_dir.display());
     println!("cargo:rustc-link-lib=static={lib_name_patched}");
 
+    // Add platform-specific system libraries
+    add_platform_specific_libs();
+
     generate_bindings();
+}
+
+fn add_platform_specific_libs() {
+    if cfg!(target_os = "macos") {
+        // macOS requires CoreFoundation framework for time zone operations
+        // This is needed by chrono and other crates that interact with system time
+        println!("cargo:rustc-link-lib=framework=CoreFoundation");
+        
+        // Security framework might also be needed for some operations
+        println!("cargo:rustc-link-lib=framework=Security");
+    } else if cfg!(target_os = "windows") {
+        // Windows system libraries that might be needed
+        println!("cargo:rustc-link-lib=advapi32");
+        println!("cargo:rustc-link-lib=bcrypt");
+        println!("cargo:rustc-link-lib=kernel32");
+        println!("cargo:rustc-link-lib=ws2_32");
+    } else if cfg!(target_os = "linux") {
+        // Linux system libraries
+        println!("cargo:rustc-link-lib=pthread");
+        println!("cargo:rustc-link-lib=dl");
+        println!("cargo:rustc-link-lib=rt");
+    }
 }
 
 #[cfg(feature = "download-lib")]
