@@ -636,22 +636,6 @@ fn generate_bindings() {
         .constified_enum_module("AicErrorCode")
         .constified_enum_module("AicParameter")
         .constified_enum_module("AicModelType")
-        // Force consistent types for enums to avoid Windows/Unix differences
-        .default_enum_style(bindgen::EnumVariation::Consts)
-        // Prepend type aliases to force consistent types across platforms
-        .raw_line("// Force consistent types across platforms")
-        .raw_line("// Windows tends to generate i32, Unix tends to generate u32")
-        .raw_line("// We'll alias the generated constants to u32 for consistency")
-        // Make sure C int types are mapped consistently
-        .size_t_is_usize(true)
-        // Ensure unsigned types are used where appropriate
-        .ctypes_prefix("core::ffi")
-        // Additional type consistency options
-        .raw_line("use core::ffi::{c_uint, c_int, c_char, c_void};")
-        // Allow all types, functions, and variables
-        .allowlist_type(".*")
-        .allowlist_function(".*")
-        .allowlist_var(".*")
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.

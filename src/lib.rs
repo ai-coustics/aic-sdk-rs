@@ -22,8 +22,8 @@ pub enum AicError {
     Unknown(u32),
 }
 
-impl From<core::ffi::c_uint> for AicError {
-    fn from(error_code: core::ffi::c_uint) -> Self {
+impl From<AicErrorCode::Type> for AicError {
+    fn from(error_code: AicErrorCode::Type) -> Self {
         match error_code {
             AIC_ERROR_CODE_NULL_POINTER => {
                 // This should never happen in our Rust wrapper, but if it does,
@@ -44,7 +44,7 @@ impl From<core::ffi::c_uint> for AicError {
 }
 
 /// Helper function to convert C error codes to Rust Results.
-pub fn handle_error(error_code: core::ffi::c_uint) -> Result<(), AicError> {
+pub fn handle_error(error_code: AicErrorCode::Type) -> Result<(), AicError> {
     match error_code {
         AIC_ERROR_CODE_SUCCESS => Ok(()),
         code => Err(AicError::from(code)),
