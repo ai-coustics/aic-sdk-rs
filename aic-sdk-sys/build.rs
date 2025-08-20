@@ -512,18 +512,136 @@ fn filter_windows_object_symbols(input_obj: &Path, output_obj: &Path) -> bool {
     // For Windows COFF files, skip llvm-objcopy as it corrupts the file structure
     // Go directly to staticlib-fucker which mangles symbols safely
     
-    // Approach 1: Try using staticlib-fucker to mangle problematic symbols
-    // This preserves COFF file integrity while avoiding symbol conflicts
-    if try_staticlib_fucker_mangle(input_obj, output_obj) {
+    // Approach 1: Try conservative symbol mangling (only target specific conflicts)
+    if try_conservative_symbol_mangle(input_obj, output_obj) {
         return true;
     }
     
-    // Approach 2: Fallback to copy-as-is if staticlib-fucker is not available
-    println!("cargo:warning=Copying {} as-is (staticlib-fucker not available)", filename);
+    // Approach 2: Copy-as-is approach (safer fallback)
+    println!("cargo:warning=Copying {} as-is (conservative mangling failed or unavailable)", filename);
     fs::copy(input_obj, output_obj).unwrap_or_else(|_| {
         panic!("Failed to copy object file {}", input_obj.display())
     });
     true
+}
+
+fn try_conservative_symbol_mangle(input_obj: &Path, output_obj: &Path) -> bool {
+    let filename = input_obj.file_name().unwrap().to_string_lossy();
+    
+    // Check if staticlib-fucker is available
+    if let Ok(status) = Command::new("staticlib-fucker")
+        .arg("--help")
+        .output()
+    {
+        if !status.status.success() {
+            return false;
+        }
+    } else {
+        return false;
+    }
+    
+    // Only target the most problematic symbols that actually cause linker conflicts
+    // Avoid mangling symbols that might be needed for library functionality
+    let mut symbols_to_mangle = Vec::new();
+    
+    // Only look for EMPTY_PANIC symbol - this is the main conflict we saw
+    if let Ok(nm_output) = Command::new("llvm-nm")
+        .arg(&input_obj)
+        .output()
+    {
+        if nm_output.status.success() {
+            let nm_stdout = String::from_utf8_lossy(&nm_output.stdout);
+            for line in nm_stdout.lines() {
+                if line.contains("EMPTY_PANIC") {
+                    if let Some(symbol) = line.split_whitespace().last() {
+                        if symbol.contains("EMPTY_PANIC") {
+                            symbols_to_mangle.push(symbol.to_string());
+                            println!("cargo:warning=Found conflicting EMPTY_PANIC symbol: {}", symbol);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // If no conflicting symbols found, don't mangle anything
+    if symbols_to_mangle.is_empty() {
+        println!("cargo:warning=No conflicting symbols found, using original file");
+        return false;
+    }
+    
+    // Create a temporary single-object library to process
+    let temp_lib = output_obj.with_extension("temp.lib");
+    
+    // First, create a temporary library with just this object
+    let lib_output = Command::new("llvm-lib")
+        .arg(&format!("/OUT:{}", temp_lib.display()))
+        .arg(&input_obj)
+        .output();
+        
+    if let Ok(lib_output) = lib_output {
+        if lib_output.status.success() {
+            // Now use staticlib-fucker to mangle only the conflicting symbols
+            let symbols_arg = symbols_to_mangle.join(",");
+            println!("cargo:warning=Conservative mangling - only targeting: {}", symbols_arg);
+            let mangle_output = Command::new("staticlib-fucker")
+                .arg("--input")
+                .arg(&temp_lib)
+                .arg("--output")
+                .arg(&temp_lib)  // Overwrite the temp lib
+                .arg("--symbols")
+                .arg(&symbols_arg)
+                .output();
+                
+            if let Ok(mangle_output) = mangle_output {
+                if mangle_output.status.success() {
+                    // Extract the mangled object back out
+                    let extract_output = Command::new("llvm-ar")
+                        .arg("x")
+                        .arg(&temp_lib)
+                        .current_dir(output_obj.parent().unwrap())
+                        .output();
+                        
+                    if let Ok(extract_output) = extract_output {
+                        if extract_output.status.success() {
+                            // Find the extracted object file and rename it to our desired output
+                            let mut found_file = false;
+                            if let Ok(entries) = fs::read_dir(output_obj.parent().unwrap()) {
+                                for entry in entries {
+                                    if let Ok(entry) = entry {
+                                        let path = entry.path();
+                                        // Look for any .o or .obj file that's not already there
+                                        let ext = path.extension().and_then(|s| s.to_str());
+                                        if (ext == Some("o") || ext == Some("obj")) && 
+                                           path != *output_obj &&
+                                           !path.to_string_lossy().contains("temp") {
+                                            if let Ok(_) = fs::rename(&path, &output_obj) {
+                                                found_file = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Clean up temp library
+                            let _ = fs::remove_file(&temp_lib);
+                            
+                            if found_file {
+                                println!("cargo:warning=Conservative symbol mangling successful for {}", filename);
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Clean up temp library on failure
+    let _ = fs::remove_file(&temp_lib);
+    false
 }
 
 fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
