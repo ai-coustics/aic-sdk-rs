@@ -409,19 +409,34 @@ fn patch_lib_windows_llvm(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
 
     // For Windows, we'll apply a simpler approach - just rebuild the library
     // Full symbol filtering would require more complex tooling
-    let mut llvm_lib_cmd = Command::new("llvm-lib");
-    llvm_lib_cmd.arg("/OUT:").arg(&final_lib);
     
-    for obj in extracted_files {
-        llvm_lib_cmd.arg(&obj);
+    // Use a response file to avoid command line length limits on Windows
+    let response_file = out_dir.join("llvm_lib_response.txt");
+    let mut response_content = String::new();
+    
+    // Add output specification
+    response_content.push_str(&format!("/OUT:{}\n", final_lib.display()));
+    
+    // Add all object files
+    for obj in &extracted_files {
+        response_content.push_str(&format!("{}\n", obj.display()));
     }
+    
+    // Write response file
+    fs::write(&response_file, response_content)
+        .expect("Failed to write llvm-lib response file");
 
-    let lib_status = llvm_lib_cmd.status()
+    let lib_status = Command::new("llvm-lib")
+        .arg(&format!("@{}", response_file.display()))
+        .status()
         .expect("Failed to execute llvm-lib command");
 
     if !lib_status.success() {
         panic!("llvm-lib command failed when creating {}", final_lib.display());
     }
+    
+    // Cleanup response file
+    let _ = fs::remove_file(&response_file);
 
     // Cleanup
     let _ = fs::remove_dir_all(&extract_dir);
@@ -478,19 +493,33 @@ fn patch_lib_windows_msvc(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
     }
 
     // Recreate the library with the extracted objects
-    let mut lib_cmd = Command::new("lib");
-    lib_cmd.arg("/OUT:").arg(&final_lib);
+    // Use a response file to avoid command line length limits on Windows
+    let response_file = out_dir.join("msvc_lib_response.txt");
+    let mut response_content = String::new();
     
+    // Add output specification
+    response_content.push_str(&format!("/OUT:{}\n", final_lib.display()));
+    
+    // Add all object files
     for obj in extracted_files {
-        lib_cmd.arg(&obj);
+        response_content.push_str(&format!("{}\n", obj.display()));
     }
+    
+    // Write response file
+    fs::write(&response_file, response_content)
+        .expect("Failed to write MSVC lib response file");
 
-    let lib_status = lib_cmd.status()
+    let lib_status = Command::new("lib")
+        .arg(&format!("@{}", response_file.display()))
+        .status()
         .expect("Failed to execute lib command");
 
     if !lib_status.success() {
         panic!("lib command failed when creating {}", final_lib.display());
     }
+    
+    // Cleanup response file
+    let _ = fs::remove_file(&response_file);
 
     // Cleanup
     let _ = fs::remove_dir_all(&extract_dir);
