@@ -521,7 +521,11 @@ fn filter_windows_object_symbols(input_obj: &Path, output_obj: &Path) -> bool {
             println!("cargo:warning=🛠️ Trying llvm-objcopy for {}", filename);
             let result = filter_with_llvm_objcopy(input_obj, output_obj);
             println!("cargo:warning=🛠️ llvm-objcopy result for {}: {}", filename, result);
-            return result;
+            if result {
+                return true; // Success, we're done
+            }
+            println!("cargo:warning=🛠️ llvm-objcopy failed, trying fallback methods for {}", filename);
+            // Don't return false here - try other methods
         }
     }
     
@@ -534,7 +538,11 @@ fn filter_windows_object_symbols(input_obj: &Path, output_obj: &Path) -> bool {
             println!("cargo:warning=✂️ Trying llvm-strip for {}", filename);
             let result = filter_with_llvm_strip(input_obj, output_obj);
             println!("cargo:warning=✂️ llvm-strip result for {}: {}", filename, result);
-            return result;
+            if result {
+                return true; // Success, we're done
+            }
+            println!("cargo:warning=✂️ llvm-strip failed, using copy fallback for {}", filename);
+            // Don't return false here - try copy fallback
         }
     }
     
@@ -550,21 +558,29 @@ fn filter_with_llvm_objcopy(input_obj: &Path, output_obj: &Path) -> bool {
     let filename = input_obj.file_name().unwrap().to_string_lossy();
     
     // Use llvm-objcopy to keep only aic_* symbols (Windows equivalent of GNU objcopy)
-    let status = Command::new("llvm-objcopy")
+    let output = Command::new("llvm-objcopy")
         .arg("--keep-global-symbol=aic_*")
         .arg("--wildcard")
         .arg(&input_obj)
         .arg(&output_obj)
-        .status()
+        .output()
         .expect("Failed to execute llvm-objcopy");
 
-    if status.success() {
+    if output.status.success() {
         println!("cargo:warning=✅ llvm-objcopy succeeded for {}", filename);
         // If llvm-objcopy succeeded, trust that it filtered correctly
         // (we already verified the input has aic symbols)
         true
     } else {
-        println!("cargo:warning=❌ llvm-objcopy failed for {} with exit code: {:?}", filename, status.code());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("cargo:warning=❌ llvm-objcopy failed for {} with exit code: {:?}", filename, output.status.code());
+        if !stderr.trim().is_empty() {
+            println!("cargo:warning=❌ llvm-objcopy stderr: {}", stderr.trim());
+        }
+        if !stdout.trim().is_empty() {
+            println!("cargo:warning=❌ llvm-objcopy stdout: {}", stdout.trim());
+        }
         false
     }
 }
@@ -578,18 +594,26 @@ fn filter_with_llvm_strip(input_obj: &Path, output_obj: &Path) -> bool {
     });
 
     // Use llvm-strip to remove debug info and local symbols
-    let status = Command::new("llvm-strip")
+    let output = Command::new("llvm-strip")
         .arg("--strip-debug")
         .arg("--strip-unneeded")
         .arg(&output_obj)
-        .status()
+        .output()
         .expect("Failed to execute llvm-strip");
 
-    if status.success() {
+    if output.status.success() {
         println!("cargo:warning=✅ llvm-strip succeeded for {}", filename);
         true
     } else {
-        println!("cargo:warning=❌ llvm-strip failed for {} with exit code: {:?}", filename, status.code());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("cargo:warning=❌ llvm-strip failed for {} with exit code: {:?}", filename, output.status.code());
+        if !stderr.trim().is_empty() {
+            println!("cargo:warning=❌ llvm-strip stderr: {}", stderr.trim());
+        }
+        if !stdout.trim().is_empty() {
+            println!("cargo:warning=❌ llvm-strip stdout: {}", stdout.trim());
+        }
         false
     }
 }
