@@ -19,7 +19,7 @@ pub enum AicError {
     #[error("Parameter value is out of valid range")]
     ParameterOutOfRange,
     #[error("Unknown error code: {0}")]
-    Unknown(u32),
+    Unknown(AicErrorCode::Type),
 }
 
 impl From<AicErrorCode::Type> for AicError {
@@ -96,7 +96,7 @@ pub enum ModelType {
     QuailXXS,
 }
 
-impl From<ModelType> for u32 {
+impl From<ModelType> for AicModelType::Type {
     fn from(model_type: ModelType) -> Self {
         match model_type {
             ModelType::QuailL48 => AIC_MODEL_TYPE_QUAIL_L48,
@@ -144,7 +144,7 @@ pub enum Parameter {
     NoiseGateEnable,
 }
 
-impl From<Parameter> for u32 {
+impl From<Parameter> for AicParameter::Type {
     fn from(parameter: Parameter) -> Self {
         match parameter {
             Parameter::EnhancementLevel => AIC_PARAMETER_ENHANCEMENT_LEVEL,
