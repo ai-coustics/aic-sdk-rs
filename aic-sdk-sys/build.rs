@@ -500,7 +500,12 @@ fn patch_lib_windows_llvm(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
 }
 
 fn filter_windows_object_symbols(input_obj: &Path, output_obj: &Path) -> bool {
-    // Try multiple approaches to filter symbols on Windows
+    // First, check if this object file contains aic symbols
+    if !has_aic_symbols_windows(input_obj) {
+        return false;
+    }
+    
+    // File has aic symbols, now try to filter it
     
     // Approach 1: Use llvm-objcopy if available (most effective)
     if let Ok(status) = Command::new("llvm-objcopy")
@@ -522,15 +527,11 @@ fn filter_windows_object_symbols(input_obj: &Path, output_obj: &Path) -> bool {
         }
     }
     
-    // Approach 3: Check if object has aic symbols, if so copy as-is, otherwise skip
-    if has_aic_symbols_windows(input_obj) {
-        fs::copy(input_obj, output_obj).unwrap_or_else(|_| {
-            panic!("Failed to copy object file {}", input_obj.display())
-        });
-        true
-    } else {
-        false
-    }
+    // Approach 3: Just copy the file as-is since we know it has aic symbols
+    fs::copy(input_obj, output_obj).unwrap_or_else(|_| {
+        panic!("Failed to copy object file {}", input_obj.display())
+    });
+    true
 }
 
 fn filter_with_llvm_objcopy(input_obj: &Path, output_obj: &Path) -> bool {
@@ -544,8 +545,9 @@ fn filter_with_llvm_objcopy(input_obj: &Path, output_obj: &Path) -> bool {
         .expect("Failed to execute llvm-objcopy");
 
     if status.success() {
-        // Verify the output file has aic symbols
-        has_aic_symbols_windows(output_obj)
+        // If llvm-objcopy succeeded, trust that it filtered correctly
+        // (we already verified the input has aic symbols)
+        true
     } else {
         false
     }
@@ -556,12 +558,6 @@ fn filter_with_llvm_strip(input_obj: &Path, output_obj: &Path) -> bool {
     fs::copy(input_obj, output_obj).unwrap_or_else(|_| {
         panic!("Failed to copy object file {}", input_obj.display())
     });
-
-    // Check if it has aic symbols before stripping
-    if !has_aic_symbols_windows(output_obj) {
-        let _ = fs::remove_file(output_obj);
-        return false;
-    }
 
     // Use llvm-strip to remove debug info and local symbols
     let status = Command::new("llvm-strip")
@@ -577,9 +573,11 @@ fn filter_with_llvm_strip(input_obj: &Path, output_obj: &Path) -> bool {
 fn has_aic_symbols_windows(obj_file: &Path) -> bool {
     let filename = obj_file.file_name().unwrap().to_string_lossy();
     
+    println!("cargo:warning=Checking symbols in: {}", filename);
+    
     // Quick heuristic: if the filename suggests it's related to aic, include it
     if filename.contains("aic") && !filename.contains("compiler_builtins") {
-        println!("cargo:warning=Including {} based on filename heuristic", filename);
+        println!("cargo:warning=✅ Including {} based on filename heuristic", filename);
         return true;
     }
     
@@ -589,6 +587,7 @@ fn has_aic_symbols_windows(obj_file: &Path) -> bool {
        filename.contains("core-") ||
        filename.contains("alloc-") ||
        filename.starts_with("d067f95df2315da6-") { // compiler builtin artifacts
+        println!("cargo:warning=❌ Skipping {} (known system/compiler file)", filename);
         return false;
     }
     
@@ -624,13 +623,14 @@ fn has_aic_symbols_windows(obj_file: &Path) -> bool {
                        line_lower.contains("aic") ||
                        line.contains("AIC_") ||
                        line.contains("Aic") {
-                        println!("cargo:warning=Found aic symbol in {}: {}", filename, line.trim());
+                        println!("cargo:warning=✅ Found aic symbol in {}: {}", filename, line.trim());
                         return true;
                     }
                 }
                 
                 // If we got output but no aic symbols, this file doesn't have them
                 if !stdout.trim().is_empty() {
+                    println!("cargo:warning=❌ No aic symbols found in {} (has {} other symbols)", filename, stdout.lines().count());
                     return false;
                 }
             } else {
@@ -643,7 +643,7 @@ fn has_aic_symbols_windows(obj_file: &Path) -> bool {
     }
     
     // If we can't determine and it's not obviously a system file, include it to be safe
-    println!("cargo:warning=Could not determine symbols in {}, including by default", filename);
+    println!("cargo:warning=⚠️ Could not determine symbols in {}, including by default", filename);
     true
 }
 
