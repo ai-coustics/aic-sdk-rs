@@ -575,30 +575,75 @@ fn filter_with_llvm_strip(input_obj: &Path, output_obj: &Path) -> bool {
 }
 
 fn has_aic_symbols_windows(obj_file: &Path) -> bool {
-    // Use llvm-nm to check for aic symbols
-    let nm_variations = ["llvm-nm", "nm"];
+    let filename = obj_file.file_name().unwrap().to_string_lossy();
     
-    for nm_cmd in &nm_variations {
-        if let Ok(output) = Command::new(nm_cmd)
-            .arg("--defined-only")
-            .arg("--global")
+    // Quick heuristic: if the filename suggests it's related to aic, include it
+    if filename.contains("aic") && !filename.contains("compiler_builtins") {
+        println!("cargo:warning=Including {} based on filename heuristic", filename);
+        return true;
+    }
+    
+    // Skip obviously unrelated files
+    if filename.contains("compiler_builtins") || 
+       filename.contains("std-") ||
+       filename.contains("core-") ||
+       filename.contains("alloc-") ||
+       filename.starts_with("d067f95df2315da6-") { // compiler builtin artifacts
+        return false;
+    }
+    
+    // Use llvm-nm to check for aic symbols with multiple flag combinations
+    let nm_variations = [
+        vec!["llvm-nm", "--defined-only", "--global"],
+        vec!["llvm-nm", "--global"],
+        vec!["llvm-nm", "--extern-only"],
+        vec!["llvm-nm"],
+        vec!["nm", "--defined-only", "--global"],
+        vec!["nm", "--global"],
+        vec!["nm"],
+    ];
+    
+    for args in &nm_variations {
+        if let Ok(output) = Command::new(&args[0])
+            .args(&args[1..])
             .arg(&obj_file)
             .output()
         {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
+                
+                // Debug output for files that might contain aic symbols  
+                if filename.contains("aic") && stdout.lines().count() > 0 {
+                    println!("cargo:warning=Analyzing {} ({} symbols found)", filename, stdout.lines().count());
+                }
+                
+                // Look for aic symbols with various patterns
                 for line in stdout.lines() {
-                    if line.contains("aic_") {
+                    let line_lower = line.to_lowercase();
+                    if line.contains("aic_") || 
+                       line_lower.contains("aic") ||
+                       line.contains("AIC_") ||
+                       line.contains("Aic") {
+                        println!("cargo:warning=Found aic symbol in {}: {}", filename, line.trim());
                         return true;
                     }
                 }
-                return false; // No aic symbols found
+                
+                // If we got output but no aic symbols, this file doesn't have them
+                if !stdout.trim().is_empty() {
+                    return false;
+                }
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                if !stderr.trim().is_empty() {
+                    println!("cargo:warning=nm failed for {}: {}", filename, stderr.trim());
+                }
             }
         }
     }
     
-    // If we can't determine, assume it has symbols to be safe
-    println!("cargo:warning=Could not determine symbols in {}, including by default", obj_file.display());
+    // If we can't determine and it's not obviously a system file, include it to be safe
+    println!("cargo:warning=Could not determine symbols in {}, including by default", filename);
     true
 }
 
