@@ -529,9 +529,15 @@ fn filter_windows_object_symbols(input_obj: &Path, output_obj: &Path) -> bool {
         }
     }
     
-    // Approach 2: For Windows COFF files, skip llvm-strip as it can corrupt auxiliary symbol tables
-    // and go straight to copy-as-is since we know this file contains aic symbols
-    println!("cargo:warning=📋 Copying {} as-is (Windows COFF files require gentle handling)", filename);
+    // Approach 2: Try using staticlib-fucker to mangle problematic symbols instead of removing them
+    // This preserves COFF file integrity while avoiding symbol conflicts
+    if try_staticlib_fucker_mangle(input_obj, output_obj) {
+        println!("cargo:warning=🔀 Successfully mangled symbols in {} using staticlib-fucker", filename);
+        return true;
+    }
+    
+    // Approach 3: Fallback to copy-as-is if staticlib-fucker is not available
+    println!("cargo:warning=📋 Copying {} as-is (staticlib-fucker not available, manual mangling needed)", filename);
     fs::copy(input_obj, output_obj).unwrap_or_else(|_| {
         panic!("Failed to copy object file {}", input_obj.display())
     });
@@ -598,8 +604,92 @@ fn filter_with_llvm_objcopy(input_obj: &Path, output_obj: &Path) -> bool {
     }
 }
 
+fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
+    let filename = input_obj.file_name().unwrap().to_string_lossy();
+    
+    // Check if staticlib-fucker is available
+    if let Ok(status) = Command::new("staticlib-fucker")
+        .arg("--help")
+        .output()
+    {
+        if !status.status.success() {
+            return false;
+        }
+    } else {
+        return false;
+    }
+    
+    // Create a temporary single-object library to process
+    let temp_lib = output_obj.with_extension("temp.lib");
+    
+    // First, create a temporary library with just this object
+    let lib_output = Command::new("llvm-lib")
+        .arg(&format!("/OUT:{}", temp_lib.display()))
+        .arg(&input_obj)
+        .output();
+        
+    if let Ok(lib_output) = lib_output {
+        if lib_output.status.success() {
+            // Now use staticlib-fucker to mangle the problematic symbols
+            let mangle_output = Command::new("staticlib-fucker")
+                .arg("--input")
+                .arg(&temp_lib)
+                .arg("--output")
+                .arg(&temp_lib)  // Overwrite the temp lib
+                .arg("--symbols")
+                .arg("rust_eh_personality,__rust_no_alloc_shim_is_unstable")
+                .output();
+                
+            if let Ok(mangle_output) = mangle_output {
+                if mangle_output.status.success() {
+                    // Extract the mangled object back out
+                    let extract_output = Command::new("llvm-ar")
+                        .arg("x")
+                        .arg(&temp_lib)
+                        .current_dir(output_obj.parent().unwrap())
+                        .output();
+                        
+                    if let Ok(extract_output) = extract_output {
+                        if extract_output.status.success() {
+                            // The extracted object should now be in the same directory
+                            // Find it and rename it to our desired output
+                            if let Ok(entries) = fs::read_dir(output_obj.parent().unwrap()) {
+                                for entry in entries {
+                                    if let Ok(entry) = entry {
+                                        let path = entry.path();
+                                        if path.extension().and_then(|s| s.to_str()) == Some("o") && 
+                                           path.file_name().unwrap().to_string_lossy().contains("cgu.0.rcgu") {
+                                            fs::rename(&path, &output_obj).unwrap_or_else(|_| {
+                                                panic!("Failed to rename mangled object file")
+                                            });
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Clean up temp library
+                            let _ = fs::remove_file(&temp_lib);
+                            
+                            println!("cargo:warning=🔀 staticlib-fucker successfully mangled symbols in {}", filename);
+                            return true;
+                        }
+                    }
+                } else {
+                    let stderr = String::from_utf8_lossy(&mangle_output.stderr);
+                    println!("cargo:warning=❌ staticlib-fucker failed for {}: {}", filename, stderr.trim());
+                }
+            }
+        }
+    }
+    
+    // Clean up temp library on failure
+    let _ = fs::remove_file(&temp_lib);
+    false
+}
+
 // Note: filter_with_llvm_strip function removed as it corrupts Windows COFF files
-// We now use a safer copy-as-is approach for Windows object files with aic symbols
+// We now use staticlib-fucker for symbol mangling on Windows object files with aic symbols
 
 fn has_aic_symbols_windows(obj_file: &Path) -> bool {
     let filename = obj_file.file_name().unwrap().to_string_lossy();
