@@ -130,129 +130,97 @@ fn patch_lib_linux(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_p
 }
 
 fn patch_lib_macos(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_patched: &str, _global_symbols_wildcard: &str, final_lib: &Path) {
-    // macOS approach: extract objects, filter symbols, and recreate archive
+    // macOS approach: Use ld -r to create intermediate object, then create filtered library
     
-    // Extract all object files from the archive
-    let extract_dir = out_dir.join(format!("{}_extracted", lib_name));
-    fs::create_dir_all(&extract_dir).expect("Failed to create extraction directory");
-
-    // Extract archive
-    let ar_extract_status = Command::new("ar")
-        .arg("-x")
+    // Create intermediate object by linking all objects from the archive
+    let intermediate_obj = out_dir.join(format!("lib{}_intermediate.o", lib_name));
+    
+    // Use ld -r with -all_load (macOS equivalent of --whole-archive)
+    let ld_status = Command::new("ld")
+        .arg("-r")
+        .arg("-o")
+        .arg(&intermediate_obj)
+        .arg("-all_load")
         .arg(&static_lib)
-        .current_dir(&extract_dir)
         .status()
-        .expect("Failed to extract archive");
+        .expect("Failed to execute ld command on macOS");
 
-    if !ar_extract_status.success() {
-        panic!("Failed to extract archive {}", static_lib.display());
+    if !ld_status.success() {
+        panic!("ld -r command failed for {} on macOS", static_lib.display());
     }
 
-    // Get list of extracted object files
-    let extracted_files: Vec<_> = fs::read_dir(&extract_dir)
-        .expect("Failed to read extraction directory")
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("o") {
-                Some(path)
-            } else {
-                None
-            }
-        })
-        .collect();
+    // Create symbols file listing symbols to keep
+    let symbols_file = out_dir.join("symbols_to_keep.txt");
+    create_macos_symbols_file(&intermediate_obj, &symbols_file)
+        .expect("Failed to create symbols file for macOS");
 
-    // For each object file, filter symbols
-    let filtered_dir = out_dir.join(format!("{}_filtered", lib_name_patched));
-    fs::create_dir_all(&filtered_dir).expect("Failed to create filtered directory");
-
-    for obj_file in &extracted_files {
-        let file_name = obj_file.file_name().unwrap();
-        let filtered_obj = filtered_dir.join(file_name);
-
-        // Copy the object file first
-        fs::copy(obj_file, &filtered_obj).expect("Failed to copy object file");
-
-        // Get all symbols from the object file
-        let nm_output = Command::new("nm")
-            .arg("-g")  // Global symbols only
-            .arg(&filtered_obj)
-            .output()
-            .expect("Failed to run nm");
-
-        if !nm_output.status.success() {
-            panic!("nm command failed for {}", filtered_obj.display());
-        }
-
-        let nm_stdout = String::from_utf8_lossy(&nm_output.stdout);
-        
-        // Find symbols that should be stripped (don't match our pattern)
-        let mut symbols_to_strip = Vec::new();
-        
-        for line in nm_stdout.lines() {
-            if let Some(symbol) = parse_nm_symbol_line(line) {
-                // Keep symbols that start with "aic_", strip everything else
-                if !symbol.starts_with("aic_") {
-                    symbols_to_strip.push(symbol);
-                }
-            }
-        }
-
-        // Strip unwanted symbols
-        if !symbols_to_strip.is_empty() {
-            let mut strip_cmd = Command::new("strip");
-            strip_cmd.arg("-x");  // Remove local symbols
-            
-            for symbol in symbols_to_strip {
-                strip_cmd.arg("-N").arg(&symbol);  // Remove specific global symbol
-            }
-            
-            strip_cmd.arg(&filtered_obj);
-            
-            let strip_status = strip_cmd.status()
-                .expect("Failed to execute strip command");
-
-            if !strip_status.success() {
-                panic!("strip command failed for {}", filtered_obj.display());
-            }
-        }
-    }
-
-    // Recreate the archive with filtered objects
-    let filtered_objects: Vec<_> = fs::read_dir(&filtered_dir)
-        .expect("Failed to read filtered directory")
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("o") {
-                Some(path)
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    if filtered_objects.is_empty() {
-        panic!("No object files found after filtering");
-    }
-
-    let mut ar_cmd = Command::new("ar");
-    ar_cmd.arg("rcs").arg(&final_lib);
+    // Create the final filtered object
+    let final_obj = out_dir.join(format!("lib{}_filtered.o", lib_name_patched));
     
-    for obj in filtered_objects {
-        ar_cmd.arg(&obj);
+    // Use ld to create a new object with only the symbols we want
+    let ld_filter_status = Command::new("ld")
+        .arg("-r")
+        .arg("-o")
+        .arg(&final_obj)
+        .arg("-exported_symbols_list")
+        .arg(&symbols_file)
+        .arg(&intermediate_obj)
+        .status()
+        .expect("Failed to execute ld filtering command on macOS");
+
+    if !ld_filter_status.success() {
+        panic!("ld filtering command failed for {} on macOS", intermediate_obj.display());
     }
 
-    let ar_status = ar_cmd.status()
-        .expect("Failed to execute ar command");
+    // Create the final archive
+    let ar_status = Command::new("ar")
+        .arg("rcs")
+        .arg(&final_lib)
+        .arg(&final_obj)
+        .status()
+        .expect("Failed to execute ar command on macOS");
 
     if !ar_status.success() {
-        panic!("ar command failed when creating {}", final_lib.display());
+        panic!("ar command failed for {} on macOS", final_obj.display());
     }
 
-    // Cleanup temporary directories
-    let _ = fs::remove_dir_all(&extract_dir);
-    let _ = fs::remove_dir_all(&filtered_dir);
+    // Cleanup temporary files
+    let _ = fs::remove_file(&intermediate_obj);
+    let _ = fs::remove_file(&final_obj);
+    let _ = fs::remove_file(&symbols_file);
+}
+
+fn create_macos_symbols_file(obj_file: &Path, symbols_file: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    // Get all global symbols from the object file
+    let nm_output = Command::new("nm")
+        .arg("-g")  // Global symbols only
+        .arg("-defined-only")  // Only defined symbols
+        .arg(&obj_file)
+        .output()?;
+
+    if !nm_output.status.success() {
+        return Err(format!("nm command failed for {}", obj_file.display()).into());
+    }
+
+    let nm_stdout = String::from_utf8_lossy(&nm_output.stdout);
+    let mut symbols_to_keep = Vec::new();
+    
+    // Parse nm output and collect aic_* symbols
+    for line in nm_stdout.lines() {
+        if let Some(symbol) = parse_nm_symbol_macos(line) {
+            // Only keep symbols that start with "aic_" or "_aic_" (macOS prefixes with underscore)
+            if symbol.starts_with("aic_") || symbol.starts_with("_aic_") {
+                symbols_to_keep.push(symbol);
+            }
+        }
+    }
+
+    // Write symbols to file (one per line)
+    let symbols_content = symbols_to_keep.join("\n");
+    fs::write(symbols_file, symbols_content)
+        .map_err(|e| format!("Failed to write symbols file: {}", e))?;
+    
+    Ok(())
 }
 
 fn patch_lib_windows(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_patched: &str, _global_symbols_wildcard: &str, final_lib: &Path) {
@@ -414,25 +382,26 @@ fn patch_lib_windows_msvc(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
     let _ = fs::remove_dir_all(&extract_dir);
 }
 
-// Helper function to parse nm output and extract symbol names
-fn parse_nm_symbol_line(line: &str) -> Option<String> {
+
+// Helper function to parse nm output on macOS and extract symbol names
+fn parse_nm_symbol_macos(line: &str) -> Option<String> {
+    let line = line.trim();
+    if line.is_empty() {
+        return None;
+    }
+    
     let parts: Vec<&str> = line.split_whitespace().collect();
     
-    // nm output format: [address] [type] [symbol]
-    // We want the symbol name (last part)
+    // macOS nm output format: [address] [type] [symbol]
+    // Types we care about: T (text), D (data), B (bss), S (other section)
     if parts.len() >= 3 {
-        // Check if this is a defined global symbol (types: T, D, B, etc.)
         let symbol_type = parts[1];
+        let symbol_name = parts[2];
+        
+        // Check if this is a defined global symbol
+        // Capital letters indicate global symbols
         if symbol_type.chars().any(|c| c.is_uppercase()) {
-            Some(parts[2].to_string())
-        } else {
-            None
-        }
-    } else if parts.len() == 2 {
-        // Sometimes nm output might be: [type] [symbol]
-        let symbol_type = parts[0];
-        if symbol_type.chars().any(|c| c.is_uppercase()) {
-            Some(parts[1].to_string())
+            Some(symbol_name.to_string())
         } else {
             None
         }
