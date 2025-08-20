@@ -503,10 +503,7 @@ fn filter_windows_object_symbols(input_obj: &Path, output_obj: &Path) -> bool {
     
     // First, check if this object file contains aic symbols
     if !has_aic_symbols_windows(input_obj) {
-        // Skip logging for compiler_builtins and d067f95df2315da6 files to reduce noise
-        if !filename.contains("compiler_builtins") && !filename.contains("d067f95df2315da6") {
-            println!("cargo:warning=Skipped {} (no aic symbols)", filename);
-        }
+        // Silently skip non-aic files to reduce log noise
         return false;
     }
     
@@ -544,6 +541,31 @@ fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
         return false;
     }
     
+    // First, let's get the actual symbol names from the object file
+    let mut symbols_to_mangle = vec!["rust_eh_personality".to_string(), "__rust_no_alloc_shim_is_unstable".to_string()];
+    
+    // Try to find the actual EMPTY_PANIC symbol name with the correct hash
+    if let Ok(nm_output) = Command::new("llvm-nm")
+        .arg(&input_obj)
+        .output()
+    {
+        if nm_output.status.success() {
+            let nm_stdout = String::from_utf8_lossy(&nm_output.stdout);
+            for line in nm_stdout.lines() {
+                if line.contains("EMPTY_PANIC") {
+                    // Extract the full symbol name
+                    if let Some(symbol) = line.split_whitespace().last() {
+                        if symbol.contains("EMPTY_PANIC") {
+                            symbols_to_mangle.push(symbol.to_string());
+                            println!("cargo:warning=Found EMPTY_PANIC symbol: {}", symbol);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     // Create a temporary single-object library to process
     let temp_lib = output_obj.with_extension("temp.lib");
     
@@ -555,16 +577,16 @@ fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
         
     if let Ok(lib_output) = lib_output {
         if lib_output.status.success() {
-            println!("cargo:warning=Created temporary library: {}", temp_lib.display());
             // Now use staticlib-fucker to mangle the problematic symbols
-            println!("cargo:warning=Running staticlib-fucker on {}", temp_lib.display());
+            let symbols_arg = symbols_to_mangle.join(",");
+            println!("cargo:warning=Attempting to mangle symbols: {}", symbols_arg);
             let mangle_output = Command::new("staticlib-fucker")
                 .arg("--input")
                 .arg(&temp_lib)
                 .arg("--output")
                 .arg(&temp_lib)  // Overwrite the temp lib
                 .arg("--symbols")
-                .arg("rust_eh_personality,__rust_no_alloc_shim_is_unstable")
+                .arg(&symbols_arg)
                 .output();
                 
             if let Ok(mangle_output) = mangle_output {
@@ -577,16 +599,14 @@ fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
                     if !stderr.is_empty() {
                         println!("cargo:warning=staticlib-fucker stderr: {}", stderr.trim());
                     }
-                    // Check that the library file still exists
-                    if temp_lib.exists() {
-                        println!("cargo:warning=Temp library exists, size: {} bytes", temp_lib.metadata().unwrap().len());
-                    } else {
-                        println!("cargo:warning=ERROR: Temp library doesn't exist after staticlib-fucker!");
-                        return false;
-                    }
                     
+                    // Check if staticlib-fucker actually found symbols to mangle
+                    if stdout.contains("Found symbol") || stdout.contains("Mangled") {
+                        println!("cargo:warning=✅ staticlib-fucker found symbols to mangle");
+                    } else if stdout.contains("No symbols") || stdout.contains("not found") {
+                        println!("cargo:warning=⚠️ staticlib-fucker did not find target symbols - symbol hash may have changed");
+                    }
                     // Extract the mangled object back out
-                    println!("cargo:warning=Extracting mangled object from {}", temp_lib.display());
                     let extract_output = Command::new("llvm-ar")
                         .arg("x")
                         .arg(&temp_lib)
@@ -595,32 +615,17 @@ fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
                         
                     if let Ok(extract_output) = extract_output {
                         if extract_output.status.success() {
-                            // Debug: List all files in the extraction directory
-                            println!("cargo:warning=Listing files in extraction directory:");
-                            if let Ok(entries) = fs::read_dir(output_obj.parent().unwrap()) {
-                                for entry in entries {
-                                    if let Ok(entry) = entry {
-                                        let path = entry.path();
-                                        let filename_str = path.file_name().unwrap().to_string_lossy();
-                                        println!("cargo:warning=  Found file: {} (ext: {:?})", filename_str, path.extension());
-                                    }
-                                }
-                            }
-                            
-                            // The extracted object should now be in the same directory
-                            // Find it and rename it to our desired output
+                            // Find the extracted object file and rename it to our desired output
                             let mut found_file = false;
                             if let Ok(entries) = fs::read_dir(output_obj.parent().unwrap()) {
                                 for entry in entries {
                                     if let Ok(entry) = entry {
                                         let path = entry.path();
-                                        let filename_str = path.file_name().unwrap().to_string_lossy();
                                         // Look for any .o or .obj file that's not already there
                                         let ext = path.extension().and_then(|s| s.to_str());
                                         if (ext == Some("o") || ext == Some("obj")) && 
                                            path != *output_obj &&
                                            !path.to_string_lossy().contains("temp") {
-                                            println!("cargo:warning=Trying to use extracted file: {}", filename_str);
                                             if let Ok(_) = fs::rename(&path, &output_obj) {
                                                 found_file = true;
                                                 break;
