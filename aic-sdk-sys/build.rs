@@ -13,7 +13,8 @@ fn main() {
     }
 
     if env::var("DOCS_RS").is_ok() {
-        // On docs.rs we don't need to link, and B) we don't have network, so we couldn't download anything if we wanted to
+        // On docs.rs we don't need to link and we don't have network,
+        // so we couldn't download anything if we wanted to
         return;
     }
 
@@ -35,7 +36,7 @@ fn main() {
 
     patch_lib(&lib_path, lib_name, lib_name_patched);
 
-    // link with the curated library
+    // Link with the curated library
     println!("cargo:rustc-link-search=native={}", out_dir.display());
     println!("cargo:rustc-link-lib=static={lib_name_patched}");
 
@@ -63,16 +64,16 @@ fn patch_lib(lib_path: &Path, lib_name: &str, lib_name_patched: &str) {
         panic!("Please provide the SDK at {}", static_lib.display());
     }
 
-    // original .o file
+    // Original .o file
     let intermediate_obj = out_dir.join(format!("lib{}.o", lib_name));
 
-    // modified .o file
+    // Modified .o file
     let final_obj = out_dir.join(format!("lib{}.o", lib_name_patched));
 
     // .a file
     let final_lib = out_dir.join(format!("lib{}.a", lib_name_patched));
 
-    // partially link
+    // Partially link
     let ld_status = Command::new("ld")
         .arg("-r")
         .arg("-o")
@@ -86,7 +87,7 @@ fn patch_lib(lib_path: &Path, lib_name: &str, lib_name_patched: &str) {
         panic!("ld -r command failed for {}", static_lib.display());
     }
 
-    // curate symbols (only keep specific symbols)
+    // Curate symbols (only keep specific symbols)
     let objcopy_status = Command::new("objcopy")
         .arg("--wildcard")
         .arg("--keep-global-symbol")
@@ -100,7 +101,7 @@ fn patch_lib(lib_path: &Path, lib_name: &str, lib_name_patched: &str) {
         panic!("objcopy command failed for {}", intermediate_obj.display());
     }
 
-    // build the archive
+    // Build the archive
     let ar_status = Command::new("ar")
         .arg("rcs")
         .arg(&final_lib)
