@@ -425,7 +425,7 @@ fn patch_lib_windows_llvm(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
         })
         .collect();
 
-    println!("cargo:warning=LLVM: Found {} object files to rebuild library", extracted_files.len());
+    println!("cargo:warning=Found {} object files to rebuild library", extracted_files.len());
     
     if extracted_files.is_empty() {
         println!("cargo:warning=No object files found, copying original library");
@@ -447,9 +447,8 @@ fn patch_lib_windows_llvm(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
 
         if filter_windows_object_symbols(obj_file, &filtered_obj) {
             filtered_files.push(filtered_obj);
-        } else {
-            println!("cargo:warning=Skipped object file with no aic symbols: {}", file_name.to_string_lossy());
         }
+        // Logging handled in filter_windows_object_symbols function
     }
 
     if filtered_files.is_empty() {
@@ -477,7 +476,7 @@ fn patch_lib_windows_llvm(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
     fs::write(&response_file, response_content)
         .expect("Failed to write llvm-lib response file");
 
-    println!("cargo:warning=Running llvm-lib with {} filtered objects", filtered_files.len());
+    println!("cargo:warning=Building library with {} filtered objects", filtered_files.len());
     
     let lib_output = Command::new("llvm-lib")
         .arg(&format!("@{}", response_file.display()))
@@ -504,104 +503,31 @@ fn filter_windows_object_symbols(input_obj: &Path, output_obj: &Path) -> bool {
     
     // First, check if this object file contains aic symbols
     if !has_aic_symbols_windows(input_obj) {
-        println!("cargo:warning=🔍 {} determined to have no aic symbols", filename);
+        // Skip logging for compiler_builtins to reduce noise
+        if !filename.contains("compiler_builtins") {
+            println!("cargo:warning=Skipped {} (no aic symbols)", filename);
+        }
         return false;
     }
     
-    println!("cargo:warning=🔧 Filtering {} (has aic symbols)", filename);
+    println!("cargo:warning=Filtering {} (has aic symbols)", filename);
     
-    // File has aic symbols, now try to filter it
+    // For Windows COFF files, skip llvm-objcopy as it corrupts the file structure
+    // Go directly to staticlib-fucker which mangles symbols safely
     
-    // Approach 1: Use llvm-objcopy if available (most effective)
-    if let Ok(status) = Command::new("llvm-objcopy")
-        .arg("--help")
-        .output()
-    {
-        if status.status.success() {
-            println!("cargo:warning=🛠️ Trying llvm-objcopy for {}", filename);
-            let result = filter_with_llvm_objcopy(input_obj, output_obj);
-            println!("cargo:warning=🛠️ llvm-objcopy result for {}: {}", filename, result);
-            if result {
-                return true; // Success, we're done
-            }
-            println!("cargo:warning=🛠️ llvm-objcopy failed, trying fallback methods for {}", filename);
-            // Don't return false here - try other methods
-        }
-    }
-    
-    // Approach 2: Try using staticlib-fucker to mangle problematic symbols instead of removing them
+    // Approach 1: Try using staticlib-fucker to mangle problematic symbols
     // This preserves COFF file integrity while avoiding symbol conflicts
     if try_staticlib_fucker_mangle(input_obj, output_obj) {
-        println!("cargo:warning=🔀 Successfully mangled symbols in {} using staticlib-fucker", filename);
+        println!("cargo:warning=Successfully mangled symbols in {} using staticlib-fucker", filename);
         return true;
     }
     
-    // Approach 3: Fallback to copy-as-is if staticlib-fucker is not available
-    println!("cargo:warning=📋 Copying {} as-is (staticlib-fucker not available, manual mangling needed)", filename);
+    // Approach 2: Fallback to copy-as-is if staticlib-fucker is not available
+    println!("cargo:warning=Copying {} as-is (staticlib-fucker not available)", filename);
     fs::copy(input_obj, output_obj).unwrap_or_else(|_| {
         panic!("Failed to copy object file {}", input_obj.display())
     });
     true
-}
-
-fn filter_with_llvm_objcopy(input_obj: &Path, output_obj: &Path) -> bool {
-    let filename = input_obj.file_name().unwrap().to_string_lossy();
-    
-    // First copy the file to start with
-    fs::copy(input_obj, output_obj).unwrap_or_else(|_| {
-        panic!("Failed to copy object file {}", input_obj.display())
-    });
-    
-    // Try removing specific problematic symbols one by one
-    let problematic_symbols = [
-        "rust_eh_personality",
-        "_ZN3std9panicking11EMPTY_PANIC17h885cd9d14b984618E", // Exact symbol from error
-    ];
-    
-    let mut success_count = 0;
-    
-    for symbol in &problematic_symbols {
-        // Create a temporary file for this operation
-        let temp_obj = output_obj.with_extension("tmp");
-        
-        let output = Command::new("llvm-objcopy")
-            .arg("--strip-symbol")
-            .arg(symbol)
-            .arg(&output_obj)
-            .arg(&temp_obj)
-            .output();
-            
-        if let Ok(output) = output {
-            if output.status.success() {
-                // Replace the output with the filtered version
-                fs::rename(&temp_obj, &output_obj).unwrap_or_else(|_| {
-                    panic!("Failed to move filtered object file")
-                });
-                println!("cargo:warning=✅ Removed symbol {} from {}", symbol, filename);
-                success_count += 1;
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                println!("cargo:warning=⚠️ Failed to remove symbol {} from {}: {}", symbol, filename, stderr.trim());
-                let _ = fs::remove_file(&temp_obj); // Clean up temp file
-                
-                // If this is a COFF limitation, stop trying symbol removal
-                if stderr.contains("not supported for COFF") {
-                    println!("cargo:warning=❌ COFF format doesn't support symbol removal, using file as-is");
-                    break;
-                }
-            }
-        } else {
-            let _ = fs::remove_file(&temp_obj); // Clean up temp file
-        }
-    }
-    
-    if success_count > 0 {
-        println!("cargo:warning=✅ llvm-objcopy successfully removed {} symbols from {}", success_count, filename);
-        true
-    } else {
-        println!("cargo:warning=⚠️ llvm-objcopy could not remove symbols from {}, using file as-is", filename);
-        true // Still return true since we have the file copied
-    }
 }
 
 fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
@@ -825,9 +751,8 @@ fn patch_lib_windows_msvc(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
 
         if filter_windows_object_symbols(obj_file, &filtered_obj) {
             filtered_files.push(filtered_obj);
-        } else {
-            println!("cargo:warning=Skipped object file with no aic symbols: {}", file_name.to_string_lossy());
         }
+        // Logging handled in filter_windows_object_symbols function
     }
 
     if filtered_files.is_empty() {
