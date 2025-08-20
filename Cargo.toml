@@ -11,7 +11,11 @@ edition = "2024"
 
 [dependencies]
 aic-sdk-sys = { workspace = true }
-thiserror = "2.0.15"
+thiserror = "2.0.16"
 
 [features]
 download-lib = ["aic-sdk-sys/download-lib"]
+
+[[example]]
+name = "basic_usage"
+path = "examples/basic_usage.rs"
