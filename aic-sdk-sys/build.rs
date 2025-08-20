@@ -529,25 +529,9 @@ fn filter_windows_object_symbols(input_obj: &Path, output_obj: &Path) -> bool {
         }
     }
     
-    // Approach 2: Use llvm-strip to remove debug symbols and try symbol filtering
-    if let Ok(status) = Command::new("llvm-strip")
-        .arg("--help")
-        .output()
-    {
-        if status.status.success() {
-            println!("cargo:warning=✂️ Trying llvm-strip for {}", filename);
-            let result = filter_with_llvm_strip(input_obj, output_obj);
-            println!("cargo:warning=✂️ llvm-strip result for {}: {}", filename, result);
-            if result {
-                return true; // Success, we're done
-            }
-            println!("cargo:warning=✂️ llvm-strip failed, using copy fallback for {}", filename);
-            // Don't return false here - try copy fallback
-        }
-    }
-    
-    // Approach 3: Just copy the file as-is since we know it has aic symbols
-    println!("cargo:warning=📋 Copying {} as-is (no filtering tools available)", filename);
+    // Approach 2: For Windows COFF files, skip llvm-strip as it can corrupt auxiliary symbol tables
+    // and go straight to copy-as-is since we know this file contains aic symbols
+    println!("cargo:warning=📋 Copying {} as-is (Windows COFF files require gentle handling)", filename);
     fs::copy(input_obj, output_obj).unwrap_or_else(|_| {
         panic!("Failed to copy object file {}", input_obj.display())
     });
@@ -585,38 +569,8 @@ fn filter_with_llvm_objcopy(input_obj: &Path, output_obj: &Path) -> bool {
     }
 }
 
-fn filter_with_llvm_strip(input_obj: &Path, output_obj: &Path) -> bool {
-    let filename = input_obj.file_name().unwrap().to_string_lossy();
-    
-    // Copy the file first
-    fs::copy(input_obj, output_obj).unwrap_or_else(|_| {
-        panic!("Failed to copy object file {}", input_obj.display())
-    });
-
-    // Use llvm-strip to remove debug info and local symbols
-    let output = Command::new("llvm-strip")
-        .arg("--strip-debug")
-        .arg("--strip-unneeded")
-        .arg(&output_obj)
-        .output()
-        .expect("Failed to execute llvm-strip");
-
-    if output.status.success() {
-        println!("cargo:warning=✅ llvm-strip succeeded for {}", filename);
-        true
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        println!("cargo:warning=❌ llvm-strip failed for {} with exit code: {:?}", filename, output.status.code());
-        if !stderr.trim().is_empty() {
-            println!("cargo:warning=❌ llvm-strip stderr: {}", stderr.trim());
-        }
-        if !stdout.trim().is_empty() {
-            println!("cargo:warning=❌ llvm-strip stdout: {}", stdout.trim());
-        }
-        false
-    }
-}
+// Note: filter_with_llvm_strip function removed as it corrupts Windows COFF files
+// We now use a safer copy-as-is approach for Windows object files with aic symbols
 
 fn has_aic_symbols_windows(obj_file: &Path) -> bool {
     let filename = obj_file.file_name().unwrap().to_string_lossy();
