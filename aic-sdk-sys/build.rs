@@ -569,6 +569,22 @@ fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
                 
             if let Ok(mangle_output) = mangle_output {
                 if mangle_output.status.success() {
+                    let stdout = String::from_utf8_lossy(&mangle_output.stdout);
+                    let stderr = String::from_utf8_lossy(&mangle_output.stderr);
+                    if !stdout.is_empty() {
+                        println!("cargo:warning=staticlib-fucker stdout: {}", stdout.trim());
+                    }
+                    if !stderr.is_empty() {
+                        println!("cargo:warning=staticlib-fucker stderr: {}", stderr.trim());
+                    }
+                    // Check that the library file still exists
+                    if temp_lib.exists() {
+                        println!("cargo:warning=Temp library exists, size: {} bytes", temp_lib.metadata().unwrap().len());
+                    } else {
+                        println!("cargo:warning=ERROR: Temp library doesn't exist after staticlib-fucker!");
+                        return false;
+                    }
+                    
                     // Extract the mangled object back out
                     println!("cargo:warning=Extracting mangled object from {}", temp_lib.display());
                     let extract_output = Command::new("llvm-ar")
@@ -579,6 +595,18 @@ fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
                         
                     if let Ok(extract_output) = extract_output {
                         if extract_output.status.success() {
+                            // Debug: List all files in the extraction directory
+                            println!("cargo:warning=Listing files in extraction directory:");
+                            if let Ok(entries) = fs::read_dir(output_obj.parent().unwrap()) {
+                                for entry in entries {
+                                    if let Ok(entry) = entry {
+                                        let path = entry.path();
+                                        let filename_str = path.file_name().unwrap().to_string_lossy();
+                                        println!("cargo:warning=  Found file: {} (ext: {:?})", filename_str, path.extension());
+                                    }
+                                }
+                            }
+                            
                             // The extracted object should now be in the same directory
                             // Find it and rename it to our desired output
                             let mut found_file = false;
@@ -587,11 +615,12 @@ fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
                                     if let Ok(entry) = entry {
                                         let path = entry.path();
                                         let filename_str = path.file_name().unwrap().to_string_lossy();
-                                        // Look for any .o file that's not already there
-                                        if path.extension().and_then(|s| s.to_str()) == Some("o") && 
+                                        // Look for any .o or .obj file that's not already there
+                                        let ext = path.extension().and_then(|s| s.to_str());
+                                        if (ext == Some("o") || ext == Some("obj")) && 
                                            path != *output_obj &&
                                            !path.to_string_lossy().contains("temp") {
-                                            println!("cargo:warning=Found extracted file: {}", filename_str);
+                                            println!("cargo:warning=Trying to use extracted file: {}", filename_str);
                                             if let Ok(_) = fs::rename(&path, &output_obj) {
                                                 found_file = true;
                                                 break;
@@ -612,8 +641,13 @@ fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
                             }
                         } else {
                             let stderr = String::from_utf8_lossy(&extract_output.stderr);
-                            println!("cargo:warning=llvm-ar extraction failed: {}", stderr.trim());
+                            let stdout = String::from_utf8_lossy(&extract_output.stdout);
+                            println!("cargo:warning=llvm-ar extraction failed with exit code: {:?}", extract_output.status.code());
+                            println!("cargo:warning=llvm-ar stderr: {}", stderr.trim());
+                            println!("cargo:warning=llvm-ar stdout: {}", stdout.trim());
                         }
+                    } else {
+                        println!("cargo:warning=Failed to execute llvm-ar extraction command");
                     }
                 } else {
                     let stderr = String::from_utf8_lossy(&mangle_output.stderr);
