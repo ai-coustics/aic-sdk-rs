@@ -132,11 +132,16 @@ fn patch_lib_linux(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_p
 fn patch_lib_macos(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_patched: &str, _global_symbols_wildcard: &str, final_lib: &Path) {
     // macOS approach: Use ld -r to create intermediate object, then create filtered library
     
+    // Get target architecture for macOS linker
+    let target_arch = get_macos_arch();
+    
     // Create intermediate object by linking all objects from the archive
     let intermediate_obj = out_dir.join(format!("lib{}_intermediate.o", lib_name));
     
     // Use ld -r with -all_load (macOS equivalent of --whole-archive)
     let ld_status = Command::new("ld")
+        .arg("-arch")
+        .arg(&target_arch)
         .arg("-r")
         .arg("-o")
         .arg(&intermediate_obj)
@@ -159,6 +164,8 @@ fn patch_lib_macos(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_p
     
     // Use ld to create a new object with only the symbols we want
     let ld_filter_status = Command::new("ld")
+        .arg("-arch")
+        .arg(&target_arch)
         .arg("-r")
         .arg("-o")
         .arg(&final_obj)
@@ -188,6 +195,22 @@ fn patch_lib_macos(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_p
     let _ = fs::remove_file(&intermediate_obj);
     let _ = fs::remove_file(&final_obj);
     let _ = fs::remove_file(&symbols_file);
+}
+
+fn get_macos_arch() -> String {
+    // Get the target architecture from Rust's build environment
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH")
+        .expect("CARGO_CFG_TARGET_ARCH not set");
+    
+    // Convert Rust architecture names to macOS ld architecture names
+    match target_arch.as_str() {
+        "aarch64" => "arm64".to_string(),
+        "x86_64" => "x86_64".to_string(),
+        arch => {
+            println!("cargo:warning=Unknown target architecture for macOS: {}", arch);
+            arch.to_string()
+        }
+    }
 }
 
 fn create_macos_symbols_file(obj_file: &Path, symbols_file: &Path) -> Result<(), Box<dyn std::error::Error>> {
