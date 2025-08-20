@@ -101,7 +101,7 @@ fn patch_lib(lib_path: &Path, lib_name: &str, lib_name_patched: &str) {
     } else if cfg!(target_os = "macos") {
         patch_lib_macos(&static_lib, &out_dir, lib_name, lib_name_patched, global_symbols_wildcard, &final_lib);
     } else if cfg!(target_os = "windows") {
-        patch_lib_windows(&static_lib, &out_dir, lib_name, lib_name_patched, global_symbols_wildcard, &final_lib);
+        // patch_lib_windows(&static_lib, &out_dir, lib_name, lib_name_patched, global_symbols_wildcard, &final_lib);
     } else {
         panic!("Unsupported platform for library patching");
     }
