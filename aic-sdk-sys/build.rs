@@ -503,8 +503,8 @@ fn filter_windows_object_symbols(input_obj: &Path, output_obj: &Path) -> bool {
     
     // First, check if this object file contains aic symbols
     if !has_aic_symbols_windows(input_obj) {
-        // Skip logging for compiler_builtins to reduce noise
-        if !filename.contains("compiler_builtins") {
+        // Skip logging for compiler_builtins and d067f95df2315da6 files to reduce noise
+        if !filename.contains("compiler_builtins") && !filename.contains("d067f95df2315da6") {
             println!("cargo:warning=Skipped {} (no aic symbols)", filename);
         }
         return false;
@@ -518,7 +518,6 @@ fn filter_windows_object_symbols(input_obj: &Path, output_obj: &Path) -> bool {
     // Approach 1: Try using staticlib-fucker to mangle problematic symbols
     // This preserves COFF file integrity while avoiding symbol conflicts
     if try_staticlib_fucker_mangle(input_obj, output_obj) {
-        println!("cargo:warning=Successfully mangled symbols in {} using staticlib-fucker", filename);
         return true;
     }
     
@@ -556,7 +555,9 @@ fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
         
     if let Ok(lib_output) = lib_output {
         if lib_output.status.success() {
+            println!("cargo:warning=Created temporary library: {}", temp_lib.display());
             // Now use staticlib-fucker to mangle the problematic symbols
+            println!("cargo:warning=Running staticlib-fucker on {}", temp_lib.display());
             let mangle_output = Command::new("staticlib-fucker")
                 .arg("--input")
                 .arg(&temp_lib)
@@ -569,6 +570,7 @@ fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
             if let Ok(mangle_output) = mangle_output {
                 if mangle_output.status.success() {
                     // Extract the mangled object back out
+                    println!("cargo:warning=Extracting mangled object from {}", temp_lib.display());
                     let extract_output = Command::new("llvm-ar")
                         .arg("x")
                         .arg(&temp_lib)
@@ -579,16 +581,21 @@ fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
                         if extract_output.status.success() {
                             // The extracted object should now be in the same directory
                             // Find it and rename it to our desired output
+                            let mut found_file = false;
                             if let Ok(entries) = fs::read_dir(output_obj.parent().unwrap()) {
                                 for entry in entries {
                                     if let Ok(entry) = entry {
                                         let path = entry.path();
+                                        let filename_str = path.file_name().unwrap().to_string_lossy();
+                                        // Look for any .o file that's not already there
                                         if path.extension().and_then(|s| s.to_str()) == Some("o") && 
-                                           path.file_name().unwrap().to_string_lossy().contains("cgu.0.rcgu") {
-                                            fs::rename(&path, &output_obj).unwrap_or_else(|_| {
-                                                panic!("Failed to rename mangled object file")
-                                            });
-                                            break;
+                                           path != *output_obj &&
+                                           !path.to_string_lossy().contains("temp") {
+                                            println!("cargo:warning=Found extracted file: {}", filename_str);
+                                            if let Ok(_) = fs::rename(&path, &output_obj) {
+                                                found_file = true;
+                                                break;
+                                            }
                                         }
                                     }
                                 }
@@ -597,15 +604,25 @@ fn try_staticlib_fucker_mangle(input_obj: &Path, output_obj: &Path) -> bool {
                             // Clean up temp library
                             let _ = fs::remove_file(&temp_lib);
                             
-                            println!("cargo:warning=🔀 staticlib-fucker successfully mangled symbols in {}", filename);
-                            return true;
+                            if found_file {
+                                println!("cargo:warning=Successfully mangled symbols in {} using staticlib-fucker", filename);
+                                return true;
+                            } else {
+                                println!("cargo:warning=staticlib-fucker extraction failed for {} - no output file found", filename);
+                            }
+                        } else {
+                            let stderr = String::from_utf8_lossy(&extract_output.stderr);
+                            println!("cargo:warning=llvm-ar extraction failed: {}", stderr.trim());
                         }
                     }
                 } else {
                     let stderr = String::from_utf8_lossy(&mangle_output.stderr);
-                    println!("cargo:warning=❌ staticlib-fucker failed for {}: {}", filename, stderr.trim());
+                    println!("cargo:warning=staticlib-fucker failed for {}: {}", filename, stderr.trim());
                 }
             }
+        } else {
+            let stderr = String::from_utf8_lossy(&lib_output.stderr);
+            println!("cargo:warning=llvm-lib failed to create temp library: {}", stderr.trim());
         }
     }
     
