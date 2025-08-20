@@ -25,7 +25,7 @@ fn main() {
 
     #[cfg(not(feature = "download-lib"))]
     let lib_path = PathBuf::from(
-        env::var("AIC_LIB_PATH").expect("Environment variable `AIC_LIB_PATH` not set"),
+        env::var("AIC_LIB_PATH").expect("Enable feature `download-lib` or use a local library by setting the environment variable `AIC_LIB_PATH`"),
     );
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
