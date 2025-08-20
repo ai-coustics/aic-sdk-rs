@@ -342,13 +342,30 @@ fn create_macos_symbols_file(obj_file: &Path, symbols_file: &Path) -> Result<usi
 }
 
 fn patch_lib_windows(static_lib: &Path, _out_dir: &Path, _lib_name: &str, _lib_name_patched: &str, _global_symbols_wildcard: &str, final_lib: &Path) {
-    // Simple copy from original library to patched library name
-    println!("cargo:warning=Windows: Copying {} to {}", static_lib.display(), final_lib.display());
+    println!("cargo:warning=Windows: Mangling symbols in {} to {}", static_lib.display(), final_lib.display());
     
-    fs::copy(static_lib, final_lib)
-        .expect("Failed to copy library for Windows");
+    // Target the specific symbols causing conflicts (from the linker error)
+    let symbols_to_mangle = "rust_eh_personality,_ZN3std9panicking11EMPTY_PANIC17h885cd9d14b984618E";
     
-    println!("cargo:warning=Windows library copied successfully");
+    let output = Command::new("staticlib-fucker")
+        .arg("--input")
+        .arg(static_lib)
+        .arg("--output")
+        .arg(final_lib)
+        .arg("--symbols")
+        .arg(symbols_to_mangle)
+        .output()
+        .expect("Failed to execute staticlib-fucker command");
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("cargo:warning=staticlib-fucker stdout: {}", stdout);
+        println!("cargo:warning=staticlib-fucker stderr: {}", stderr);
+        panic!("staticlib-fucker failed: exit code {}", output.status.code().unwrap_or(-1));
+    }
+    
+    println!("cargo:warning=Symbol mangling completed successfully");
 }
 
 
