@@ -11,27 +11,28 @@ pub struct Downloader {
 
 impl Downloader {
     pub fn new(output_path: &Path) -> Self {
+        let version = env::var("CARGO_PKG_VERSION").unwrap();
         let base_url = "https://github.com/ai-coustics/aic-sdk-c/releases/download".to_string();
 
         let artifact_sha = HashMap::from([
             (
-                "aic-sdk-aarch64-apple-darwin-0.6.2.tar.gz".to_string(),
+                format!("aic-sdk-aarch64-apple-darwin-{version}.tar.gz"),
                 "7f2a3f1705113a8e0eb4e01cd24afbc959b84451b33fc9aaaea7475e71971fc6".to_string(),
             ),
             (
-                "aic-sdk-aarch64-unknown-linux-gnu-0.6.2.tar.gz".to_string(),
+                format!("aic-sdk-aarch64-unknown-linux-gnu-{version}.tar.gz"),
                 "25b065eb82dfd21934c244e0e1307bfa6b49af25c3e68986e8e1a0e6f151332d".to_string(),
             ),
             (
-                "aic-sdk-x86_64-apple-darwin-0.6.2.tar.gz".to_string(),
+                format!("aic-sdk-x86_64-apple-darwin-{version}.tar.gz"),
                 "5b86b2359427adb56000a88308c75cc9b636890abd5211120a5735ea1e75c696".to_string(),
             ),
             (
-                "aic-sdk-x86_64-pc-windows-msvc-0.6.2.zip".to_string(),
+                format!("aic-sdk-x86_64-pc-windows-msvc-{version}.zip"),
                 "c662138cd4d997fec0b1e0fd7312c1693d976a3fe15d4236409d1b645b879281".to_string(),
             ),
             (
-                "aic-sdk-x86_64-unknown-linux-gnu-0.6.2.tar.gz".to_string(),
+                format!("aic-sdk-x86_64-unknown-linux-gnu-{version}.tar.gz"),
                 "bc410a5aea213bcbf3a3dd9e2192fbd308ff2e15312479f559138814352cc15a".to_string(),
             ),
         ]);
@@ -43,7 +44,8 @@ impl Downloader {
         }
     }
 
-    pub fn download(&self, version: &str) -> PathBuf {
+    pub fn download(&self) -> PathBuf {
+        let version = env::var("CARGO_PKG_VERSION").unwrap();
         let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
         let vendor = std::env::var("CARGO_CFG_TARGET_VENDOR").unwrap();
         let abi = std::env::var("CARGO_CFG_TARGET_ENV").unwrap();

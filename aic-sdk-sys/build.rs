@@ -47,10 +47,9 @@ fn download_lib() -> PathBuf {
     use downloader::Downloader;
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    let version = env::var("CARGO_PKG_VERSION").unwrap();
 
     let downloader = Downloader::new(&out_dir);
-    downloader.download(&version)
+    downloader.download()
 }
 
 fn patch_lib(lib_path: &Path, lib_name: &str, lib_name_patched: &str) {
