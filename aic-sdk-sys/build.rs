@@ -425,9 +425,6 @@ fn patch_lib_windows_llvm(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
         })
         .collect();
 
-    // For Windows, we'll apply a simpler approach - just rebuild the library
-    // Full symbol filtering would require more complex tooling
-    
     println!("cargo:warning=LLVM: Found {} object files to rebuild library", extracted_files.len());
     
     if extracted_files.is_empty() {
@@ -435,6 +432,32 @@ fn patch_lib_windows_llvm(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
         fs::copy(static_lib, final_lib)
             .expect("Failed to copy library for Windows LLVM");
         let _ = fs::remove_dir_all(&extract_dir);
+        return;
+    }
+
+    // Filter symbols from each object file to remove Rust runtime symbols
+    let filtered_dir = out_dir.join(format!("{}_filtered", lib_name));
+    fs::create_dir_all(&filtered_dir).expect("Failed to create filtered directory");
+
+    let mut filtered_files = Vec::new();
+    
+    for obj_file in &extracted_files {
+        let file_name = obj_file.file_name().unwrap();
+        let filtered_obj = filtered_dir.join(file_name);
+
+        if filter_windows_object_symbols(obj_file, &filtered_obj) {
+            filtered_files.push(filtered_obj);
+        } else {
+            println!("cargo:warning=Skipped object file with no aic symbols: {}", file_name.to_string_lossy());
+        }
+    }
+
+    if filtered_files.is_empty() {
+        println!("cargo:warning=No object files with aic symbols found, copying original library");
+        fs::copy(static_lib, final_lib)
+            .expect("Failed to copy library for Windows LLVM");
+        let _ = fs::remove_dir_all(&extract_dir);
+        let _ = fs::remove_dir_all(&filtered_dir);
         return;
     }
     
@@ -445,8 +468,8 @@ fn patch_lib_windows_llvm(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
     // Add output specification
     response_content.push_str(&format!("/OUT:{}\n", final_lib.display()));
     
-    // Add all object files
-    for obj in &extracted_files {
+    // Add all filtered object files
+    for obj in &filtered_files {
         response_content.push_str(&format!("{}\n", obj.display()));
     }
     
@@ -454,7 +477,7 @@ fn patch_lib_windows_llvm(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
     fs::write(&response_file, response_content)
         .expect("Failed to write llvm-lib response file");
 
-    println!("cargo:warning=Running llvm-lib with response file: {}", response_file.display());
+    println!("cargo:warning=Running llvm-lib with {} filtered objects", filtered_files.len());
     
     let lib_output = Command::new("llvm-lib")
         .arg(&format!("@{}", response_file.display()))
@@ -470,11 +493,113 @@ fn patch_lib_windows_llvm(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
                final_lib.display(), lib_output.status.code().unwrap_or(-1));
     }
     
-    // Cleanup response file
+    // Cleanup response file and temp directories
     let _ = fs::remove_file(&response_file);
-
-    // Cleanup
     let _ = fs::remove_dir_all(&extract_dir);
+    let _ = fs::remove_dir_all(&filtered_dir);
+}
+
+fn filter_windows_object_symbols(input_obj: &Path, output_obj: &Path) -> bool {
+    // Try multiple approaches to filter symbols on Windows
+    
+    // Approach 1: Use llvm-objcopy if available (most effective)
+    if let Ok(status) = Command::new("llvm-objcopy")
+        .arg("--help")
+        .output()
+    {
+        if status.status.success() {
+            return filter_with_llvm_objcopy(input_obj, output_obj);
+        }
+    }
+    
+    // Approach 2: Use llvm-strip to remove debug symbols and try symbol filtering
+    if let Ok(status) = Command::new("llvm-strip")
+        .arg("--help")
+        .output()
+    {
+        if status.status.success() {
+            return filter_with_llvm_strip(input_obj, output_obj);
+        }
+    }
+    
+    // Approach 3: Check if object has aic symbols, if so copy as-is, otherwise skip
+    if has_aic_symbols_windows(input_obj) {
+        fs::copy(input_obj, output_obj).unwrap_or_else(|_| {
+            panic!("Failed to copy object file {}", input_obj.display())
+        });
+        true
+    } else {
+        false
+    }
+}
+
+fn filter_with_llvm_objcopy(input_obj: &Path, output_obj: &Path) -> bool {
+    // Use llvm-objcopy to keep only aic_* symbols (Windows equivalent of GNU objcopy)
+    let status = Command::new("llvm-objcopy")
+        .arg("--keep-global-symbol=aic_*")
+        .arg("--wildcard")
+        .arg(&input_obj)
+        .arg(&output_obj)
+        .status()
+        .expect("Failed to execute llvm-objcopy");
+
+    if status.success() {
+        // Verify the output file has aic symbols
+        has_aic_symbols_windows(output_obj)
+    } else {
+        false
+    }
+}
+
+fn filter_with_llvm_strip(input_obj: &Path, output_obj: &Path) -> bool {
+    // Copy the file first
+    fs::copy(input_obj, output_obj).unwrap_or_else(|_| {
+        panic!("Failed to copy object file {}", input_obj.display())
+    });
+
+    // Check if it has aic symbols before stripping
+    if !has_aic_symbols_windows(output_obj) {
+        let _ = fs::remove_file(output_obj);
+        return false;
+    }
+
+    // Use llvm-strip to remove debug info and local symbols
+    let status = Command::new("llvm-strip")
+        .arg("--strip-debug")
+        .arg("--strip-unneeded")
+        .arg(&output_obj)
+        .status()
+        .expect("Failed to execute llvm-strip");
+
+    status.success()
+}
+
+fn has_aic_symbols_windows(obj_file: &Path) -> bool {
+    // Use llvm-nm to check for aic symbols
+    let nm_variations = ["llvm-nm", "nm"];
+    
+    for nm_cmd in &nm_variations {
+        if let Ok(output) = Command::new(nm_cmd)
+            .arg("--defined-only")
+            .arg("--global")
+            .arg(&obj_file)
+            .output()
+        {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                for line in stdout.lines() {
+                    if line.contains("aic_") {
+                        return true;
+                    }
+                }
+                return false; // No aic symbols found
+            }
+        }
+    }
+    
+    // If we can't determine, assume it has symbols to be safe
+    println!("cargo:warning=Could not determine symbols in {}, including by default", obj_file.display());
+    true
 }
 
 fn patch_lib_windows_msvc(static_lib: &Path, out_dir: &Path, lib_name: &str, _lib_name_patched: &str, final_lib: &Path) {
@@ -527,18 +652,44 @@ fn patch_lib_windows_msvc(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
         return;
     }
 
-    // Recreate the library with the extracted objects
-    // Use a response file to avoid command line length limits on Windows
     println!("cargo:warning=MSVC: Found {} object files to rebuild library", extracted_files.len());
+
+    // Filter symbols from each object file to remove Rust runtime symbols
+    let filtered_dir = out_dir.join(format!("{}_filtered", lib_name));
+    fs::create_dir_all(&filtered_dir).expect("Failed to create filtered directory");
+
+    let mut filtered_files = Vec::new();
     
+    for obj_file in &extracted_files {
+        let file_name = obj_file.file_name().unwrap();
+        let filtered_obj = filtered_dir.join(file_name);
+
+        if filter_windows_object_symbols(obj_file, &filtered_obj) {
+            filtered_files.push(filtered_obj);
+        } else {
+            println!("cargo:warning=Skipped object file with no aic symbols: {}", file_name.to_string_lossy());
+        }
+    }
+
+    if filtered_files.is_empty() {
+        println!("cargo:warning=No object files with aic symbols found, copying original library");
+        fs::copy(static_lib, final_lib)
+            .expect("Failed to copy library for Windows MSVC");
+        let _ = fs::remove_dir_all(&extract_dir);
+        let _ = fs::remove_dir_all(&filtered_dir);
+        return;
+    }
+    
+    // Recreate the library with the filtered objects
+    // Use a response file to avoid command line length limits on Windows
     let response_file = out_dir.join("msvc_lib_response.txt");
     let mut response_content = String::new();
     
     // Add output specification
     response_content.push_str(&format!("/OUT:{}\n", final_lib.display()));
     
-    // Add all object files
-    for obj in extracted_files {
+    // Add all filtered object files
+    for obj in filtered_files {
         response_content.push_str(&format!("{}\n", obj.display()));
     }
     
@@ -546,7 +697,7 @@ fn patch_lib_windows_msvc(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
     fs::write(&response_file, response_content)
         .expect("Failed to write MSVC lib response file");
 
-    println!("cargo:warning=Running MSVC lib with response file: {}", response_file.display());
+    println!("cargo:warning=Running MSVC lib with filtered objects");
     
     let lib_output = Command::new("lib")
         .arg(&format!("@{}", response_file.display()))
@@ -562,11 +713,10 @@ fn patch_lib_windows_msvc(static_lib: &Path, out_dir: &Path, lib_name: &str, _li
                final_lib.display(), lib_output.status.code().unwrap_or(-1));
     }
     
-    // Cleanup response file
+    // Cleanup response file and temp directories
     let _ = fs::remove_file(&response_file);
-
-    // Cleanup
     let _ = fs::remove_dir_all(&extract_dir);
+    let _ = fs::remove_dir_all(&filtered_dir);
 }
 
 
