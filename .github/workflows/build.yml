@@ -62,12 +62,59 @@ jobs:
             }
           }
           
+          # Ensure Windows Kits directory is in PATH for Universal CRT
+          Write-Host "Adding Windows Kits to PATH for Universal CRT access..."
+          $windowsKitsPath = "${env:ProgramFiles(x86)}\Windows Kits\10\Redist\ucrt\DLLs\x64"
+          if (Test-Path $windowsKitsPath) {
+            Write-Host "✅ Found Windows Kits UCRT path: $windowsKitsPath"
+            $env:PATH = "$windowsKitsPath;$env:PATH"
+          } else {
+            Write-Host "⚠️  Windows Kits UCRT path not found at expected location"
+            # Try alternative locations
+            $altPaths = @(
+              "${env:ProgramFiles}\Windows Kits\10\Redist\ucrt\DLLs\x64",
+              "C:\Program Files (x86)\Windows Kits\10\Redist\10.0.19041.0\ucrt\DLLs\x64",
+              "C:\Program Files\Windows Kits\10\Redist\10.0.19041.0\ucrt\DLLs\x64"
+            )
+            foreach ($altPath in $altPaths) {
+              if (Test-Path $altPath) {
+                Write-Host "✅ Found alternative UCRT path: $altPath"
+                $env:PATH = "$altPath;$env:PATH"
+                break
+              }
+            }
+          }
+          
           Write-Host "Visual C++ Redistributable installation completed"
 
-      - name: Verify DLL accessibility (Windows)
+      - name: Build and Run Example
+        run: cargo run --example basic_usage --features download-lib
+
+      - name: Post-build DLL Diagnostics (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          Write-Host "Checking for aic.dll in target directories..."
+          Write-Host "=== POST-BUILD DLL DIAGNOSTICS ==="
+          
+          # Re-check Universal CRT API files after SDK installation
+          Write-Host "Re-checking Universal CRT API files after build..."
+          $crtFiles = Get-ChildItem -Path "$env:WINDIR\System32\api-ms-win-crt-*.dll" -ErrorAction SilentlyContinue
+          if ($crtFiles) {
+            Write-Host "✅ Found $($crtFiles.Count) Universal CRT API files"
+            # Check for specific ones our DLL needs
+            $requiredCRT = @("api-ms-win-crt-runtime-l1-1-0.dll", "api-ms-win-crt-math-l1-1-0.dll", "api-ms-win-crt-string-l1-1-0.dll")
+            foreach ($req in $requiredCRT) {
+              if (Test-Path "$env:WINDIR\System32\$req") {
+                Write-Host "✅ Required: $req"
+              } else {
+                Write-Host "❌ Missing required: $req"
+              }
+            }
+          } else {
+            Write-Host "❌ Still no Universal CRT API files found"
+          }
+          
+          # Check aic.dll accessibility after build
+          Write-Host "Checking for aic.dll in target directories after build..."
           $targetDirs = @(
             "target\debug\aic.dll",
             "target\debug\examples\aic.dll",
@@ -82,9 +129,24 @@ jobs:
             }
           }
           
-          # Check PATH for DLL resolution
-          Write-Host "Current working directory: $(Get-Location)"
-          Write-Host "PATH includes target directories: $($env:PATH -split ';' | Where-Object { $_ -like '*target*' })"
-
-      - name: Build and Run Example
-        run: cargo run --example basic_usage --features download-lib
+          # Try to manually load aic.dll to get specific error
+          Write-Host "Attempting to manually load aic.dll for detailed error..."
+          try {
+            if (Test-Path "target\debug\examples\aic.dll") {
+              $dll = [System.Reflection.Assembly]::LoadFile((Resolve-Path "target\debug\examples\aic.dll").Path)
+              Write-Host "✅ aic.dll loaded successfully via .NET"
+            }
+          } catch {
+            Write-Host "❌ Failed to load aic.dll via .NET: $($_.Exception.Message)"
+          }
+          
+          # Use dependency walker style check
+          Write-Host "Checking what dependencies are missing..."
+          if (Get-Command "dumpbin.exe" -ErrorAction SilentlyContinue) {
+            if (Test-Path "target\debug\examples\aic.dll") {
+              Write-Host "Using dumpbin to check dependencies..."
+              dumpbin /DEPENDENTS "target\debug\examples\aic.dll"
+            }
+          } else {
+            Write-Host "dumpbin not available for dependency checking"
+          }
