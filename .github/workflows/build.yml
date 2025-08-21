@@ -37,7 +37,54 @@ jobs:
             Write-Host "⚠️  VCRUNTIME140.dll not found in System32, but may be available via other paths"
           }
           
+          # Check for Universal CRT components
+          Write-Host "Checking for Universal CRT components..."
+          $ucrtBase = Get-ChildItem -Path "$env:WINDIR\System32\ucrtbase.dll" -ErrorAction SilentlyContinue
+          if ($ucrtBase) {
+            Write-Host "✅ ucrtbase.dll found at: $($ucrtBase.FullName)"
+          } else {
+            Write-Host "⚠️  ucrtbase.dll not found"
+          }
+          
+          # Check for api-ms-win-crt files (Universal CRT API sets)
+          $crtFiles = Get-ChildItem -Path "$env:WINDIR\System32\api-ms-win-crt-*.dll" -ErrorAction SilentlyContinue
+          if ($crtFiles) {
+            Write-Host "✅ Found $($crtFiles.Count) Universal CRT API files"
+            $crtFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
+          } else {
+            Write-Host "⚠️  Universal CRT API files not found, attempting to install..."
+            # Try installing Windows SDK for Universal CRT
+            try {
+              choco install windows-sdk-10-version-2004-all --no-progress --yes
+              Write-Host "✅ Windows SDK installed for Universal CRT support"
+            } catch {
+              Write-Host "⚠️  Could not install Windows SDK: $($_.Exception.Message)"
+            }
+          }
+          
           Write-Host "Visual C++ Redistributable installation completed"
+
+      - name: Verify DLL accessibility (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          Write-Host "Checking for aic.dll in target directories..."
+          $targetDirs = @(
+            "target\debug\aic.dll",
+            "target\debug\examples\aic.dll",
+            "target\debug\deps\aic.dll"
+          )
+          foreach ($dll in $targetDirs) {
+            if (Test-Path $dll) {
+              $size = (Get-Item $dll).Length
+              Write-Host "✅ Found: $dll ($(($size/1MB).ToString('F1')) MB)"
+            } else {
+              Write-Host "❌ Missing: $dll"
+            }
+          }
+          
+          # Check PATH for DLL resolution
+          Write-Host "Current working directory: $(Get-Location)"
+          Write-Host "PATH includes target directories: $($env:PATH -split ';' | Where-Object { $_ -like '*target*' })"
 
       - name: Build and Run Example
         run: cargo run --example basic_usage --features download-lib

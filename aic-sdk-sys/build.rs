@@ -149,6 +149,12 @@ fn handle_windows_linking(lib_path: &Path) {
     // Check DLL dependencies to help debug runtime issues
     check_dll_dependencies(&dll_path);
     
+    // Add enhanced diagnostics for Windows CI
+    println!("cargo:warning=Windows DLL diagnostics:");
+    println!("cargo:warning=- aic.dll copied to multiple locations");
+    println!("cargo:warning=- VCRUNTIME140.dll should be available in System32");
+    println!("cargo:warning=- If STATUS_DLL_NOT_FOUND persists, check Universal CRT availability");
+    
     // Copy the DLL to the output directory so it can be found at runtime
     let out_dll_path = out_dir.join(dll_name);
     std::fs::copy(&dll_path, &out_dll_path)
