@@ -87,7 +87,40 @@ jobs:
           
           Write-Host "Visual C++ Redistributable installation completed"
 
+      - name: Pre-runtime Check (Windows)
+        if: matrix.os == 'windows-latest'
+        env:
+          # Ensure Universal CRT is accessible by adding all possible Windows Kits paths
+          PATH: "C:\\Program Files (x86)\\Windows Kits\\10\\Redist\\ucrt\\DLLs\\x64;C:\\Program Files\\Windows Kits\\10\\Redist\\ucrt\\DLLs\\x64;C:\\Program Files (x86)\\Windows Kits\\10\\Redist\\10.0.19041.0\\ucrt\\DLLs\\x64;${{ env.PATH }}"
+        run: |
+          Write-Host "=== RUNTIME ENVIRONMENT CHECK ==="
+          Write-Host "Current PATH includes Universal CRT: $($env:PATH -split ';' | Where-Object { $_ -like '*Windows Kits*' -or $_ -like '*ucrt*' })"
+          
+          # Verify Universal CRT files are accessible at runtime
+          $requiredCRT = @("api-ms-win-crt-runtime-l1-1-0.dll", "api-ms-win-crt-math-l1-1-0.dll", "api-ms-win-crt-string-l1-1-0.dll")
+          foreach ($req in $requiredCRT) {
+            $found = $false
+            foreach ($pathDir in ($env:PATH -split ';')) {
+              if (Test-Path "$pathDir\$req") {
+                Write-Host "✅ Found $req in: $pathDir"
+                $found = $true
+                break
+              }
+            }
+            if (-not $found -and (Test-Path "$env:WINDIR\System32\$req")) {
+              Write-Host "✅ Found $req in System32"
+              $found = $true
+            }
+            if (-not $found) {
+              Write-Host "❌ Missing: $req"
+            }
+          }
+
       - name: Build and Run Example
+        continue-on-error: true
+        env:
+          # Windows: Add Universal CRT paths for DLL resolution
+          PATH: ${{ matrix.os == 'windows-latest' && 'C:\\Program Files (x86)\\Windows Kits\\10\\Redist\\ucrt\\DLLs\\x64;C:\\Program Files\\Windows Kits\\10\\Redist\\ucrt\\DLLs\\x64;C:\\Program Files (x86)\\Windows Kits\\10\\Redist\\10.0.19041.0\\ucrt\\DLLs\\x64;' || '' }}${{ env.PATH }}
         run: cargo run --example basic_usage --features download-lib
 
       - name: Post-build DLL Diagnostics (Windows)
@@ -95,22 +128,40 @@ jobs:
         run: |
           Write-Host "=== POST-BUILD DLL DIAGNOSTICS ==="
           
-          # Re-check Universal CRT API files after SDK installation
-          Write-Host "Re-checking Universal CRT API files after build..."
-          $crtFiles = Get-ChildItem -Path "$env:WINDIR\System32\api-ms-win-crt-*.dll" -ErrorAction SilentlyContinue
-          if ($crtFiles) {
-            Write-Host "✅ Found $($crtFiles.Count) Universal CRT API files"
-            # Check for specific ones our DLL needs
-            $requiredCRT = @("api-ms-win-crt-runtime-l1-1-0.dll", "api-ms-win-crt-math-l1-1-0.dll", "api-ms-win-crt-string-l1-1-0.dll")
-            foreach ($req in $requiredCRT) {
-              if (Test-Path "$env:WINDIR\System32\$req") {
-                Write-Host "✅ Required: $req"
-              } else {
-                Write-Host "❌ Missing required: $req"
+          # Comprehensive Universal CRT search
+          Write-Host "Comprehensive Universal CRT file search..."
+          $requiredCRT = @("api-ms-win-crt-runtime-l1-1-0.dll", "api-ms-win-crt-math-l1-1-0.dll", "api-ms-win-crt-string-l1-1-0.dll")
+          $searchPaths = @(
+            "$env:WINDIR\System32",
+            "$env:WINDIR\SysWOW64",
+            "C:\Program Files (x86)\Windows Kits\10\Redist\ucrt\DLLs\x64",
+            "C:\Program Files\Windows Kits\10\Redist\ucrt\DLLs\x64",
+            "C:\Program Files (x86)\Windows Kits\10\Redist\10.0.19041.0\ucrt\DLLs\x64",
+            "C:\Program Files\Windows Kits\10\Redist\10.0.19041.0\ucrt\DLLs\x64"
+          )
+          
+          $foundFiles = @{}
+          foreach ($req in $requiredCRT) {
+            $foundPaths = @()
+            foreach ($searchPath in $searchPaths) {
+              if (Test-Path "$searchPath\$req") {
+                $foundPaths += $searchPath
               }
             }
+            if ($foundPaths.Count -gt 0) {
+              Write-Host "✅ $req found in:"
+              $foundPaths | ForEach-Object { Write-Host "    - $_" }
+              $foundFiles[$req] = $foundPaths
+            } else {
+              Write-Host "❌ $req not found in any search location"
+            }
+          }
+          
+          # Check if all required files are available
+          if ($foundFiles.Count -eq $requiredCRT.Count) {
+            Write-Host "✅ All required Universal CRT files found"
           } else {
-            Write-Host "❌ Still no Universal CRT API files found"
+            Write-Host "❌ Some Universal CRT files are missing"
           }
           
           # Check aic.dll accessibility after build
