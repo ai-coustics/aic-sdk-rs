@@ -23,49 +23,122 @@ pub fn patch_lib(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_pat
 }
 
 fn try_llvm_approach(static_lib: &Path, out_dir: &Path, _lib_name: &str, lib_name_patched: &str, global_symbols_wildcard: &str, final_lib: &Path) -> bool {
-    // Check if LLVM tools are available
-    if !is_command_available("llvm-nm") || !is_command_available("llvm-objcopy") {
+    // Check if required tools are available
+    if !is_command_available("llvm-ar") || !is_command_available("llvm-objcopy") || !is_command_available("llvm-nm") {
         return false;
     }
     
     println!("cargo:warning=Using LLVM tools for symbol filtering on Windows");
     
-    // Create intermediate file
-    let intermediate_lib = out_dir.join(format!("{}_intermediate.lib", lib_name_patched));
-    
-    // First, copy the original library
-    if let Err(e) = fs::copy(static_lib, &intermediate_lib) {
-        println!("cargo:warning=Failed to copy library for LLVM processing: {}", e);
+    // Create working directory for object extraction
+    let work_dir = out_dir.join(format!("{}_llvm_objs", lib_name_patched));
+    if work_dir.exists() {
+        let _ = fs::remove_dir_all(&work_dir);
+    }
+    if let Err(e) = fs::create_dir(&work_dir) {
+        println!("cargo:warning=Failed to create working directory: {}", e);
         return false;
     }
     
-    // Get symbols from the library
-    let symbols = match get_symbols_llvm(&intermediate_lib, global_symbols_wildcard) {
-        Ok(symbols) => symbols,
+    // Extract all object files from the library using llvm-ar
+    let extract_output = Command::new("llvm-ar")
+        .arg("x")
+        .arg(static_lib)
+        .current_dir(&work_dir)
+        .output();
+    
+    let extract_success = match extract_output {
+        Ok(output) if output.status.success() => true,
+        Ok(output) => {
+            println!("cargo:warning=llvm-ar extraction failed: {}", String::from_utf8_lossy(&output.stderr));
+            false
+        }
         Err(e) => {
-            println!("cargo:warning=Failed to extract symbols with llvm-nm: {}", e);
-            let _ = fs::remove_file(&intermediate_lib);
+            println!("cargo:warning=Failed to execute llvm-ar: {}", e);
+            false
+        }
+    };
+    
+    if !extract_success {
+        let _ = fs::remove_dir_all(&work_dir);
+        return false;
+    }
+    
+    // Process each object file
+    let mut filtered_objects = Vec::new();
+    let prefix = global_symbols_wildcard.trim_end_matches('*');
+    
+    let entries = match fs::read_dir(&work_dir) {
+        Ok(entries) => entries,
+        Err(e) => {
+            println!("cargo:warning=Failed to read working directory: {}", e);
+            let _ = fs::remove_dir_all(&work_dir);
             return false;
         }
     };
     
-    if symbols.is_empty() {
-        println!("cargo:warning=No matching symbols found, using library as-is");
-        fs::rename(&intermediate_lib, final_lib)
-            .expect("Failed to rename library file");
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(_) => continue,
+        };
+        
+        let path = entry.path();
+        if !path.is_file() || path.extension().and_then(|s| s.to_str()) != Some("o") {
+            continue;
+        }
+        
+        // Check if this object contains symbols we want to keep
+        let should_keep = match check_object_symbols_llvm(&path, prefix) {
+            Ok(has_symbols) => has_symbols,
+            Err(_) => {
+                // If we can't analyze it, keep it to be safe
+                true
+            }
+        };
+        
+        if should_keep {
+            // Filter symbols in this object file
+            let filtered_obj = work_dir.join(format!("filtered_{}", path.file_name().unwrap().to_string_lossy()));
+            if filter_object_symbols_llvm(&path, &filtered_obj, prefix).is_ok() {
+                filtered_objects.push(filtered_obj);
+            } else {
+                // If filtering fails, use the original
+                filtered_objects.push(path);
+            }
+        }
+    }
+    
+    if filtered_objects.is_empty() {
+        println!("cargo:warning=No objects contain desired symbols, using library as-is");
+        fs::copy(static_lib, final_lib).expect("Failed to copy library file");
+        let _ = fs::remove_dir_all(&work_dir);
         return true;
     }
     
-    // Filter symbols using llvm-objcopy
-    if let Err(e) = filter_symbols_llvm(&intermediate_lib, final_lib, &symbols) {
-        println!("cargo:warning=Failed to filter symbols with llvm-objcopy: {}", e);
-        let _ = fs::remove_file(&intermediate_lib);
-        return false;
+    // Create new library with filtered objects using llvm-ar
+    let mut cmd = Command::new("llvm-ar");
+    cmd.arg("rcs").arg(final_lib);
+    for obj in &filtered_objects {
+        cmd.arg(obj);
     }
     
+    let ar_success = match cmd.output() {
+        Ok(output) if output.status.success() => true,
+        Ok(output) => {
+            println!("cargo:warning=llvm-ar library creation failed: {}", String::from_utf8_lossy(&output.stderr));
+            false
+        }
+        Err(e) => {
+            println!("cargo:warning=Failed to execute llvm-ar for library creation: {}", e);
+            false
+        }
+    };
+    
     // Cleanup
-    let _ = fs::remove_file(&intermediate_lib);
-    true
+    let _ = fs::remove_dir_all(&work_dir);
+    
+    ar_success
 }
 
 fn try_msvc_approach(static_lib: &Path, out_dir: &Path, _lib_name: &str, lib_name_patched: &str, global_symbols_wildcard: &str, final_lib: &Path) -> bool {
@@ -83,24 +156,71 @@ fn try_msvc_approach(static_lib: &Path, out_dir: &Path, _lib_name: &str, lib_nam
     }
     fs::create_dir(&work_dir).expect("Failed to create working directory");
     
-    // Extract all object files from the library
-    let extract_status = Command::new("lib")
-        .arg("/EXTRACT")
-        .arg(format!("/OUT:{}", work_dir.display()))
+    // Extract all object files from the library using lib.exe
+    // Note: lib.exe /EXTRACT extracts all members, we need to do this differently
+    let list_output = Command::new("lib")
+        .arg("/LIST")
         .arg(static_lib)
-        .status();
+        .output();
     
-    let success = match extract_status {
-        Ok(status) if status.success() => {
-            // Analyze objects and keep only those with desired symbols
-            if let Ok(filtered_objects) = filter_objects_msvc(&work_dir, global_symbols_wildcard) {
-                // Create new library with filtered objects
-                create_filtered_library_msvc(&filtered_objects, final_lib).is_ok()
-            } else {
-                false
-            }
+    let object_names = match list_output {
+        Ok(output) if output.status.success() => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            stdout.lines()
+                .map(|line| line.trim().to_string())
+                .filter(|line| !line.is_empty() && line.ends_with(".obj"))
+                .collect::<Vec<_>>()
         }
-        _ => false,
+        Ok(output) => {
+            println!("cargo:warning=lib /LIST failed: {}", String::from_utf8_lossy(&output.stderr));
+            let _ = fs::remove_dir_all(&work_dir);
+            return false;
+        }
+        Err(e) => {
+            println!("cargo:warning=Failed to execute lib /LIST: {}", e);
+            let _ = fs::remove_dir_all(&work_dir);
+            return false;
+        }
+    };
+    
+    if object_names.is_empty() {
+        println!("cargo:warning=No object files found in library");
+        let _ = fs::remove_dir_all(&work_dir);
+        return false;
+    }
+    
+    // Extract each object file individually
+    let mut extract_success = true;
+    for obj_name in &object_names {
+        let extract_status = Command::new("lib")
+            .arg(format!("/EXTRACT:{}", obj_name))
+            .arg(format!("/OUT:{}", work_dir.join(obj_name).display()))
+            .arg(static_lib)
+            .status();
+        
+        if let Ok(status) = extract_status {
+            if !status.success() {
+                println!("cargo:warning=Failed to extract {}", obj_name);
+                extract_success = false;
+                break;
+            }
+        } else {
+            println!("cargo:warning=Failed to execute lib /EXTRACT for {}", obj_name);
+            extract_success = false;
+            break;
+        }
+    }
+    
+    let success = if extract_success {
+        // Analyze objects and keep only those with desired symbols
+        if let Ok(filtered_objects) = filter_objects_msvc(&work_dir, global_symbols_wildcard) {
+            // Create new library with filtered objects
+            create_filtered_library_msvc(&filtered_objects, final_lib).is_ok()
+        } else {
+            false
+        }
+    } else {
+        false
     };
     
     // Cleanup
@@ -126,33 +246,7 @@ fn is_command_available(cmd: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn get_symbols_llvm(lib_path: &Path, wildcard: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let output = Command::new("llvm-nm")
-        .arg("--defined-only")
-        .arg("--extern-only")
-        .arg(lib_path)
-        .output()?;
-    
-    if !output.status.success() {
-        return Err(format!("llvm-nm failed: {}", String::from_utf8_lossy(&output.stderr)).into());
-    }
-    
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut symbols = Vec::new();
-    
-    // Convert wildcard to prefix (aic_* becomes aic_)
-    let prefix = wildcard.trim_end_matches('*');
-    
-    for line in stdout.lines() {
-        if let Some(symbol) = parse_nm_symbol_windows(line) {
-            if symbol.starts_with(prefix) {
-                symbols.push(symbol);
-            }
-        }
-    }
-    
-    Ok(symbols)
-}
+
 
 fn parse_nm_symbol_windows(line: &str) -> Option<String> {
     let line = line.trim();
@@ -178,28 +272,86 @@ fn parse_nm_symbol_windows(line: &str) -> Option<String> {
     }
 }
 
-fn filter_symbols_llvm(input_lib: &Path, output_lib: &Path, symbols_to_keep: &[String]) -> Result<(), Box<dyn std::error::Error>> {
-    // Create a symbols file
-    let symbols_file = input_lib.with_extension("symbols");
-    let symbols_content = symbols_to_keep.join("\n");
+
+
+fn check_object_symbols_llvm(obj_path: &Path, prefix: &str) -> Result<bool, Box<dyn std::error::Error>> {
+    let output = Command::new("llvm-nm")
+        .arg("--defined-only")
+        .arg("--extern-only")
+        .arg(obj_path)
+        .output()?;
+    
+    if !output.status.success() {
+        return Err(format!("llvm-nm failed on object: {}", String::from_utf8_lossy(&output.stderr)).into());
+    }
+    
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    
+    for line in stdout.lines() {
+        if let Some(symbol) = parse_nm_symbol_windows(line) {
+            if symbol.starts_with(prefix) {
+                return Ok(true);
+            }
+        }
+    }
+    
+    Ok(false)
+}
+
+fn filter_object_symbols_llvm(input_obj: &Path, output_obj: &Path, prefix: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // Get all symbols from this object
+    let output = Command::new("llvm-nm")
+        .arg("--defined-only")
+        .arg("--extern-only")
+        .arg(input_obj)
+        .output()?;
+    
+    if !output.status.success() {
+        return Err(format!("llvm-nm failed: {}", String::from_utf8_lossy(&output.stderr)).into());
+    }
+    
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut symbols_to_strip = Vec::new();
+    
+    for line in stdout.lines() {
+        if let Some(symbol) = parse_nm_symbol_windows(line) {
+            // Strip symbols that don't start with our prefix
+            if !symbol.starts_with(prefix) {
+                symbols_to_strip.push(symbol);
+            }
+        }
+    }
+    
+    if symbols_to_strip.is_empty() {
+        // No symbols to strip, just copy the file
+        fs::copy(input_obj, output_obj)?;
+        return Ok(());
+    }
+    
+    // Create symbols file for stripping
+    let symbols_file = input_obj.with_extension("strip_symbols");
+    let symbols_content = symbols_to_strip.join("\n");
     fs::write(&symbols_file, symbols_content)?;
     
-    // Use llvm-objcopy to keep only specified symbols
-    let status = Command::new("llvm-objcopy")
-        .arg(format!("--keep-global-symbols={}", symbols_file.display()))
-        .arg(input_lib)
-        .arg(output_lib)
-        .status()?;
+    // Use llvm-objcopy to strip unwanted symbols
+    let objcopy_output = Command::new("llvm-objcopy")
+        .arg(format!("--strip-symbols={}", symbols_file.display()))
+        .arg(input_obj)
+        .arg(output_obj)
+        .output()?;
     
     // Cleanup
     let _ = fs::remove_file(&symbols_file);
     
-    if !status.success() {
-        return Err("llvm-objcopy failed".into());
+    if !objcopy_output.status.success() {
+        let stderr = String::from_utf8_lossy(&objcopy_output.stderr);
+        return Err(format!("llvm-objcopy failed on object: {}", stderr).into());
     }
     
     Ok(())
 }
+
+
 
 fn filter_objects_msvc(work_dir: &Path, wildcard: &str) -> Result<Vec<std::path::PathBuf>, Box<dyn std::error::Error>> {
     let mut filtered_objects = Vec::new();
