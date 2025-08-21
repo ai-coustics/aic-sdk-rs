@@ -20,5 +20,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Visual C++ Redistributable (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          # Download and install Visual C++ Redistributable x64
+          Write-Host "Installing Visual C++ Redistributable..."
+          Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "vc_redist.x64.exe"
+          Start-Process -FilePath "vc_redist.x64.exe" -ArgumentList "/quiet", "/norestart" -Wait
+          
+          # Verify installation
+          Write-Host "Checking for VCRUNTIME140.dll..."
+          $vcruntime = Get-ChildItem -Path "$env:WINDIR\System32\VCRUNTIME140.dll" -ErrorAction SilentlyContinue
+          if ($vcruntime) {
+            Write-Host "✅ VCRUNTIME140.dll found at: $($vcruntime.FullName)"
+          } else {
+            Write-Host "⚠️  VCRUNTIME140.dll not found in System32, but may be available via other paths"
+          }
+          
+          Write-Host "Visual C++ Redistributable installation completed"
+
       - name: Build and Run Example
         run: cargo run --example basic_usage --features download-lib
