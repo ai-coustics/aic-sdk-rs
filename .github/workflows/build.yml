@@ -20,28 +20,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Option 1: Install from cargo (compile from source)
-      - name: Cache staticlib-fucker (Windows only)
-        if: matrix.os == 'windows-latest'
-        uses: actions/cache@v4
-        id: staticlib-fucker-cache
-        with:
-          path: ~/.cargo/bin/staticlib-fucker.exe
-          key: staticlib-fucker-v0.1.0
-
-      - name: Install staticlib-fucker (Windows only)
-        if: matrix.os == 'windows-latest' && steps.staticlib-fucker-cache.outputs.cache-hit != 'true'
-        run: cargo install staticlib-fucker --version 0.1.0
-
-      # Option 2: Download from GitHub releases (faster alternative)
-      # Uncomment the lines below and comment out the cargo install lines above for faster builds
-      # - name: Download staticlib-fucker from releases (Windows only)
-      #   if: matrix.os == 'windows-latest'
-      #   run: |
-      #     curl -L -o staticlib-fucker.exe https://github.com/zeozeozeo/staticlib-fucker/releases/download/0.1.0/staticlib-fucker.exe
-      #     mkdir -p $HOME/.cargo/bin
-      #     mv staticlib-fucker.exe $HOME/.cargo/bin/
-      #     echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
       - name: Build and Run Example
         run: cargo run --example basic_usage --features download-lib

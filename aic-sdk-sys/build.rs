@@ -151,23 +151,24 @@ fn handle_windows_linking(lib_path: &Path) {
     std::fs::copy(&dll_path, &out_dll_path)
         .expect("Failed to copy DLL to output directory");
     
-    // Check if we have an import library (.lib file)
+    // Always generate our own import library from the DLL to avoid symbol conflicts
+    // The existing aic.lib is likely a static library with conflicting symbols
     if import_lib_path.exists() {
-        // Use the existing import library
-        println!("cargo:warning=Using existing import library: {}", import_lib_path.display());
-        println!("cargo:rustc-link-search=native={}", lib_path.display());
+        println!("cargo:warning=Found existing aic.lib but generating new import library from DLL to avoid symbol conflicts");
+    }
+    
+    // Try to generate import library using available tools
+    if try_generate_import_library(&dll_path, &out_dir) {
+        println!("cargo:rustc-link-search=native={}", out_dir.display());
+        println!("cargo:rustc-link-lib=dylib=aic");
+    } else if try_generate_import_library_llvm(&dll_path, &out_dir) {
+        println!("cargo:rustc-link-search=native={}", out_dir.display());
         println!("cargo:rustc-link-lib=dylib=aic");
     } else {
-        // Generate import library using lib.exe if available
-        if try_generate_import_library(&dll_path, &out_dir) {
-            println!("cargo:rustc-link-search=native={}", out_dir.display());
-            println!("cargo:rustc-link-lib=dylib=aic");
-        } else {
-            // Fallback: try to use the DLL directly (may not work on all systems)
-            println!("cargo:warning=No import library found and couldn't generate one, trying direct DLL linking");
-            println!("cargo:rustc-link-search=native={}", dll_path.parent().unwrap().display());
-            println!("cargo:rustc-link-lib=dylib=aic");
-        }
+        // Last resort: try to use the DLL directly (may not work on all systems)
+        println!("cargo:warning=Couldn't generate import library with any available tools, trying direct DLL linking");
+        println!("cargo:rustc-link-search=native={}", dll_path.parent().unwrap().display());
+        println!("cargo:rustc-link-lib=dylib=aic");
     }
     
     // Tell cargo to rerun if the DLL changes
@@ -184,29 +185,62 @@ fn try_generate_import_library(dll_path: &Path, out_dir: &Path) -> bool {
     let import_lib_path = out_dir.join("aic.lib");
     let def_file_path = out_dir.join("aic.def");
     
+    // Clean up any existing files first
+    let _ = std::fs::remove_file(&import_lib_path);
+    let _ = std::fs::remove_file(&def_file_path);
+    
+    println!("cargo:warning=Attempting to generate import library from DLL using Microsoft tools");
+    
     // First, try to generate a .def file from the DLL
-    if let Ok(output) = Command::new("dumpbin")
+    match Command::new("dumpbin")
         .arg("/EXPORTS")
         .arg(dll_path)
         .output() 
     {
-        if output.status.success() {
+        Ok(output) if output.status.success() => {
             let exports_output = String::from_utf8_lossy(&output.stdout);
-            if let Ok(()) = create_def_file(&exports_output, &def_file_path) {
-                // Now generate the import library
-                if let Ok(status) = Command::new("lib")
-                    .arg(format!("/DEF:{}", def_file_path.display()))
-                    .arg(format!("/OUT:{}", import_lib_path.display()))
-                    .arg("/MACHINE:X64")
-                    .status() 
-                {
-                    if status.success() {
-                        println!("cargo:warning=Generated import library: {}", import_lib_path.display());
-                        let _ = std::fs::remove_file(&def_file_path); // Cleanup
-                        return true;
+            println!("cargo:warning=Successfully extracted exports from DLL");
+            
+            match create_def_file(&exports_output, &def_file_path) {
+                Ok(export_count) => {
+                    if export_count == 0 {
+                        println!("cargo:warning=No aic_* exports found in DLL");
+                        return false;
+                    }
+                    println!("cargo:warning=Created .def file with {} exports", export_count);
+                    
+                    // Now generate the import library
+                    match Command::new("lib")
+                        .arg(format!("/DEF:{}", def_file_path.display()))
+                        .arg(format!("/OUT:{}", import_lib_path.display()))
+                        .arg("/MACHINE:X64")
+                        .output()
+                    {
+                        Ok(lib_output) if lib_output.status.success() => {
+                            println!("cargo:warning=Successfully generated import library: {}", import_lib_path.display());
+                            let _ = std::fs::remove_file(&def_file_path); // Cleanup .def file
+                            return true;
+                        }
+                        Ok(lib_output) => {
+                            let stderr = String::from_utf8_lossy(&lib_output.stderr);
+                            println!("cargo:warning=lib.exe failed: {}", stderr);
+                        }
+                        Err(e) => {
+                            println!("cargo:warning=Failed to execute lib.exe: {}", e);
+                        }
                     }
                 }
+                Err(e) => {
+                    println!("cargo:warning=Failed to create .def file: {}", e);
+                }
             }
+        }
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            println!("cargo:warning=dumpbin failed: {}", stderr);
+        }
+        Err(e) => {
+            println!("cargo:warning=Failed to execute dumpbin: {}", e);
         }
     }
     
@@ -216,17 +250,18 @@ fn try_generate_import_library(dll_path: &Path, out_dir: &Path) -> bool {
     false
 }
 
-fn create_def_file(dumpbin_output: &str, def_file_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn create_def_file(dumpbin_output: &str, def_file_path: &Path) -> Result<usize, Box<dyn std::error::Error>> {
     use std::fs::File;
     use std::io::Write;
     
     let mut def_content = String::from("EXPORTS\n");
     let mut in_exports_section = false;
+    let mut export_count = 0;
     
     for line in dumpbin_output.lines() {
         let line = line.trim();
         
-        if line.contains("ordinal hint RVA      name") {
+        if line.contains("ordinal hint RVA      name") || line.contains("ordinal  hint RVA      name") {
             in_exports_section = true;
             continue;
         }
@@ -238,20 +273,126 @@ fn create_def_file(dumpbin_output: &str, def_file_path: &Path) -> Result<(), Box
             
             // Parse the dumpbin export line format
             // Example: "    1    0 00001234 function_name"
+            // Or sometimes: "    1          00001234 function_name" (no hint column)
             let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 4 {
-                let function_name = parts[3];
+            if parts.len() >= 3 {
+                // The function name is the last part
+                let function_name = parts.last().unwrap();
                 // Only include functions that start with "aic" to avoid system symbols
                 if function_name.starts_with("aic") {
                     def_content.push_str(&format!("    {}\n", function_name));
+                    export_count += 1;
                 }
             }
         }
     }
     
-    let mut file = File::create(def_file_path)?;
-    file.write_all(def_content.as_bytes())?;
-    Ok(())
+    if export_count > 0 {
+        let mut file = File::create(def_file_path)?;
+        file.write_all(def_content.as_bytes())?;
+    }
+    
+    Ok(export_count)
+}
+
+fn try_generate_import_library_llvm(dll_path: &Path, out_dir: &Path) -> bool {
+    use std::process::Command;
+    
+    // Check if LLVM tools are available
+    if Command::new("llvm-dlltool").arg("--help").output().is_err() {
+        return false;
+    }
+    
+    println!("cargo:warning=Attempting to generate import library using LLVM tools");
+    
+    let import_lib_path = out_dir.join("aic.lib");
+    let def_file_path = out_dir.join("aic.def");
+    
+    // Clean up any existing files first
+    let _ = std::fs::remove_file(&import_lib_path);
+    let _ = std::fs::remove_file(&def_file_path);
+    
+    // First try to extract exports using llvm-objdump
+    match Command::new("llvm-objdump")
+        .arg("--exports")
+        .arg(dll_path)
+        .output() 
+    {
+        Ok(output) if output.status.success() => {
+            let exports_output = String::from_utf8_lossy(&output.stdout);
+            
+            match create_def_file_from_llvm(&exports_output, &def_file_path) {
+                Ok(export_count) if export_count > 0 => {
+                    println!("cargo:warning=Created .def file with {} exports using LLVM", export_count);
+                    
+                    // Generate import library using llvm-dlltool
+                    match Command::new("llvm-dlltool")
+                        .arg("-d").arg(&def_file_path)
+                        .arg("-l").arg(&import_lib_path)
+                        .arg("-m").arg("i386:x86-64")
+                        .output()
+                    {
+                        Ok(dll_output) if dll_output.status.success() => {
+                            println!("cargo:warning=Successfully generated import library using LLVM: {}", import_lib_path.display());
+                            let _ = std::fs::remove_file(&def_file_path);
+                            return true;
+                        }
+                        Ok(dll_output) => {
+                            let stderr = String::from_utf8_lossy(&dll_output.stderr);
+                            println!("cargo:warning=llvm-dlltool failed: {}", stderr);
+                        }
+                        Err(e) => {
+                            println!("cargo:warning=Failed to execute llvm-dlltool: {}", e);
+                        }
+                    }
+                }
+                _ => {
+                    println!("cargo:warning=No aic_* exports found using LLVM tools");
+                }
+            }
+        }
+        _ => {
+            println!("cargo:warning=llvm-objdump failed or not available");
+        }
+    }
+    
+    // Cleanup on failure
+    let _ = std::fs::remove_file(&def_file_path);
+    let _ = std::fs::remove_file(&import_lib_path);
+    false
+}
+
+fn create_def_file_from_llvm(llvm_output: &str, def_file_path: &Path) -> Result<usize, Box<dyn std::error::Error>> {
+    use std::fs::File;
+    use std::io::Write;
+    
+    let mut def_content = String::from("EXPORTS\n");
+    let mut export_count = 0;
+    
+    // Parse llvm-objdump export output
+    for line in llvm_output.lines() {
+        let line = line.trim();
+        
+        // Look for export entries (format varies)
+        if line.contains("aic") {
+            // Try to extract function name
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            for part in parts {
+                if part.starts_with("aic") {
+                    def_content.push_str(&format!("    {}\n", part));
+                    export_count += 1;
+                    break;
+                }
+            }
+        }
+    }
+    
+    if export_count > 0 {
+        let mut file = File::create(def_file_path)?;
+        file.write_all(def_content.as_bytes())?;
+    }
+    
+    Ok(export_count)
 }
 
 fn copy_dll_to_target(dll_path: &Path) {
