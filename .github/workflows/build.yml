@@ -123,7 +123,52 @@ jobs:
           echo "C:\Program Files\Windows Kits\10\Redist\ucrt\DLLs\x64" >> $GITHUB_PATH
           echo "C:\Program Files (x86)\Windows Kits\10\Redist\10.0.19041.0\ucrt\DLLs\x64" >> $GITHUB_PATH
 
-      - name: Build and Run Example
+      - name: Build and Run Example (Windows)
+        if: matrix.os == 'windows-latest'
+        continue-on-error: true
+        run: |
+          # Build first
+          cargo build --example basic_usage --features download-lib
+          
+          # Copy Universal CRT DLLs to target directories for direct access
+          Write-Host "Copying Universal CRT DLLs to target directories..."
+          $requiredCRT = @("api-ms-win-crt-runtime-l1-1-0.dll", "api-ms-win-crt-math-l1-1-0.dll", "api-ms-win-crt-string-l1-1-0.dll")
+          $sourcePath = "C:\Program Files (x86)\Windows Kits\10\Redist\ucrt\DLLs\x64"
+          $targetDirs = @("target\debug", "target\debug\examples", "target\debug\deps")
+          
+          foreach ($targetDir in $targetDirs) {
+            if (Test-Path $targetDir) {
+              foreach ($dll in $requiredCRT) {
+                $sourceFile = Join-Path $sourcePath $dll
+                $targetFile = Join-Path $targetDir $dll
+                if (Test-Path $sourceFile) {
+                  Copy-Item $sourceFile $targetFile -Force
+                  Write-Host "✅ Copied $dll to $targetDir"
+                }
+              }
+            }
+          }
+          
+          # Verify all DLLs are present before running
+          Write-Host "Verifying DLLs in target\debug\examples before running..."
+          $examplesDir = "target\debug\examples"
+          $allDlls = @("aic.dll") + $requiredCRT
+          foreach ($dll in $allDlls) {
+            $dllPath = Join-Path $examplesDir $dll
+            if (Test-Path $dllPath) {
+              $size = (Get-Item $dllPath).Length
+              Write-Host "✅ $dll present ($(($size/1MB).ToString('F1')) MB)"
+            } else {
+              Write-Host "❌ $dll missing in examples directory"
+            }
+          }
+          
+          # Now run the example
+          Write-Host "Running example with all DLLs co-located..."
+          cargo run --example basic_usage --features download-lib
+
+      - name: Build and Run Example (Unix)
+        if: matrix.os != 'windows-latest'
         continue-on-error: true
         run: cargo run --example basic_usage --features download-lib
 
