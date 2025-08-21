@@ -188,6 +188,37 @@ fn handle_windows_linking(lib_path: &Path) {
     
     // Copy DLL to target directory for examples and tests
     copy_dll_to_target(&dll_path);
+    
+    // Also set up cargo instruction to copy DLL at runtime
+    println!("cargo:rustc-env=AIC_DLL_PATH={}", dll_path.display());
+    
+    // Set up PATH environment variable to include DLL directory for runtime
+    if let Some(dll_dir) = dll_path.parent() {
+        println!("cargo:rustc-env=AIC_DLL_DIR={}", dll_dir.display());
+    }
+    
+    // For CI environments, also try copying based on workspace structure
+    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    if let Some(workspace_root) = manifest_dir.parent() {
+        let workspace_target = workspace_root.join("target").join(env::var("PROFILE").unwrap_or_else(|_| "debug".to_string()));
+        if workspace_target.exists() || workspace_target.parent().unwrap().exists() {
+            let _ = std::fs::create_dir_all(&workspace_target);
+            
+            // Copy to workspace target root
+            let workspace_dll = workspace_target.join("aic.dll");
+            if let Ok(_) = std::fs::copy(&dll_path, &workspace_dll) {
+                println!("cargo:warning=Copied DLL to workspace target: {}", workspace_dll.display());
+            }
+            
+            // Copy to workspace examples directory
+            let workspace_examples = workspace_target.join("examples");
+            let _ = std::fs::create_dir_all(&workspace_examples);
+            let workspace_examples_dll = workspace_examples.join("aic.dll");
+            if let Ok(_) = std::fs::copy(&dll_path, &workspace_examples_dll) {
+                println!("cargo:warning=Copied DLL to workspace examples: {}", workspace_examples_dll.display());
+            }
+        }
+    }
 }
 
 fn try_generate_import_library(dll_path: &Path, out_dir: &Path) -> bool {
@@ -540,7 +571,9 @@ fn copy_dll_to_target(dll_path: &Path) {
                 let examples_dir = profile_dir.join("examples");
                 let _ = std::fs::create_dir_all(&examples_dir);
                 let examples_dll_path = examples_dir.join("aic.dll");
-                let _ = std::fs::copy(dll_path, &examples_dll_path);
+                if let Ok(_) = std::fs::copy(dll_path, &examples_dll_path) {
+                    println!("cargo:warning=Copied DLL to examples directory: {}", examples_dll_path.display());
+                }
                 
                 // Also copy to deps subdirectory 
                 let deps_dir = profile_dir.join("deps");
@@ -557,6 +590,39 @@ fn copy_dll_to_target(dll_path: &Path) {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let out_dll_path = out_dir.join("aic.dll");
     let _ = std::fs::copy(dll_path, &out_dll_path);
+    
+    // Try to determine the actual target directory from OUT_DIR
+    // OUT_DIR is typically something like: target/debug/build/crate-name-hash/out
+    if let Some(build_dir) = out_dir.parent() {
+        if let Some(crate_build_dir) = build_dir.parent() {
+            if let Some(build_root) = crate_build_dir.parent() {
+                if let Some(target_dir) = build_root.parent() {
+                    // Now target_dir should be the actual target directory
+                    let profile_dir = target_dir.join(&profile);
+                    
+                    // Copy to main target directory
+                    let main_dll_path = profile_dir.join("aic.dll");
+                    if let Ok(_) = std::fs::copy(dll_path, &main_dll_path) {
+                        println!("cargo:warning=Copied DLL to main target: {}", main_dll_path.display());
+                    }
+                    
+                    // Copy to examples directory 
+                    let examples_dir = profile_dir.join("examples");
+                    let _ = std::fs::create_dir_all(&examples_dir);
+                    let examples_dll_path = examples_dir.join("aic.dll");
+                    if let Ok(_) = std::fs::copy(dll_path, &examples_dll_path) {
+                        println!("cargo:warning=Copied DLL to examples (from OUT_DIR): {}", examples_dll_path.display());
+                    }
+                    
+                    // Copy to deps directory
+                    let deps_dir = profile_dir.join("deps");
+                    let _ = std::fs::create_dir_all(&deps_dir);
+                    let deps_dll_path = deps_dir.join("aic.dll");
+                    let _ = std::fs::copy(dll_path, &deps_dll_path);
+                }
+            }
+        }
+    }
 }
 
 fn generate_bindings() {
