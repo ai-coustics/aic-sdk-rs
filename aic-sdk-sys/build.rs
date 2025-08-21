@@ -511,24 +511,52 @@ fn try_create_lib_with_any_tool(def_file_path: &Path, import_lib_path: &Path) ->
 }
 
 fn copy_dll_to_target(dll_path: &Path) {
-    // Copy DLL to target directory so examples and tests can find it
-    if let Ok(target_dir) = env::var("CARGO_TARGET_DIR") {
-        let target_path = PathBuf::from(target_dir);
-        let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
-        let dll_target_path = target_path.join(profile).join("aic.dll");
-        
-        let _ = std::fs::copy(dll_path, &dll_target_path);
-        println!("cargo:warning=Copied DLL to target directory: {}", dll_target_path.display());
+    // Copy DLL to multiple locations where the executable might look for it
+    let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
+    
+    // Try to get the correct target directory
+    let target_dirs = if let Ok(target_dir) = env::var("CARGO_TARGET_DIR") {
+        vec![PathBuf::from(target_dir)]
     } else {
-        // Fallback: try relative path
-        let target_path = PathBuf::from("../target");
-        if target_path.exists() {
-            let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
-            let dll_target_path = target_path.join(profile).join("aic.dll");
-            let _ = std::fs::copy(dll_path, &dll_target_path);
-            println!("cargo:warning=Copied DLL to target directory: {}", dll_target_path.display());
+        // Try both workspace root and current directory
+        vec![
+            PathBuf::from("../../target"),  // From aic-sdk-sys directory to workspace root
+            PathBuf::from("../target"),     // From aic-sdk-sys directory to parent
+            PathBuf::from("target"),        // Current directory
+        ]
+    };
+    
+    for target_path in target_dirs {
+        if target_path.exists() || target_path.parent().map(|p| p.exists()).unwrap_or(false) {
+            // Create target directory if it doesn't exist
+            let profile_dir = target_path.join(&profile);
+            let _ = std::fs::create_dir_all(&profile_dir);
+            
+            let dll_target_path = profile_dir.join("aic.dll");
+            if let Ok(_) = std::fs::copy(dll_path, &dll_target_path) {
+                println!("cargo:warning=Copied DLL to target directory: {}", dll_target_path.display());
+                
+                // Also copy to examples subdirectory for examples
+                let examples_dir = profile_dir.join("examples");
+                let _ = std::fs::create_dir_all(&examples_dir);
+                let examples_dll_path = examples_dir.join("aic.dll");
+                let _ = std::fs::copy(dll_path, &examples_dll_path);
+                
+                // Also copy to deps subdirectory 
+                let deps_dir = profile_dir.join("deps");
+                let _ = std::fs::create_dir_all(&deps_dir);
+                let deps_dll_path = deps_dir.join("aic.dll");
+                let _ = std::fs::copy(dll_path, &deps_dll_path);
+                
+                break; // Successfully copied, no need to try other paths
+            }
         }
     }
+    
+    // Additional fallback: copy to the output directory itself for build scripts to find
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let out_dll_path = out_dir.join("aic.dll");
+    let _ = std::fs::copy(dll_path, &out_dll_path);
 }
 
 fn generate_bindings() {
