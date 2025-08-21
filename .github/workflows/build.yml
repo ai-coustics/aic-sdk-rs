@@ -116,17 +116,14 @@ jobs:
             }
           }
 
-      - name: Build and Run Example (Windows)
+      - name: Add Universal CRT to PATH (Windows)
         if: matrix.os == 'windows-latest'
-        continue-on-error: true
-        shell: cmd
-        env:
-          # Add Universal CRT paths for DLL resolution
-          PATH: "C:\\Program Files (x86)\\Windows Kits\\10\\Redist\\ucrt\\DLLs\\x64;C:\\Program Files\\Windows Kits\\10\\Redist\\ucrt\\DLLs\\x64;C:\\Program Files (x86)\\Windows Kits\\10\\Redist\\10.0.19041.0\\ucrt\\DLLs\\x64;%PATH%"
-        run: cargo run --example basic_usage --features download-lib
+        run: |
+          echo "C:\Program Files (x86)\Windows Kits\10\Redist\ucrt\DLLs\x64" >> $GITHUB_PATH
+          echo "C:\Program Files\Windows Kits\10\Redist\ucrt\DLLs\x64" >> $GITHUB_PATH
+          echo "C:\Program Files (x86)\Windows Kits\10\Redist\10.0.19041.0\ucrt\DLLs\x64" >> $GITHUB_PATH
 
-      - name: Build and Run Example (Unix)
-        if: matrix.os != 'windows-latest'
+      - name: Build and Run Example
         continue-on-error: true
         run: cargo run --example basic_usage --features download-lib
 
