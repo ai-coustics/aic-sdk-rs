@@ -165,10 +165,22 @@ fn handle_windows_linking(lib_path: &Path) {
         println!("cargo:rustc-link-search=native={}", out_dir.display());
         println!("cargo:rustc-link-lib=dylib=aic");
     } else {
-        // Last resort: try to use the DLL directly (may not work on all systems)
-        println!("cargo:warning=Couldn't generate import library with any available tools, trying direct DLL linking");
-        println!("cargo:rustc-link-search=native={}", dll_path.parent().unwrap().display());
-        println!("cargo:rustc-link-lib=dylib=aic");
+        // Last resort: create a minimal import library manually or avoid the conflicting static lib
+        println!("cargo:warning=Couldn't generate import library with any available tools, trying manual approach");
+        if try_manual_import_library(&dll_path, &out_dir) {
+            println!("cargo:rustc-link-search=native={}", out_dir.display());
+            println!("cargo:rustc-link-lib=dylib=aic");
+        } else {
+            // Final fallback: copy DLL to clean location and try direct linking
+            let clean_dll_dir = out_dir.join("dll_clean");
+            std::fs::create_dir_all(&clean_dll_dir).expect("Failed to create clean DLL directory");
+            let clean_dll_path = clean_dll_dir.join("aic.dll");
+            std::fs::copy(&dll_path, &clean_dll_path).expect("Failed to copy DLL to clean location");
+            
+            println!("cargo:warning=Using direct DLL linking from clean directory");
+            println!("cargo:rustc-link-search=native={}", clean_dll_dir.display());
+            println!("cargo:rustc-link-lib=dylib=aic");
+        }
     }
     
     // Tell cargo to rerun if the DLL changes
@@ -393,6 +405,109 @@ fn create_def_file_from_llvm(llvm_output: &str, def_file_path: &Path) -> Result<
     }
     
     Ok(export_count)
+}
+
+fn try_manual_import_library(_dll_path: &Path, out_dir: &Path) -> bool {
+    println!("cargo:warning=Attempting to create minimal import library manually");
+    
+    let import_lib_path = out_dir.join("aic.lib");
+    let def_file_path = out_dir.join("aic.def");
+    
+    // Clean up any existing files first
+    let _ = std::fs::remove_file(&import_lib_path);
+    let _ = std::fs::remove_file(&def_file_path);
+    
+    // Try to create a minimal .def file with common aic functions
+    // This is a fallback approach when we can't inspect the DLL
+    match create_minimal_def_file(&def_file_path) {
+        Ok(_) => {
+            println!("cargo:warning=Created minimal .def file");
+            
+            // Try any available tool to create import library
+            if try_create_lib_with_any_tool(&def_file_path, &import_lib_path) {
+                let _ = std::fs::remove_file(&def_file_path);
+                return true;
+            }
+        }
+        Err(e) => {
+            println!("cargo:warning=Failed to create minimal .def file: {}", e);
+        }
+    }
+    
+    // Cleanup on failure
+    let _ = std::fs::remove_file(&def_file_path);
+    let _ = std::fs::remove_file(&import_lib_path);
+    false
+}
+
+fn create_minimal_def_file(def_file_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    use std::fs::File;
+    use std::io::Write;
+    
+    // Create a .def file with actual function names from the AIC SDK header
+    let def_content = r#"EXPORTS
+    aic_model_create
+    aic_model_destroy
+    aic_model_initialize
+    aic_model_reset
+    aic_model_process_planar
+    aic_model_process_interleaved
+    aic_model_set_parameter
+    aic_model_get_parameter
+    aic_get_output_delay
+    aic_get_optimal_sample_rate
+    aic_get_optimal_num_frames
+    aic_get_sdk_version
+"#;
+    
+    let mut file = File::create(def_file_path)?;
+    file.write_all(def_content.as_bytes())?;
+    Ok(())
+}
+
+fn try_create_lib_with_any_tool(def_file_path: &Path, import_lib_path: &Path) -> bool {
+    use std::process::Command;
+    
+    // Try lib.exe (Microsoft)
+    if let Ok(output) = Command::new("lib")
+        .arg(format!("/DEF:{}", def_file_path.display()))
+        .arg(format!("/OUT:{}", import_lib_path.display()))
+        .arg("/MACHINE:X64")
+        .output()
+    {
+        if output.status.success() {
+            println!("cargo:warning=Created import library with lib.exe");
+            return true;
+        }
+    }
+    
+    // Try llvm-dlltool
+    if let Ok(output) = Command::new("llvm-dlltool")
+        .arg("-d").arg(def_file_path)
+        .arg("-l").arg(import_lib_path)
+        .arg("-m").arg("i386:x86-64")
+        .output()
+    {
+        if output.status.success() {
+            println!("cargo:warning=Created import library with llvm-dlltool");
+            return true;
+        }
+    }
+    
+    // Try dlltool (MinGW)
+    if let Ok(output) = Command::new("dlltool")
+        .arg("-d").arg(def_file_path)
+        .arg("-l").arg(import_lib_path)
+        .arg("-m").arg("i386:x86-64")
+        .output()
+    {
+        if output.status.success() {
+            println!("cargo:warning=Created import library with dlltool");
+            return true;
+        }
+    }
+    
+    false
 }
 
 fn copy_dll_to_target(dll_path: &Path) {
