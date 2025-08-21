@@ -32,19 +32,14 @@ fn main() {
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    // Use different approaches for Windows vs other platforms
-    if cfg!(target_os = "windows") {
-        handle_windows_linking(&lib_path);
-    } else {
-        let lib_name = "aic";
-        let lib_name_patched = "aic_patched";
+    let lib_name = "aic";
+    let lib_name_patched = "aic_patched";
 
-        patch_lib(&lib_path, lib_name, lib_name_patched);
+    patch_lib(&lib_path, lib_name, lib_name_patched);
 
-        // Link with the curated library
-        println!("cargo:rustc-link-search=native={}", out_dir.display());
-        println!("cargo:rustc-link-lib=static={lib_name_patched}");
-    }
+    // Link with the curated library
+    println!("cargo:rustc-link-search=native={}", out_dir.display());
+    println!("cargo:rustc-link-lib=static={lib_name_patched}");
 
     // Add platform-specific system libraries
     add_platform_specific_libs();
