@@ -146,6 +146,9 @@ fn handle_windows_linking(lib_path: &Path) {
     
     println!("cargo:warning=Using DLL linking approach on Windows: {}", dll_path.display());
     
+    // Check DLL dependencies to help debug runtime issues
+    check_dll_dependencies(&dll_path);
+    
     // Copy the DLL to the output directory so it can be found at runtime
     let out_dll_path = out_dir.join(dll_name);
     std::fs::copy(&dll_path, &out_dll_path)
@@ -188,6 +191,9 @@ fn handle_windows_linking(lib_path: &Path) {
     
     // Copy DLL to target directory for examples and tests
     copy_dll_to_target(&dll_path);
+    
+    // Also copy any additional DLLs that might be dependencies
+    // copy_additional_dlls(&dll_path); // TODO: Fix function order issue
     
     // Also set up cargo instruction to copy DLL at runtime
     println!("cargo:rustc-env=AIC_DLL_PATH={}", dll_path.display());
@@ -539,6 +545,99 @@ fn try_create_lib_with_any_tool(def_file_path: &Path, import_lib_path: &Path) ->
     }
     
     false
+}
+
+fn copy_additional_dlls(dll_path: &Path) {
+    // Look for additional DLLs in the same directory as aic.dll
+    if let Some(dll_dir) = dll_path.parent() {
+        if let Ok(entries) = std::fs::read_dir(dll_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() && 
+                   path.extension().and_then(|s| s.to_str()) == Some("dll") &&
+                   path.file_name() != dll_path.file_name() {
+                    
+                    println!("cargo:warning=Found additional DLL: {}", path.display());
+                    
+                    // Copy this DLL to the same locations as the main DLL
+                    let dll_name = path.file_name().unwrap();
+                    copy_single_dll_to_targets(&path, dll_name.to_str().unwrap());
+                }
+            }
+        }
+    }
+}
+
+fn copy_single_dll_to_targets(dll_path: &Path, dll_name: &str) {
+    let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
+    
+    // Copy to workspace structure
+    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    if let Some(workspace_root) = manifest_dir.parent() {
+        let workspace_target = workspace_root.join("target").join(&profile);
+        if workspace_target.exists() || workspace_target.parent().unwrap().exists() {
+            let _ = std::fs::create_dir_all(&workspace_target);
+            
+            // Copy to main target directory
+            let target_dll = workspace_target.join(dll_name);
+            if let Ok(_) = std::fs::copy(dll_path, &target_dll) {
+                println!("cargo:warning=Copied additional DLL to target: {}", target_dll.display());
+            }
+            
+            // Copy to examples directory
+            let examples_dir = workspace_target.join("examples");
+            let _ = std::fs::create_dir_all(&examples_dir);
+            let examples_dll = examples_dir.join(dll_name);
+            if let Ok(_) = std::fs::copy(dll_path, &examples_dll) {
+                println!("cargo:warning=Copied additional DLL to examples: {}", examples_dll.display());
+            }
+        }
+    }
+}
+
+fn check_dll_dependencies(dll_path: &Path) {
+    use std::process::Command;
+    
+    // Try to check DLL dependencies using dumpbin if available
+    if let Ok(output) = Command::new("dumpbin")
+        .arg("/DEPENDENTS")
+        .arg(dll_path)
+        .output()
+    {
+        if output.status.success() {
+            let deps_output = String::from_utf8_lossy(&output.stdout);
+            println!("cargo:warning=DLL dependencies found:");
+            for line in deps_output.lines() {
+                if line.trim().ends_with(".dll") {
+                    println!("cargo:warning=  -> {}", line.trim());
+                }
+            }
+        }
+    } else if let Ok(output) = Command::new("objdump")
+        .arg("-p")
+        .arg(dll_path)
+        .output()
+    {
+        if output.status.success() {
+            let deps_output = String::from_utf8_lossy(&output.stdout);
+            println!("cargo:warning=DLL dependencies (objdump):");
+            for line in deps_output.lines() {
+                if line.contains("DLL Name:") {
+                    println!("cargo:warning=  -> {}", line.trim());
+                }
+            }
+        }
+    }
+    
+    // Also check if the DLL exists and is readable
+    match std::fs::metadata(dll_path) {
+        Ok(metadata) => {
+            println!("cargo:warning=DLL file size: {} bytes", metadata.len());
+        }
+        Err(e) => {
+            println!("cargo:warning=Error reading DLL metadata: {}", e);
+        }
+    }
 }
 
 fn copy_dll_to_target(dll_path: &Path) {
