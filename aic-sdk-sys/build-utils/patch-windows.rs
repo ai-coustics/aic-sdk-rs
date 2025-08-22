@@ -124,13 +124,7 @@ fn try_llvm_approach(
         }
 
         // Check if this object contains symbols we want to keep
-        let should_keep = match check_object_symbols_llvm(&path, prefix) {
-            Ok(has_symbols) => has_symbols,
-            Err(_) => {
-                // If we can't analyze it, keep it to be safe
-                true
-            }
-        };
+        let should_keep = check_object_symbols_llvm(&path, prefix).unwrap_or(true);
 
         if should_keep {
             // Filter symbols in this object file
@@ -346,10 +340,10 @@ fn check_object_symbols_llvm(
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     for line in stdout.lines() {
-        if let Some(symbol) = parse_nm_symbol_windows(line) {
-            if symbol.starts_with(prefix) {
-                return Ok(true);
-            }
+        if let Some(symbol) = parse_nm_symbol_windows(line)
+            && symbol.starts_with(prefix)
+        {
+            return Ok(true);
         }
     }
 

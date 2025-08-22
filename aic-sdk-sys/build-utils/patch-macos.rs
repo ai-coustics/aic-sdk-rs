@@ -27,7 +27,7 @@ pub fn patch_lib(
         .arg("-o")
         .arg(&intermediate_obj)
         .arg("-all_load")
-        .arg(&static_lib)
+        .arg(static_lib)
         .status()
         .expect("Failed to execute ld command on macOS");
 
@@ -88,7 +88,7 @@ pub fn patch_lib(
     // Create the final archive
     let ar_status = Command::new("ar")
         .arg("rcs")
-        .arg(&final_lib)
+        .arg(final_lib)
         .arg(&final_obj)
         .status()
         .expect("Failed to execute ar command on macOS");
@@ -141,7 +141,7 @@ fn create_macos_symbols_file(
         for arg in args {
             cmd.arg(arg);
         }
-        cmd.arg(&obj_file);
+        cmd.arg(obj_file);
 
         match cmd.output() {
             Ok(output) if output.status.success() => {

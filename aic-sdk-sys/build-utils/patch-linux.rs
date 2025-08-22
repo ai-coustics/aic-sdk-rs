@@ -21,7 +21,7 @@ pub fn patch_lib(
         .arg("-o")
         .arg(&intermediate_obj)
         .arg("--whole-archive")
-        .arg(&static_lib)
+        .arg(static_lib)
         .status()
         .expect("Failed to execute ld command.");
 
@@ -53,7 +53,7 @@ pub fn patch_lib(
     // Build the archive
     let ar_status = Command::new("ar")
         .arg("rcs")
-        .arg(&final_lib)
+        .arg(final_lib)
         .arg(&final_obj)
         .status()
         .expect("Failed to execute ar.");
