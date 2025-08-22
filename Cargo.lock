@@ -30,7 +30,7 @@ dependencies = [
 
 [[package]]
 name = "aic-sdk"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "aic-sdk-sys",
  "thiserror",
@@ -38,7 +38,7 @@ dependencies = [
 
 [[package]]
 name = "aic-sdk-sys"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "bindgen",
  "flate2",
