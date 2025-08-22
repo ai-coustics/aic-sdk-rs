@@ -1,4 +1,19 @@
-# Rust Wrapper for the ai-coustics SDK
+# ai-coustics Speech Enhancement SDK for Rust
+
+## What is this SDK?
+
+Our Speech Enhancement SDK delivers state-of-the-art audio processing capabilities, enabling you to enhance speech clarity and intelligibility in real-time.
+
+## Quick Start
+
+### Acquire an SDK License Key
+
+To use the SDK, you'll need a license key. Contact our team to receive your time-limited demo key:
+
+- **Email**: [info@ai-coustics.com](mailto:info@ai-coustics.com)
+- **Website**: [ai-coustics.com](https://ai-coustics.com)
+
+Once you have your license key, set it as an environment variable or pass it directly to the SDK initialization functions.
 
 ## Integration
 
@@ -12,7 +27,7 @@ aic-sdk = { version = "0.6.2", features = ["download-lib"] }
 If you want to provide your own library, use the `AIC_LIB_PATH` environment variable to specify the path
 to the directory where the library is located.
 
-## Example
+## Example Usage
 
 ```rust
 use aic_sdk::{Model, ModelType, Parameter};
@@ -42,6 +57,51 @@ model.initialize(48000, 2, 480)?;
 model.process_planar(&mut audio_refs)?;
 ```
 
+## Running the Example
+
+To run the example, make sure you have set your license key as an environment variable:
+
+```bash
+export AIC_SDK_LICENSE="your_license_key_here"
+```
+
+Then use the following commands to configure, build and run the example:
+
+```sh
+cargo run --example basic_usage --features download-lib
+```
+
 ## Compatibility
 
 This crate currently builds on Linux and macOS. Windows is not yet supported.
+
+## Support & Resources
+
+### Documentation
+- **[Basic Example](examples/basic_usage.rs)** - Sample code and integration patterns
+
+### Looking for Other Languages?
+The ai-coustics Speech Enhancement SDK is available in multiple programming languages to fit your development needs:
+
+| Language | Repository | Description |
+|----------|------------|-------------|
+| C | [aic-sdk-c](https://github.com/ai-coustics/aic-sdk-c) | Core C interface and foundation library |
+| C++ | [aic-sdk-cpp](https://github.com/ai-coustics/aic-sdk-cpp) | C++ interface |
+| Node.js | [aic-sdk-node](https://github.com/ai-coustics/aic-sdk-node) | JavaScript/TypeScript bindings for Node.js |
+| Python | [aic-sdk-py](https://github.com/ai-coustics/aic-sdk-py) | Pythonic interface |
+| WebAssembly | [aic-sdk-wasm](https://github.com/ai-coustics/aic-sdk-wasm) | Browser-compatible WebAssembly build |
+
+All SDKs provide the same core functionality with language-specific optimizations and idioms.
+
+### Get Help
+Need assistance? We're here to support you:
+- **Issues**: [GitHub Issues](https://github.com/ai-coustics/aic-sdk-rs/issues)
+- **Technical Support**: [info@ai-coustics.com](mailto:info@ai-coustics.com)
+
+## License
+This Rust wrapper is distributed under the [Apache 2.0 license](LICENSE), while the core C SDK is distributed under the proprietary [AIC-SDK license](LICENSE.AIC-SDK).
+
+---
+
+Made with ❤️ by the ai-coustics team
+

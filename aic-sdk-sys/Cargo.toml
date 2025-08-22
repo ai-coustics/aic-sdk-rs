@@ -2,6 +2,16 @@
 name = "aic-sdk-sys"
 version = "0.6.2"
 edition = "2024"
+description = "ai-coustics Speech Enhancement SDK"
+homepage = "https://ai-coustics.com/sdk/"
+repository = "https://github.com/ai-coustics/aic-sdk-rs"
+documentation = "https://docs.rs/aic-sdk-sys"
+readme = "README.md"
+license = "Apache-2.0"
+keywords = ["speech", "voice", "enhancement", "noise", "cancellation"]
+categories = ["multimedia::audio"]
+exclude = [".github"]
+
 
 [features]
 download-lib = ["dep:ureq", "dep:tar", "dep:flate2", "dep:sha2", "dep:zip"]
