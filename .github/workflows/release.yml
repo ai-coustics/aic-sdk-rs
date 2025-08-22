@@ -38,6 +38,10 @@ jobs:
           name: ${{ github.ref_name }}
           body_path: RELEASE_BODY.md
 
+        # Otherwise cargo publish fails because the repo is not clean
+      - name: Remove RELEASE_BODY.md
+        run: rm -f RELEASE_BODY.md
+
       - name: Cargo Login
         run: echo "${{ secrets.CRATES_IO_API_TOKEN }}" | cargo login
 
