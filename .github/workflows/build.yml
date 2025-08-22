@@ -1,0 +1,24 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "*"
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-run:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest] # Add windows-latest when supported
+    env:
+      AIC_SDK_LICENSE: ${{ secrets.AIC_SDK_LICENSE }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@beta
+      - name: Build and Run Example
+        run: cargo run --example basic_usage --features download-lib
