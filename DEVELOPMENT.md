@@ -4,6 +4,7 @@ Before creating a release, check that everything can be published to crates.io.
 
 1. If there were changes in `aic-sdk-sys`:
   - Increase workspace version number
+  - Update SHAs of library artifacts
   - Test if `aic-sdk-sys` can be published `cargo publish -p aic-sdk-sys --dry-run`
   - Set `aic-sdk-sys` dependency version number in top-level `Cargo.toml` to the newest version
 2. Check that the right version numbers are reflected in `README.md`.

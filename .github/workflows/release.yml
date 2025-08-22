@@ -1,0 +1,51 @@
+name: Release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    # on release with version tag
+    tags:
+      - "*.*.*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ${{ matrix.platform.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - os: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Create Release Notes
+        id: changelog
+        run: |
+          awk 'BEGIN{print_mode=0} /^## /{if (print_mode==1) exit; if (NR>1) print_mode=1} {if (print_mode==1) print}' CHANGELOG.md > RELEASE_BODY.md
+          echo "Generated release body:" && echo "-----" && cat RELEASE_BODY.md && echo "-----"
+
+      - name: Create GH Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: RELEASE_BODY.md
+
+      - name: Cargo Login
+        run: echo "${{ secrets.CRATES_IO_API_TOKEN }}" | cargo login
+
+      - name: Publish Dry Run Sys Crate
+        run: cargo publish -p aic-sdk-sys --dry-run --features download-lib
+
+      - name: Publish Dry Run Sys Crate
+        run: cargo publish -p aic-sdk-sys --features download-lib
+
+      - name: Publish Dry Run Main Crate
+        run: cargo publish -p aic-sdk --features download-lib
