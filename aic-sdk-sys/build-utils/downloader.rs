@@ -18,23 +18,23 @@ impl Downloader {
         let artifact_sha = HashMap::from([
             (
                 format!("aic-sdk-aarch64-apple-darwin-{version}.tar.gz"),
-                "7f2a3f1705113a8e0eb4e01cd24afbc959b84451b33fc9aaaea7475e71971fc6".to_string(),
+                "35384d0e51733f39276c427a92f13d4a983404634604ec5fbeda10a3debc2860".to_string(),
             ),
             (
                 format!("aic-sdk-aarch64-unknown-linux-gnu-{version}.tar.gz"),
-                "25b065eb82dfd21934c244e0e1307bfa6b49af25c3e68986e8e1a0e6f151332d".to_string(),
+                "3c10d6af456d8d6641f7e0f82e85145f79d7b1b6459c820e489f685296fafc28".to_string(),
             ),
             (
                 format!("aic-sdk-x86_64-apple-darwin-{version}.tar.gz"),
-                "5b86b2359427adb56000a88308c75cc9b636890abd5211120a5735ea1e75c696".to_string(),
+                "a1e8050c8b87b645c2acb5bce396aa964640074b183da54248c2ef9549c41b6b".to_string(),
             ),
             (
                 format!("aic-sdk-x86_64-pc-windows-msvc-{version}.zip"),
-                "c662138cd4d997fec0b1e0fd7312c1693d976a3fe15d4236409d1b645b879281".to_string(),
+                "c6a414e23285e3c2930cae4c942f02aea30175a2986a2871304e6229b83bc91b".to_string(),
             ),
             (
                 format!("aic-sdk-x86_64-unknown-linux-gnu-{version}.tar.gz"),
-                "bc410a5aea213bcbf3a3dd9e2192fbd308ff2e15312479f559138814352cc15a".to_string(),
+                "e22593f5cc6241be3d495d4a154c1157f298213e614cbe248a419745fc02e681".to_string(),
             ),
         ]);
 
