@@ -42,7 +42,7 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - run: RUSTFLAGS="-D warnings" cargo clippy
+      - run: RUSTFLAGS="-D warnings" cargo clippy --features download-lib
 
   doc:
     name: Documentation
