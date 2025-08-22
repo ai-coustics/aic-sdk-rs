@@ -22,11 +22,18 @@ pub fn patch_lib(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_pat
         panic!("ld -r command failed for {}", static_lib.display());
     }
 
-    // Curate symbols (only keep specific symbols)
+    // Curate symbols (only keep specific symbols) and remove problematic sections
     let objcopy_status = Command::new("objcopy")
         .arg("--wildcard")
         .arg("--keep-global-symbol")
         .arg(global_symbols_wildcard)
+        // Remove sections that may contain references to stripped Rust compiler symbols
+        .arg("--remove-section=.eh_frame")
+        .arg("--remove-section=.eh_frame_hdr")
+        .arg("--remove-section=.gcc_except_table")
+        .arg("--remove-section=.debug_*")
+        .arg("--remove-section=.note.gnu.build-id")
+        .arg("--remove-section=.comment")
         .arg(&intermediate_obj)
         .arg(&final_obj)
         .status()
