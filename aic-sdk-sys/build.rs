@@ -13,6 +13,10 @@ mod patch_macos;
 mod patch_windows;
 
 fn main() {
+    if cfg!(target_os = "windows") {
+        panic!("Windows is not supported yet. Please use a different platform to build the SDK.");
+    }
+
     if env::var("DOCS_RS").is_ok() {
         // On docs.rs we don't need to link and we don't have network,
         // so we couldn't download anything if we wanted to
