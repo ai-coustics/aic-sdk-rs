@@ -38,7 +38,6 @@ pub fn patch_lib(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_pat
     match create_macos_symbols_file(&intermediate_obj, &symbols_file) {
         Ok(symbol_count) => {
             if symbol_count == 0 {
-                println!("cargo:warning=No aic_* symbols found in macOS library, using library as-is");
                 // Just copy the original library since no filtering is needed
                 fs::copy(static_lib, final_lib)
                     .expect("Failed to copy library file");
@@ -46,9 +45,7 @@ pub fn patch_lib(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_pat
                 return;
             }
         }
-        Err(e) => {
-            println!("cargo:warning=Symbol analysis failed on macOS: {}", e);
-            println!("cargo:warning=Using library as-is without symbol filtering");
+        Err(_) => {
             // Fallback: just copy the original library
             fs::copy(static_lib, final_lib)
                 .expect("Failed to copy library file");
@@ -112,16 +109,6 @@ fn get_macos_arch() -> String {
 }
 
 fn create_macos_symbols_file(obj_file: &Path, symbols_file: &Path) -> Result<usize, Box<dyn std::error::Error>> {
-    // First, let's try to get basic file info to debug
-    let file_info = Command::new("file")
-        .arg(&obj_file)
-        .output();
-    
-    if let Ok(info) = file_info {
-        let info_str = String::from_utf8_lossy(&info.stdout);
-        println!("cargo:warning=Object file info: {}", info_str.trim());
-    }
-
     // Try different nm command variations for macOS
     let nm_variations = [
         vec!["-g", "-defined-only"],  // Global and defined only
@@ -170,11 +157,6 @@ fn create_macos_symbols_file(obj_file: &Path, symbols_file: &Path) -> Result<usi
     }
 
     if symbols_to_keep.is_empty() {
-        // Debug: Let's see what symbols are actually there
-        println!("cargo:warning=No aic symbols found. First 10 lines of nm output:");
-        for (i, line) in nm_stdout.lines().take(10).enumerate() {
-            println!("cargo:warning=  {}: {}", i, line);
-        }
         return Ok(0);
     }
 
