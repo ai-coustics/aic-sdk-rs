@@ -1,15 +1,16 @@
 # Rust Wrapper for the ai-coustics SDK
 
-This example is using the Linux x86 built of our SDK.
-If you need a different built, just exchange the `libaic.a` or `aic.lib` file in the `aic-sdk-sys/libs/` folder.
-The library will be statically linked so it can be used in any Rust project.
-
 ## Integration
+
+Enable the `download-lib` feature to automatically download the library when building the crate.
 
 ```toml
 [dependencies]
 aic-sdk = { version = "0.6.2", features = ["download-lib"] }
 ```
+
+If you want to provide your own library, use the `AIC_LIB_PATH` environment variable to specify the path
+to the directory where the library is located.
 
 ## Example
 
