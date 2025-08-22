@@ -6,11 +6,9 @@ The library will be statically linked so it can be used in any Rust project.
 
 ## Integration
 
-You can drop this folder in your project and just add it like this in your `Cargo.toml` file.
-
 ```toml
 [dependencies]
-aic-sdk = { path = "path/to/aic-sdk-rs" } # or whatever name you gave the folder
+aic-sdk = { version = "0.6.2", features = ["download-lib"] }
 ```
 
 ## Example
@@ -24,8 +22,7 @@ let license_key = std::env::var("AIC_SDK_LICENSE")?;
 // and passing your license key as an &str
 let mut model = Model::new(ModelType::QuailS48, &license_key)?;
 
-// Initialize must be called at least once before processing can start
-// and every time when the audio settings change
+// Initialize the model with your audio settings
 model.initialize(48000, 1, 480)?;
 
 let mut audio_buffer = vec![0.0f32; 480];
@@ -36,7 +33,6 @@ model.process_interleaved(&mut audio_buffer, 1, 480)?;
 
 // You can also adjust parameters during processing
 model.set_parameter(Parameter::EnhancementLevel, 0.8)?;
-model.set_parameter(Parameter::VoiceGain, 1.5)?;
 
 // For planar audio processing (separate channel buffers)
 let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
@@ -44,3 +40,7 @@ let mut audio_refs: Vec<&mut [f32]> = audio.iter_mut().map(|ch| ch.as_mut_slice(
 model.initialize(48000, 2, 480)?;
 model.process_planar(&mut audio_refs)?;
 ```
+
+## Compatibility
+
+This crate currently builds on Linux and macOS. Windows is not yet supported.
