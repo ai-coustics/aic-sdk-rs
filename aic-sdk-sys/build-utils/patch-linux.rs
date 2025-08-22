@@ -1,7 +1,14 @@
 use std::path::Path;
 use std::process::Command;
 
-pub fn patch_lib(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_patched: &str, global_symbols_wildcard: &str, final_lib: &Path) {
+pub fn patch_lib(
+    static_lib: &Path,
+    out_dir: &Path,
+    lib_name: &str,
+    lib_name_patched: &str,
+    global_symbols_wildcard: &str,
+    final_lib: &Path,
+) {
     // Original .o file
     let intermediate_obj = out_dir.join(format!("lib{}.o", lib_name));
 
@@ -14,7 +21,7 @@ pub fn patch_lib(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_pat
         .arg("-o")
         .arg(&intermediate_obj)
         .arg("--whole-archive")
-        .arg(&static_lib)
+        .arg(static_lib)
         .status()
         .expect("Failed to execute ld command.");
 
@@ -46,7 +53,7 @@ pub fn patch_lib(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_pat
     // Build the archive
     let ar_status = Command::new("ar")
         .arg("rcs")
-        .arg(&final_lib)
+        .arg(final_lib)
         .arg(&final_obj)
         .status()
         .expect("Failed to execute ar.");

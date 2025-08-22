@@ -56,7 +56,7 @@ fn add_platform_specific_libs() {
         // macOS requires CoreFoundation framework for time zone operations
         // This is needed by chrono and other crates that interact with system time
         println!("cargo:rustc-link-lib=framework=CoreFoundation");
-        
+
         // Security framework might also be needed for some operations
         println!("cargo:rustc-link-lib=framework=Security");
     } else if cfg!(target_os = "windows") {
@@ -86,7 +86,11 @@ fn download_lib() -> PathBuf {
 fn patch_lib(lib_path: &Path, lib_name: &str, lib_name_patched: &str) {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    let static_lib_ext = if cfg!(target_os = "windows") { ".lib" } else { ".a" };
+    let static_lib_ext = if cfg!(target_os = "windows") {
+        ".lib"
+    } else {
+        ".a"
+    };
     let static_lib = if cfg!(target_os = "windows") {
         lib_path.join(format!("{}{}", lib_name, static_lib_ext))
     } else {
@@ -106,11 +110,32 @@ fn patch_lib(lib_path: &Path, lib_name: &str, lib_name_patched: &str) {
     };
 
     if cfg!(target_os = "linux") {
-        patch_linux::patch_lib(&static_lib, &out_dir, lib_name, lib_name_patched, global_symbols_wildcard, &final_lib);
+        patch_linux::patch_lib(
+            &static_lib,
+            &out_dir,
+            lib_name,
+            lib_name_patched,
+            global_symbols_wildcard,
+            &final_lib,
+        );
     } else if cfg!(target_os = "macos") {
-        patch_macos::patch_lib(&static_lib, &out_dir, lib_name, lib_name_patched, global_symbols_wildcard, &final_lib);
+        patch_macos::patch_lib(
+            &static_lib,
+            &out_dir,
+            lib_name,
+            lib_name_patched,
+            global_symbols_wildcard,
+            &final_lib,
+        );
     } else if cfg!(target_os = "windows") {
-        patch_windows::patch_lib(&static_lib, &out_dir, lib_name, lib_name_patched, global_symbols_wildcard, &final_lib);
+        patch_windows::patch_lib(
+            &static_lib,
+            &out_dir,
+            lib_name,
+            lib_name_patched,
+            global_symbols_wildcard,
+            &final_lib,
+        );
     } else {
         panic!("Unsupported platform for library patching");
     }
