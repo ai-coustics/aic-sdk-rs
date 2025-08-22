@@ -1,7 +1,14 @@
 use std::path::Path;
 use std::process::Command;
 
-pub fn patch_lib(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_patched: &str, global_symbols_wildcard: &str, final_lib: &Path) {
+pub fn patch_lib(
+    static_lib: &Path,
+    out_dir: &Path,
+    lib_name: &str,
+    lib_name_patched: &str,
+    global_symbols_wildcard: &str,
+    final_lib: &Path,
+) {
     // Original .o file
     let intermediate_obj = out_dir.join(format!("lib{}.o", lib_name));
 

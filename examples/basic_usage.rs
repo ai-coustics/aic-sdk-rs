@@ -40,14 +40,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Test parameter setting and getting
     model.set_parameter(Parameter::EnhancementLevel, 0.7)?;
     println!("Parameter set successfully");
-    
+
     let enhancement_level = model.get_parameter(Parameter::EnhancementLevel)?;
     println!("Enhancement level: {}", enhancement_level);
 
     // Create minimal test audio - planar format (separate buffers for each channel)
     let mut audio_buffer_left = vec![0.0f32; optimal_num_frames];
     let mut audio_buffer_right = vec![0.0f32; optimal_num_frames];
-    
+
     // Create mutable references for planar processing
     let mut audio_planar = vec![
         audio_buffer_left.as_mut_slice(),
@@ -62,9 +62,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create interleaved test audio (all channels mixed together)
     let mut audio_buffer_interleaved = vec![0.0f32; NUM_CHANNELS as usize * optimal_num_frames];
-    
+
     // Test interleaved audio processing
-    match model.process_interleaved(&mut audio_buffer_interleaved, NUM_CHANNELS, optimal_num_frames) {
+    match model.process_interleaved(
+        &mut audio_buffer_interleaved,
+        NUM_CHANNELS,
+        optimal_num_frames,
+    ) {
         Ok(()) => println!("Interleaved processing succeeded"),
         Err(e) => println!("Interleaved processing failed: {}", e),
     }
@@ -77,6 +81,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Clean up is handled automatically by Rust's Drop trait
     println!("All tests completed");
-    
+
     Ok(())
 }

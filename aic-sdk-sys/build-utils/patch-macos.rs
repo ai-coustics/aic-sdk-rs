@@ -1,17 +1,24 @@
 use std::env;
+use std::fs;
 use std::path::Path;
 use std::process::Command;
-use std::fs;
 
-pub fn patch_lib(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_patched: &str, _global_symbols_wildcard: &str, final_lib: &Path) {
+pub fn patch_lib(
+    static_lib: &Path,
+    out_dir: &Path,
+    lib_name: &str,
+    lib_name_patched: &str,
+    _global_symbols_wildcard: &str,
+    final_lib: &Path,
+) {
     // macOS approach: Use ld -r to create intermediate object, then create filtered library
-    
+
     // Get target architecture for macOS linker
     let target_arch = get_macos_arch();
-    
+
     // Create intermediate object by linking all objects from the archive
     let intermediate_obj = out_dir.join(format!("lib{}_intermediate.o", lib_name));
-    
+
     // Use ld -r with -all_load (macOS equivalent of --whole-archive)
     let ld_status = Command::new("ld")
         .arg("-arch")
@@ -30,7 +37,10 @@ pub fn patch_lib(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_pat
 
     // Verify the intermediate object was created
     if !intermediate_obj.exists() {
-        panic!("Intermediate object file was not created: {}", intermediate_obj.display());
+        panic!(
+            "Intermediate object file was not created: {}",
+            intermediate_obj.display()
+        );
     }
 
     // Create symbols file listing symbols to keep
@@ -39,16 +49,14 @@ pub fn patch_lib(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_pat
         Ok(symbol_count) => {
             if symbol_count == 0 {
                 // Just copy the original library since no filtering is needed
-                fs::copy(static_lib, final_lib)
-                    .expect("Failed to copy library file");
+                fs::copy(static_lib, final_lib).expect("Failed to copy library file");
                 let _ = fs::remove_file(&intermediate_obj);
                 return;
             }
         }
         Err(_) => {
             // Fallback: just copy the original library
-            fs::copy(static_lib, final_lib)
-                .expect("Failed to copy library file");
+            fs::copy(static_lib, final_lib).expect("Failed to copy library file");
             let _ = fs::remove_file(&intermediate_obj);
             return;
         }
@@ -56,7 +64,7 @@ pub fn patch_lib(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_pat
 
     // Create the final filtered object
     let final_obj = out_dir.join(format!("lib{}_filtered.o", lib_name_patched));
-    
+
     // Use ld to create a new object with only the symbols we want
     let ld_filter_status = Command::new("ld")
         .arg("-arch")
@@ -71,7 +79,10 @@ pub fn patch_lib(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_pat
         .expect("Failed to execute ld filtering command on macOS");
 
     if !ld_filter_status.success() {
-        panic!("ld filtering command failed for {} on macOS", intermediate_obj.display());
+        panic!(
+            "ld filtering command failed for {} on macOS",
+            intermediate_obj.display()
+        );
     }
 
     // Create the final archive
@@ -94,27 +105,32 @@ pub fn patch_lib(static_lib: &Path, out_dir: &Path, lib_name: &str, lib_name_pat
 
 fn get_macos_arch() -> String {
     // Get the target architecture from Rust's build environment
-    let target_arch = env::var("CARGO_CFG_TARGET_ARCH")
-        .expect("CARGO_CFG_TARGET_ARCH not set");
-    
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").expect("CARGO_CFG_TARGET_ARCH not set");
+
     // Convert Rust architecture names to macOS ld architecture names
     match target_arch.as_str() {
         "aarch64" => "arm64".to_string(),
         "x86_64" => "x86_64".to_string(),
         arch => {
-            println!("cargo:warning=Unknown target architecture for macOS: {}", arch);
+            println!(
+                "cargo:warning=Unknown target architecture for macOS: {}",
+                arch
+            );
             arch.to_string()
         }
     }
 }
 
-fn create_macos_symbols_file(obj_file: &Path, symbols_file: &Path) -> Result<usize, Box<dyn std::error::Error>> {
+fn create_macos_symbols_file(
+    obj_file: &Path,
+    symbols_file: &Path,
+) -> Result<usize, Box<dyn std::error::Error>> {
     // Try different nm command variations for macOS
     let nm_variations = [
-        vec!["-g", "-defined-only"],  // Global and defined only
-        vec!["-g"],                   // Just global
-        vec!["-a"],                   // All symbols
-        vec!["--defined-only"],       // GNU-style flag
+        vec!["-g", "-defined-only"], // Global and defined only
+        vec!["-g"],                  // Just global
+        vec!["-a"],                  // All symbols
+        vec!["--defined-only"],      // GNU-style flag
     ];
 
     let mut nm_output = None;
@@ -133,7 +149,11 @@ fn create_macos_symbols_file(obj_file: &Path, symbols_file: &Path) -> Result<usi
                 break;
             }
             Ok(output) => {
-                last_error = format!("nm failed with args {:?}: {}", args, String::from_utf8_lossy(&output.stderr));
+                last_error = format!(
+                    "nm failed with args {:?}: {}",
+                    args,
+                    String::from_utf8_lossy(&output.stderr)
+                );
             }
             Err(e) => {
                 last_error = format!("nm command error with args {:?}: {}", args, e);
@@ -141,11 +161,16 @@ fn create_macos_symbols_file(obj_file: &Path, symbols_file: &Path) -> Result<usi
         }
     }
 
-    let nm_output = nm_output.ok_or_else(|| format!("All nm command variations failed. Last error: {}", last_error))?;
+    let nm_output = nm_output.ok_or_else(|| {
+        format!(
+            "All nm command variations failed. Last error: {}",
+            last_error
+        )
+    })?;
 
     let nm_stdout = String::from_utf8_lossy(&nm_output.stdout);
     let mut symbols_to_keep = Vec::new();
-    
+
     // Parse nm output and collect aic_* symbols
     for line in nm_stdout.lines() {
         if let Some(symbol) = parse_nm_symbol_macos(line) {
@@ -160,11 +185,11 @@ fn create_macos_symbols_file(obj_file: &Path, symbols_file: &Path) -> Result<usi
         return Ok(0);
     }
 
-    // Write symbols to file (one per line)  
+    // Write symbols to file (one per line)
     let symbols_content = symbols_to_keep.join("\n");
     fs::write(symbols_file, symbols_content)
         .map_err(|e| format!("Failed to write symbols file: {}", e))?;
-    
+
     Ok(symbols_to_keep.len())
 }
 
@@ -174,19 +199,19 @@ fn parse_nm_symbol_macos(line: &str) -> Option<String> {
     if line.is_empty() {
         return None;
     }
-    
+
     let parts: Vec<&str> = line.split_whitespace().collect();
-    
+
     // macOS nm output can have different formats:
     // Format 1: [address] [type] [symbol]
     // Format 2: [type] [symbol] (for undefined symbols)
     // Format 3: [symbol] (minimal output)
-    
+
     if parts.len() >= 3 {
         // Standard format: address, type, symbol
         let symbol_type = parts[1];
         let symbol_name = parts[2];
-        
+
         // Check if this is a defined global symbol
         // Capital letters indicate global symbols, lowercase are local
         // Common types: T (text), D (data), B (bss), S (other section)
@@ -199,7 +224,7 @@ fn parse_nm_symbol_macos(line: &str) -> Option<String> {
         // Could be: type symbol OR address type
         let first = parts[0];
         let second = parts[1];
-        
+
         // If first part looks like a type (single character), second is symbol
         if first.len() == 1 && first.chars().any(|c| c.is_uppercase()) {
             Some(second.to_string())

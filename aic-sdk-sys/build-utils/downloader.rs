@@ -56,7 +56,7 @@ impl Downloader {
         };
 
         let triplet = format!("{arch}-{vendor}-{os}");
-        
+
         let file_extension = if os == "windows" { "zip" } else { "tar.gz" };
         let file_prefix = if vendor == "apple" {
             format!("aic-sdk-{triplet}-{version}")
