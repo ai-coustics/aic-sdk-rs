@@ -11,7 +11,7 @@ pub struct Downloader {
 }
 
 impl Downloader {
-    pub fn new(_output_path: &Path) -> Self {
+    pub fn new() -> Self {
         let version = env::var("CARGO_PKG_VERSION").unwrap();
         let base_url = "https://github.com/ai-coustics/aic-sdk-c/releases/download".to_string();
 

@@ -76,10 +76,7 @@ fn add_platform_specific_libs() {
 #[cfg(feature = "download-lib")]
 fn download_lib() -> PathBuf {
     use downloader::Downloader;
-
-    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-
-    let downloader = Downloader::new(&out_dir);
+    let downloader = Downloader::new();
     downloader.download()
 }
 
