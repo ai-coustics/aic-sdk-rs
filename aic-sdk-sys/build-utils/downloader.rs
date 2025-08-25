@@ -11,7 +11,7 @@ pub struct Downloader {
 }
 
 impl Downloader {
-    pub fn new(output_path: &Path) -> Self {
+    pub fn new(_output_path: &Path) -> Self {
         let version = env::var("CARGO_PKG_VERSION").unwrap();
         let base_url = "https://github.com/ai-coustics/aic-sdk-c/releases/download".to_string();
 
@@ -38,9 +38,12 @@ impl Downloader {
             ),
         ]);
 
+        // Use a stable cache directory in target/ that doesn't change with OUT_DIR hash
+        let cache_path = Self::get_cache_directory();
+
         Downloader {
             base_url,
-            output_path: output_path.to_path_buf(),
+            output_path: cache_path,
             artifact_sha,
         }
     }
@@ -65,6 +68,12 @@ impl Downloader {
         };
 
         let file_name = format!("{file_prefix}.{file_extension}");
+        let extracted_path = self.output_path.join(&file_prefix);
+
+        // Check if library is already downloaded and extracted
+        if self.is_library_valid(&extracted_path) {
+            return extracted_path;
+        }
 
         let expected_hash = self
             .artifact_sha
@@ -81,7 +90,11 @@ impl Downloader {
             &downloaded_hash, expected_hash
         );
 
-        let extracted_path = self.output_path.join(&file_prefix);
+        // Remove existing directory if it exists but is invalid
+        if extracted_path.exists() {
+            std::fs::remove_dir_all(&extracted_path)
+                .expect("Failed to remove existing invalid library directory");
+        }
 
         if file_extension == "zip" {
             extract_zip(&downloaded_file, &extracted_path);
@@ -90,6 +103,75 @@ impl Downloader {
         }
 
         extracted_path
+    }
+
+    /// Check if the library has already been downloaded and extracted properly
+    fn is_library_valid(&self, extracted_path: &Path) -> bool {
+        // Check if the extracted directory exists
+        if !extracted_path.exists() {
+            return false;
+        }
+
+        // Check if the lib directory exists (required by the build script)
+        let lib_dir = extracted_path.join("lib");
+        if !lib_dir.exists() {
+            return false;
+        }
+
+        // Check if the static library file exists
+        let static_lib_ext = if cfg!(target_os = "windows") {
+            ".lib"
+        } else {
+            ".a"
+        };
+
+        let static_lib = if cfg!(target_os = "windows") {
+            lib_dir.join(format!("aic{}", static_lib_ext))
+        } else {
+            lib_dir.join(format!("libaic{}", static_lib_ext))
+        };
+
+        if !static_lib.exists() {
+            return false;
+        }
+
+        // Check if the include directory exists (contains headers)
+        let include_dir = extracted_path.join("include");
+        if !include_dir.exists() {
+            return false;
+        }
+
+        // Check if aic.h header file exists
+        let header_file = include_dir.join("aic.h");
+        if !header_file.exists() {
+            return false;
+        }
+
+        true
+    }
+
+    /// Get a stable cache directory that persists across builds
+    fn get_cache_directory() -> PathBuf {
+        // Use OUT_DIR and navigate up to the target directory for a stable cache location
+        let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+        // OUT_DIR is typically: target/debug/build/{crate}-{hash}/out
+        // Go up 4 levels to get to target/
+        let target_dir = out_dir
+            .ancestors()
+            .nth(4)
+            .expect("Could not find target directory from OUT_DIR");
+
+        // Include version in cache directory name to avoid conflicts between different versions
+        let version = env::var("CARGO_PKG_VERSION").unwrap();
+        let version = version.replace('.', "_");
+        let cache_dir = target_dir.join(format!("__aic_sdk_c_library_download_{}", version));
+
+        // Create the cache directory if it doesn't exist
+        if !cache_dir.exists() {
+            std::fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
+        }
+
+        cache_dir
     }
 }
 
