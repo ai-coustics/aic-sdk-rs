@@ -75,6 +75,8 @@ cargo run --example basic_usage --features download-lib
 
 This crate currently builds on Linux and macOS. Windows is not yet supported.
 
+If you need Windows support, please take a look at our C/C++ SDKs for now.
+
 ## Support & Resources
 
 ### Documentation
