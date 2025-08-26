@@ -48,8 +48,8 @@ jobs:
       - name: Publish Dry Run Sys Crate
         run: cargo publish -p aic-sdk-sys --dry-run --features download-lib
 
-      - name: Publish Dry Run Sys Crate
+      - name: Publish Sys Crate
         run: cargo publish -p aic-sdk-sys --features download-lib
 
-      - name: Publish Dry Run Main Crate
+      - name: Publish Main Crate
         run: cargo publish -p aic-sdk --features download-lib

@@ -18,6 +18,9 @@ readme = "README.md"
 repository = "https://github.com/ai-coustics/aic-sdk-rs"
 version = "0.6.3"
 
+[package.metadata.docs.rs]
+features = ["download-lib"]
+
 [dependencies]
 aic-sdk-sys = { workspace = true }
 thiserror = "2.0.16"
