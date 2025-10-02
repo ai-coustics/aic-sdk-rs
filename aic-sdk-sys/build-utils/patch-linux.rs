@@ -51,12 +51,12 @@ pub fn patch_lib(
     }
 
     // Build the archive
-    let ar_status = Command::new("ar")
+    let ar_status = Command::new("llvm-ar")
         .arg("rcs")
         .arg(final_lib)
         .arg(&final_obj)
         .status()
-        .expect("Failed to execute ar.");
+        .expect("Failed to execute llvm-ar. Is llvm-ar installed?");
 
     if !ar_status.success() {
         panic!("ar command failed for {}", final_obj.display());
