@@ -55,10 +55,52 @@ pub fn patch_lib(
         .arg("rcs")
         .arg(final_lib)
         .arg(&final_obj)
-        .status()
-        .expect("Failed to execute ar.");
+        .status();
 
-    if !ar_status.success() {
-        panic!("ar command failed for {}", final_obj.display());
+    let mut success = false;
+
+    match ar_status {
+        Ok(status) => {
+            if status.success() {
+                success = true;
+            } else {
+                eprintln!(
+                    "'ar' command failed with status: {}. Trying 'llvm-ar' as a fallback.",
+                    status
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "Failed to execute 'ar' (Error: {}). Trying 'llvm-ar' as a fallback.",
+                e
+            );
+        }
+    }
+
+    // try to fallback to llvm-ar, when ar failed
+    if !success {
+        let llvm_ar_status = Command::new("llvm-ar")
+            .arg("rcs")
+            .arg(final_lib)
+            .arg(&final_obj)
+            .status()
+            .expect("Failed to execute llvm-ar. Is llvm-ar installed?");
+
+        if llvm_ar_status.success() {
+            success = true;
+        } else {
+            eprintln!(
+                "'llvm-ar' command also failed with status: {}.",
+                llvm_ar_status
+            );
+        }
+    }
+
+    if !success {
+        panic!(
+            "Both 'ar' and 'llvm-ar' commands failed to archive {}",
+            final_obj.display()
+        );
     }
 }
