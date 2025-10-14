@@ -8,12 +8,7 @@ Our Speech Enhancement SDK delivers state-of-the-art audio processing capabiliti
 
 ### Acquire an SDK License Key
 
-To use the SDK, you'll need a license key. Contact our team to receive your time-limited demo key:
-
-- **Email**: [info@ai-coustics.com](mailto:info@ai-coustics.com)
-- **Website**: [ai-coustics.com](https://ai-coustics.com)
-
-Once you have your license key, set it as an environment variable or pass it directly to the SDK initialization functions.
+**Important:** You need an **SDK license key**. This is distinct from the API license key used for our cloud API services. To obtain an SDK license key, please contact us at [info@ai-coustics.com](mailto:info@ai-coustics.com).
 
 ## Integration
 
@@ -21,7 +16,7 @@ Enable the `download-lib` feature to automatically download the library when bui
 
 ```toml
 [dependencies]
-aic-sdk = { version = "0.6.3", features = ["download-lib"] }
+aic-sdk = { version = "0.7.0", features = ["download-lib"] }
 ```
 
 If you want to provide your own library, use the `AIC_LIB_PATH` environment variable to specify the path
@@ -39,7 +34,7 @@ let license_key = std::env::var("AIC_SDK_LICENSE")?;
 let mut model = Model::new(ModelType::QuailS48, &license_key)?;
 
 // Initialize the model with your audio settings
-model.initialize(48000, 1, 480)?;
+model.initialize(48000, 1, 480, true)?;
 
 let mut audio_buffer = vec![0.0f32; 480];
 
@@ -53,7 +48,7 @@ model.set_parameter(Parameter::EnhancementLevel, 0.8)?;
 // For planar audio processing (separate channel buffers)
 let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
 let mut audio_refs: Vec<&mut [f32]> = audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
-model.initialize(48000, 2, 480)?;
+model.initialize(48000, 2, 480, true)?;
 model.process_planar(&mut audio_refs)?;
 ```
 
@@ -85,13 +80,13 @@ If you need Windows support, please take a look at our C/C++ SDKs for now.
 ### Looking for Other Languages?
 The ai-coustics Speech Enhancement SDK is available in multiple programming languages to fit your development needs:
 
-| Language | Repository | Description |
+| Platform | Repository | Description |
 |----------|------------|-------------|
 | C | [aic-sdk-c](https://github.com/ai-coustics/aic-sdk-c) | Core C interface and foundation library |
-| C++ | [aic-sdk-cpp](https://github.com/ai-coustics/aic-sdk-cpp) | C++ interface |
-| Node.js | [aic-sdk-node](https://github.com/ai-coustics/aic-sdk-node) | JavaScript/TypeScript bindings for Node.js |
-| Python | [aic-sdk-py](https://github.com/ai-coustics/aic-sdk-py) | Pythonic interface |
-| WebAssembly | [aic-sdk-wasm](https://github.com/ai-coustics/aic-sdk-wasm) | Browser-compatible WebAssembly build |
+| **C++** | [`aic-sdk-cpp`](https://github.com/ai-coustics/aic-sdk-cpp) | Modern C++ interface with RAII and type safety |
+| **JavaScript/TypeScript** | [`aic-sdk-node`](https://github.com/ai-coustics/aic-sdk-node) | Native bindings for Node.js applications |
+| **Python** | [`aic-sdk-py`](https://github.com/ai-coustics/aic-sdk-py) | Idiomatic Python interface |
+| **Web (WASM)** | [`aic-sdk-wasm`](https://github.com/ai-coustics/aic-sdk-wasm) | WebAssembly build for browser applications |
 
 All SDKs provide the same core functionality with language-specific optimizations and idioms.
 
@@ -106,4 +101,3 @@ This Rust wrapper is distributed under the [Apache 2.0 license](LICENSE), while 
 ---
 
 Made with ❤️ by the ai-coustics team
-

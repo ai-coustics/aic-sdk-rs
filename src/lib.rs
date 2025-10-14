@@ -168,7 +168,7 @@ impl From<Parameter> for AicParameter::Type {
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
 ///
-/// model.initialize(48000, 1, 1024).unwrap();
+/// model.initialize(48000, 1, 1024, false).unwrap();
 ///
 /// // Process audio data
 /// let mut audio_buffer = vec![0.0f32; 1024];
@@ -230,6 +230,7 @@ impl Model {
     /// * `sample_rate` - Audio sample rate in Hz (8000 - 192000)
     /// * `num_channels` - Number of audio channels (1 for mono, 2 for stereo, etc.)
     /// * `num_frames` - Number of samples per channel in each process call
+    /// * `allow_variable_frames` - Allows varying frame counts per process call (up to `num_frames`), but increases delay.
     ///
     /// # Returns
     ///
@@ -248,16 +249,24 @@ impl Model {
     /// # use aic_sdk::{Model, ModelType};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// model.initialize(48000, 1, 1024).unwrap();
+    /// model.initialize(48000, 1, 1024, true).unwrap();
     /// ```
     pub fn initialize(
         &mut self,
         sample_rate: u32,
         num_channels: u16,
         num_frames: usize,
+        allow_variable_frames: bool,
     ) -> Result<(), AicError> {
-        let error_code =
-            unsafe { aic_model_initialize(self.inner, sample_rate, num_channels, num_frames) };
+        let error_code = unsafe {
+            aic_model_initialize(
+                self.inner,
+                sample_rate,
+                num_channels,
+                num_frames,
+                allow_variable_frames,
+            )
+        };
 
         handle_error(error_code)?;
         Ok(())
@@ -312,7 +321,7 @@ impl Model {
     /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
     /// let mut audio_refs: Vec<&mut [f32]> = audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
-    /// model.initialize(48000, 2, 480).unwrap();
+    /// model.initialize(48000, 2, 480, false).unwrap();
     /// model.process_planar(&mut audio_refs).unwrap();
     /// ```
     pub fn process_planar(&mut self, audio: &mut [&mut [f32]]) -> Result<(), AicError> {
@@ -354,7 +363,7 @@ impl Model {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
-    /// model.initialize(48000, 2, 480).unwrap();
+    /// model.initialize(48000, 2, 480, false).unwrap();
     /// model.process_interleaved(&mut audio, 2, 480).unwrap();
     /// ```
     pub fn process_interleaved(
@@ -514,21 +523,25 @@ impl Model {
         Ok(sample_rate)
     }
 
-    /// Retrieves the native number of frames for the selected model and sample rate.
+    /// Retrieves the optimal number of frames for the selected model at a given sample rate.
+    ///
     ///
     /// Using the optimal number of frames minimizes latency by avoiding internal buffering.
+    ///
     /// **When you use a different frame count than the optimal value, the model will
     /// introduce additional buffering latency on top of its base processing delay.**
     ///
-    /// The optimal frame count adjusts dynamically based on the sample rate used during
-    /// initialization. Each time you call `initialize` with a different sample rate,
-    /// the optimal number of frames will update accordingly. Before initialization is called,
-    /// this function returns the optimal frame count for the model's native sample rate.
+    /// The optimal frame count varies based on the sample rate. Each model operates on a
+    /// fixed time window duration, so the required number of frames changes with sample rate.
+    /// For example, a model designed for 10 ms processing windows requires 480 frames at
+    /// 48 kHz, but only 160 frames at 16 kHz to capture the same duration of audio.
     ///
-    /// Each model operates on a fixed time window duration, so the required number of frames
-    /// varies with sample rate. For example, a model designed for 10 ms processing windows
-    /// requires 480 frames at 48 kHz, but only 160 frames at 16 kHz to capture the same
-    /// duration of audio.
+    /// Call this function with your intended sample rate before calling `aic_model_initialize`
+    /// to determine the best frame count for minimal latency.
+    ///
+    /// # Arguments
+    ///
+    /// * `sample_rate` - The sample rate in Hz for which to calculate the optimal frame count.
     ///
     /// # Returns
     ///
@@ -540,12 +553,14 @@ impl Model {
     /// # use aic_sdk::{Model, ModelType};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// let optimal_frames = model.optimal_num_frames().unwrap();
+    /// # let sample_rate = model.optimal_sample_rate().unwrap();
+    /// let optimal_frames = model.optimal_num_frames(sample_rate).unwrap();
     /// println!("Optimal frame count: {}", optimal_frames);
     /// ```
-    pub fn optimal_num_frames(&self) -> Result<usize, AicError> {
+    pub fn optimal_num_frames(&self, sample_rate: u32) -> Result<usize, AicError> {
         let mut num_frames: usize = 0;
-        let error_code = unsafe { aic_get_optimal_num_frames(self.inner, &mut num_frames) };
+        let error_code =
+            unsafe { aic_get_optimal_num_frames(self.inner, sample_rate, &mut num_frames) };
         handle_error(error_code)?;
         Ok(num_frames)
     }
@@ -617,7 +632,7 @@ mod tests {
         let mut model = Model::new(ModelType::QuailL48, &license_key)?;
 
         // Test initialization with QuailL48 optimal settings (48000 Hz, 480 frames)
-        model.initialize(48000, 2, 480)?;
+        model.initialize(48000, 2, 480, false)?;
 
         let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
         let mut audio_refs: Vec<&mut [f32]> =
@@ -633,7 +648,7 @@ mod tests {
         let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
         let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
         let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
-        model.initialize(48000, 2, 480).unwrap();
+        model.initialize(48000, 2, 480, false).unwrap();
         model.process_interleaved(&mut audio, 2, 480).unwrap();
     }
 }

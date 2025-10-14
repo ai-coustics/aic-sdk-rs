@@ -1,8 +1,9 @@
 /**
  * This file contains the definitions and declarations for the ai-coustics
- * speech enhancement SDK, including initialization, processing, and configuration
- * functions. The ai-coustics SDK provides advanced machine learning models for
- * speech enhancement, that can be used in audio streaming contexts.
+ * speech enhancement SDK, including initialization, processing, and
+ * configuration functions. The ai-coustics SDK provides advanced machine
+ * learning models for speech enhancement, that can be used in audio streaming
+ * contexts.
  *
  * Copyright (C) ai-coustics GmbH - All Rights Reserved
  *
@@ -11,7 +12,6 @@
  *
  * For inquiries, please contact: systems@ai-coustics.com
  */
-
 
 #ifndef AIC_H
 #define AIC_H
@@ -44,7 +44,8 @@ typedef enum AicErrorCode {
    */
   AIC_ERROR_CODE_UNSUPPORTED_AUDIO_CONFIG = 4,
   /**
-   * Process was called with a different audio buffer configuration than initialized
+   * Process was called with a different audio buffer configuration than
+   * initialized
    */
   AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH = 5,
   /**
@@ -128,15 +129,32 @@ typedef enum AicModelType {
  */
 typedef enum AicParameter {
   /**
+   * Controls whether audio processing is bypassed while preserving algorithmic
+   * delay.
+   *
+   * When enabled, the input audio passes through unmodified, but the output is
+   * still delayed by the same amount as during normal processing. This ensures
+   * seamless transitions when toggling enhancement on/off without audible
+   * clicks or timing shifts.
+   *
+   * **Range:** 0.0 to 1.0
+   * - **0.0:** Enhancement active (normal processing)
+   * - **1.0:** Bypass enabled (latency-compensated passthrough)
+   *
+   * **Default:** 0.0
+   */
+  AIC_PARAMETER_BYPASS = 0,
+  /**
    * Controls the intensity of speech enhancement processing.
    *
    * **Range:** 0.0 to 1.0
-   * - **0.0:** Bypass mode - original signal passes through unchanged
-   * - **1.0:** Full enhancement - maximum noise reduction but also more audible artifacts
+   * - **0.0:** No enhancement - original signal passes through unchanged
+   * - **1.0:** Full enhancement - maximum noise reduction but also more audible
+   * artifacts
    *
    * **Default:** 1.0
    */
-  AIC_PARAMETER_ENHANCEMENT_LEVEL = 0,
+  AIC_PARAMETER_ENHANCEMENT_LEVEL = 1,
   /**
    * Compensates for perceived volume reduction after noise removal.
    *
@@ -149,10 +167,13 @@ typedef enum AicParameter {
    * **Formula:** Gain (dB) = 20 × log₁₀(value)
    * **Default:** 1.0
    */
-  AIC_PARAMETER_VOICE_GAIN = 1,
+  AIC_PARAMETER_VOICE_GAIN = 2,
   /**
-   * Enables/disables a noise gate as a post-processing step,
-   * before passing the audio buffer to the model.
+   * Enables/disables a noise gate as a post-processing step.
+   *
+   * The noise gate can be useful for ASR (Automatic Speech Recognition) systems
+   * that should only activate when actual speech is present, preventing false
+   * triggers from background noise artifacts.
    *
    * **Valid values:** 0.0 or 1.0
    * - **0.0:** Noise gate disabled
@@ -160,7 +181,7 @@ typedef enum AicParameter {
    *
    * **Default:** 0.0
    */
-  AIC_PARAMETER_NOISE_GATE_ENABLE = 2,
+  AIC_PARAMETER_NOISE_GATE_ENABLE = 3,
 } AicParameter;
 
 typedef struct AicModel AicModel;
@@ -172,19 +193,21 @@ extern "C" {
 /**
  * Creates a new audio enhancement model instance.
  *
- * Multiple models can be created to process different audio streams simultaneously
- * or to switch between different enhancement algorithms during runtime.
+ * Multiple models can be created to process different audio streams
+ * simultaneously or to switch between different enhancement algorithms during
+ * runtime.
  *
  * # Parameters
  * - `model`: Receives the handle to the newly created model. Must not be NULL.
  * - `model_type`: Selects the enhancement algorithm variant.
- * - `license_key`: NULL-terminated string containing your license key. Must not be NULL.
+ * - `license_key`: NULL-terminated string containing your license key. Must not
+ * be NULL.
  *
  * # Returns
- * - `Success`: Model created successfully
- * - `NullPointer`: `model` or `license_key` is NULL
- * - `LicenseInvalid`: License key format is incorrect
- * - `LicenseExpired`: License key has expired
+ * - `AIC_ERROR_CODE_SUCCESS`: Model created successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `model` or `license_key` is NULL
+ * - `AIC_ERROR_CODE_LICENSE_INVALID`: License key format is incorrect
+ * - `AIC_ERROR_CODE_LICENSE_EXPIRED`: License key has expired
  */
 enum AicErrorCode aic_model_create(struct AicModel **model,
                                    enum AicModelType model_type,
@@ -213,11 +236,13 @@ void aic_model_destroy(struct AicModel *model);
  * - `sample_rate`: Audio sample rate in Hz (8000 - 192000).
  * - `num_channels`: Number of audio channels (1 for mono, 2 for stereo, etc.).
  * - `num_frames`: Number of samples per channel in each process call.
+ * - `allow_variable_frames`: Allows varying frame counts per process call (up
+ * to `num_frames`), but increases delay.
  *
  * # Returns
- * - `Success`: Configuration accepted
- * - `NullPointer`: `model` is NULL
- * - `UnsupportedAudioConfig`: Configuration is not supported
+ * - `AIC_ERROR_CODE_SUCCESS`: Configuration accepted
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `model` is NULL
+ * - `AIC_ERROR_CODE_UNSUPPORTED_AUDIO_CONFIG`: Configuration is not supported
  *
  * # Warning
  * Do not call from audio processing threads as this allocates memory.
@@ -228,8 +253,8 @@ void aic_model_destroy(struct AicModel *model);
  */
 enum AicErrorCode aic_model_initialize(struct AicModel *model,
                                        uint32_t sample_rate,
-                                       uint16_t num_channels,
-                                       size_t num_frames);
+                                       uint16_t num_channels, size_t num_frames,
+                                       bool allow_variable_frames);
 
 /**
  * Clears all internal state and buffers.
@@ -243,8 +268,8 @@ enum AicErrorCode aic_model_initialize(struct AicModel *model,
  * - `model`: Model instance to reset. Must not be NULL.
  *
  * # Returns
- * - `Success`: State cleared successfully
- * - `NullPointer`: `model` is NULL
+ * - `AIC_ERROR_CODE_SUCCESS`: State cleared successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `model` is NULL
  *
  * # Thread Safety
  * Real-time safe. Can be called from audio processing threads.
@@ -262,13 +287,15 @@ enum AicErrorCode aic_model_reset(struct AicModel *model);
  * - `model`: Initialized model instance. Must not be NULL.
  * - `audio`: Array of channel buffer pointers. Must not be NULL.
  * - `num_channels`: Number of channels (must match initialization).
- * - `num_frames`: Number of samples per channel (must match initialization).
+ * - `num_frames`: Number of samples per channel (must match initialization
+ * value, or if `allow_variable_frames` was enabled, must be ≤ initialization
+ * value).
  *
  * # Returns
- * - `Success`: Audio processed successfully
- * - `NullPointer`: `model` or `audio` is NULL
- * - `NotInitialized`: Model has not been initialized
- * - `AudioConfigMismatch`: Channel or frame count mismatch
+ * - `AIC_ERROR_CODE_SUCCESS`: Audio processed successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `model` or `audio` is NULL
+ * - `AIC_ERROR_CODE_NOT_INITIALIZED`: Model has not been initialized
+ * - `AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH`: Channel or frame count mismatch
  */
 enum AicErrorCode aic_model_process_planar(struct AicModel *model,
                                            float *const *audio,
@@ -282,15 +309,18 @@ enum AicErrorCode aic_model_process_planar(struct AicModel *model,
  *
  * # Parameters
  * - `model`: Initialized model instance. Must not be NULL.
- * - `audio`: Interleaved audio buffer. Must not be NULL and exactly of size `num_channels` * `num_frames`.
+ * - `audio`: Interleaved audio buffer. Must not be NULL and exactly of size
+ * `num_channels` * `num_frames`.
  * - `num_channels`: Number of channels (must match initialization).
- * - `num_frames`: Number of frames (must match initialization).
+ * - `num_frames`: Number of samples per channel (must match initialization
+ * value, or if `variable_num_frames` was enabled, must be ≤ initialization
+ * value).
  *
  * # Returns
- * - `Success`: Audio processed successfully
- * - `NullPointer`: `model` or `audio` is NULL
- * - `NotInitialized`: Model has not been initialized
- * - `AudioConfigMismatch`: Channel or frame count mismatch
+ * - `AIC_ERROR_CODE_SUCCESS`: Audio processed successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `model` or `audio` is NULL
+ * - `AIC_ERROR_CODE_NOT_INITIALIZED`: Model has not been initialized
+ * - `AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH`: Channel or frame count mismatch
  */
 enum AicErrorCode aic_model_process_interleaved(struct AicModel *model,
                                                 float *audio,
@@ -309,9 +339,9 @@ enum AicErrorCode aic_model_process_interleaved(struct AicModel *model,
  * - `value`: New parameter value. See parameter documentation for ranges.
  *
  * # Returns
- * - `Success`: Parameter updated successfully
- * - `NullPointer`: `model` is NULL
- * - `ParameterOutOfRange`: Value outside valid range
+ * - `AIC_ERROR_CODE_SUCCESS`: Parameter updated successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `model` is NULL
+ * - `AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE`: Value outside valid range
  */
 enum AicErrorCode aic_model_set_parameter(struct AicModel *model,
                                           enum AicParameter parameter,
@@ -328,108 +358,125 @@ enum AicErrorCode aic_model_set_parameter(struct AicModel *model,
  * - `value`: Receives the current parameter value. Must not be NULL.
  *
  * # Returns
- * - `Success`: Parameter retrieved successfully
- * - `NullPointer`: `model` or `value` is NULL
+ * - `AIC_ERROR_CODE_SUCCESS`: Parameter retrieved successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `model` or `value` is NULL
  */
 enum AicErrorCode aic_model_get_parameter(const struct AicModel *model,
                                           enum AicParameter parameter,
                                           float *value);
 
 /**
- * Returns the total output delay in samples for the current audio configuration.
+ * Returns the total output delay in samples for the current audio
+ * configuration.
  *
- * This function provides the complete end-to-end latency introduced by the model,
- * which includes both algorithmic processing delay and any buffering overhead.
- * Use this value to synchronize enhanced audio with other streams or to implement
- * delay compensation in your application.
+ * This function provides the complete end-to-end latency introduced by the
+ * model, which includes both algorithmic processing delay and any buffering
+ * overhead. Use this value to synchronize enhanced audio with other streams or
+ * to implement delay compensation in your application.
  *
  * **Delay behavior:**
- * - **Before initialization:** Returns the base processing delay using the model's
- *   optimal frame size at its native sample rate
- * - **After initialization:** Returns the actual delay for your specific configuration,
- *   including any additional buffering introduced by non-optimal frame sizes
+ * - **Before initialization:** Returns the base processing delay using the
+ * model's optimal frame size at its native sample rate
+ * - **After initialization:** Returns the actual delay for your specific
+ * configuration, including any additional buffering introduced by non-optimal
+ * frame sizes
  *
- * **Important:** The delay value is always expressed in samples at the sample rate
- * you configured during `aic_model_initialize`. To convert to time units:
+ * **Important:** The delay value is always expressed in samples at the sample
+ * rate you configured during `aic_model_initialize`. To convert to time units:
  * `delay_ms = (delay_samples * 1000) / sample_rate`
  *
  * **Note:** Using frame sizes different from the optimal value returned by
- * `aic_get_optimal_num_frames` will increase the delay beyond the model's base latency.
+ * `aic_get_optimal_num_frames` will increase the delay beyond the model's base
+ * latency.
  *
  * # Parameters
  * - `model`: Initialized model instance. Must not be NULL.
  * - `delay`: Receives the delay in samples. Must not be NULL.
  *
  * # Returns
- * - `Success`: Latency retrieved successfully
- * - `NullPointer`: `model` or `latency` is NULL
+ * - `AIC_ERROR_CODE_SUCCESS`: Latency retrieved successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `model` or `latency` is NULL
  */
-enum AicErrorCode aic_get_output_delay(const struct AicModel *model, size_t *delay);
+enum AicErrorCode aic_get_output_delay(const struct AicModel *model,
+                                       size_t *delay);
 
 /**
  * Retrieves the native sample rate of the selected model.
  *
- * Each model is optimized for a specific sample rate, which determines the frequency
- * range of the enhanced audio output. While you can process audio at any sample rate,
- * understanding the model's native rate helps predict the enhancement quality.
+ * Each model is optimized for a specific sample rate, which determines the
+ * frequency range of the enhanced audio output. While you can process audio at
+ * any sample rate, understanding the model's native rate helps predict the
+ * enhancement quality.
  *
  * **How sample rate affects enhancement:**
- * - Models trained at lower sample rates (e.g., 8 kHz) can only enhance frequencies
- *   up to their Nyquist limit (4 kHz for 8 kHz models)
- * - When processing higher sample rate input (e.g., 48 kHz) with a lower-rate model,
- *   only the lower frequency components will be enhanced
+ *
+ * - Models trained at lower sample rates (e.g., 8 kHz) can only enhance
+ * frequencies up to their Nyquist limit (4 kHz for 8 kHz models)
+ * - When processing higher sample rate input (e.g., 48 kHz) with a lower-rate
+ * model, only the lower frequency components will be enhanced
  *
  * **Enhancement blending:**
- * When enhancement strength is set below 1.0, the enhanced signal is blended with
- * the original, maintaining the full frequency spectrum of your input while adding
- * the model's noise reduction capabilities to the lower frequencies.
+ *
+ * When enhancement strength is set below 1.0, the enhanced signal is blended
+ * with the original, maintaining the full frequency spectrum of your input
+ * while adding the model's noise reduction capabilities to the lower
+ * frequencies.
  *
  * **Sample rate and optimal frames relationship:**
- * When using different sample rates than the model's native rate, the optimal number
- * of frames (returned by `aic_get_optimal_num_frames`) will change. The model's output
- * delay remains constant regardless of sample rate as long as you use the optimal frame
- * count for that rate.
+ *
+ * When using different sample rates than the model's native rate, the optimal
+ * number of frames (returned by `aic_get_optimal_num_frames`) will change. The
+ * model's output delay remains constant regardless of sample rate as long as
+ * you use the optimal frame count for that rate.
  *
  * **Recommendation:**
- * For maximum enhancement quality across the full frequency spectrum, match your
- * input sample rate to the model's native rate when possible.
+ *
+ * For maximum enhancement quality across the full frequency spectrum, match
+ * your input sample rate to the model's native rate when possible.
  *
  * # Parameters
  * - `model`: Model instance. Must not be NULL.
  * - `sample_rate`: Receives the optimal sample rate in Hz. Must not be NULL.
  *
  * # Returns
- * - `Success`: Sample rate retrieved successfully
- * - `NullPointer`: `model` or `sample_rate` is NULL
+ * - `AIC_ERROR_CODE_SUCCESS`: Sample rate retrieved successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `model` or `sample_rate` is NULL
  */
-enum AicErrorCode aic_get_optimal_sample_rate(const struct AicModel *model, uint32_t *sample_rate);
+enum AicErrorCode aic_get_optimal_sample_rate(const struct AicModel *model,
+                                              uint32_t *sample_rate);
 
 /**
- * Retrieves the native number of frames for the selected model and sample rate.
+ * Retrieves the optimal number of frames for the selected model at a given
+ * sample rate.
  *
- * Using the optimal number of frames minimizes latency by avoiding internal buffering.
+ * Using the optimal number of frames minimizes latency by avoiding internal
+ * buffering.
+ *
  * **When you use a different frame count than the optimal value, the model will
  * introduce additional buffering latency on top of its base processing delay.**
  *
- * The optimal frame count adjusts dynamically based on the sample rate used during
- * initialization. Each time you call `aic_model_initialize` with a different sample rate,
- * the optimal number of frames will update accordingly. Before initialization is called,
- * this function returns the optimal frame count for the model's native sample rate.
+ * The optimal frame count varies based on the sample rate. Each model operates
+ * on a fixed time window duration, so the required number of frames changes
+ * with sample rate. For example, a model designed for 10 ms processing windows
+ * requires 480 frames at 48 kHz, but only 160 frames at 16 kHz to capture the
+ * same duration of audio.
  *
- * Each model operates on a fixed time window duration, so the required number of frames
- * varies with sample rate. For example, a model designed for 10 ms processing windows
- * requires 480 frames at 48 kHz, but only 160 frames at 16 kHz to capture the same
- * duration of audio.
+ * Call this function with your intended sample rate before calling
+ * `aic_model_initialize` to determine the best frame count for minimal latency.
  *
  * # Parameters
  * - `model`: Model instance. Must not be NULL.
+ * - `sample_rate`: The sample rate in Hz for which to calculate the optimal
+ * frame count.
  * - `num_frames`: Receives the optimal frame count. Must not be NULL.
  *
  * # Returns
- * - `Success`: Frame count retrieved successfully
- * - `NullPointer`: `model` or `num_frames` is NULL
+ * - `AIC_ERROR_CODE_SUCCESS`: Frame count retrieved successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `model` or `num_frames` is NULL
  */
-enum AicErrorCode aic_get_optimal_num_frames(const struct AicModel *model, size_t *num_frames);
+enum AicErrorCode aic_get_optimal_num_frames(const struct AicModel *model,
+                                             uint32_t sample_rate,
+                                             size_t *num_frames);
 
 /**
  * Returns the version of the SDK.
@@ -444,7 +491,7 @@ enum AicErrorCode aic_get_optimal_num_frames(const struct AicModel *model, size_
 const char *aic_get_sdk_version(void);
 
 #ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
+} // extern "C"
+#endif // __cplusplus
 
-#endif  /* AIC_H */
+#endif /* AIC_H */
