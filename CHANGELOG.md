@@ -16,6 +16,7 @@
 - **Variable number of frames supported**: `Model::initialize` now supports a variable number of frames per call. To enable this feature, use the new `allow_variable_frames` parameter in the initialize function. Set allow_variable_frames to true to enable variable frame processing, or false to maintain the previous fixed frame behavior. Note that enabling variable frames results in higher processing delay.
 - **New bypass parameter**: A new parameter `Parameter::Bypass` has been added to control audio processing bypass while preserving algorithmic delay. When enabled, the input audio passes through unmodified, but the output is still delayed by the same amount as during normal processing. This ensures seamless transitions when toggling enhancement on/off without audible clicks or timing shifts.
 - **Updated Error Codes**: Expanded and renamed error variants, with additional license-related errors.
+- **Version API improved**: `aic_sdk_version()` was renamed to `aic_sdk::get_version()` and it now returns a `&'static str`.
 
 ### Fixes
 - The internal model state is now automatically reset when processing is paused (e.g., when bypass is enabled or enhancement level is set to 0). This ensures a clean state when processing resumes.

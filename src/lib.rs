@@ -629,23 +629,16 @@ unsafe impl Sync for Model {}
 /// # Example
 ///
 /// ```rust
-/// # use aic_sdk::aic_sdk_version;
-/// if let Some(version) = aic_sdk_version() {
-///     println!("AIC SDK version: {}", version);
-/// }
+/// let version = aic_sdk::get_version() {
+/// println!("ai-coustics SDK version: {}", version);
 /// ```
-pub fn aic_sdk_version() -> Option<String> {
+pub fn get_version() -> &'static str {
     let version_ptr = unsafe { aic_get_sdk_version() };
     if version_ptr.is_null() {
-        return None;
+        return "unknown";
     }
 
-    unsafe {
-        CStr::from_ptr(version_ptr)
-            .to_str()
-            .ok()
-            .map(|s| s.to_owned())
-    }
+    unsafe { CStr::from_ptr(version_ptr).to_str().unwrap_or("unknown") }
 }
 
 #[cfg(test)]
