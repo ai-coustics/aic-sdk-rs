@@ -1,23 +1,34 @@
 use aic_sdk_sys::{AicErrorCode::*, AicModelType::*, AicParameter::*, *};
-use std::ffi::{CStr, CString};
-use std::ptr;
+use std::{
+    ffi::{CStr, CString},
+    ptr,
+    sync::Once,
+};
 use thiserror::Error;
+
+static SET_WRAPPER_ID: Once = Once::new();
 
 /// Rust-friendly error type for AIC SDK operations.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum AicError {
-    #[error("License key format is invalid or corrupted")]
-    LicenseInvalid,
-    #[error("License key has expired")]
-    LicenseExpired,
-    #[error("Audio configuration is not supported by the model")]
-    UnsupportedAudioConfig,
-    #[error("Process was called with a different audio buffer configuration than initialized")]
-    AudioConfigMismatch,
-    #[error("Model must be initialized before this operation")]
-    NotInitialized,
-    #[error("Parameter value is out of valid range")]
+    #[error("Parameter is out of range")]
     ParameterOutOfRange,
+    #[error("Processor was not initialized")]
+    ModelNotInitialized,
+    #[error("Audio config is not supported")]
+    AudioConfigUnsupported,
+    #[error("Audio config does not match the initialized config")]
+    AudioConfigMismatch,
+    #[error("Audio enhancement was disallowed")]
+    EnhancementNotAllowed,
+    #[error("Internal error")]
+    Internal,
+    #[error("License key is invalid")]
+    LicenseFormatInvalid,
+    #[error("License version unsupported")]
+    LicenseVersionUnsupported,
+    #[error("License key expired")]
+    LicenseExpired,
     #[error("Unknown error code: {0}")]
     Unknown(AicErrorCode::Type),
 }
@@ -32,12 +43,15 @@ impl From<AicErrorCode::Type> for AicError {
                     "Unexpected null pointer error from C library - this is a bug in the Rust wrapper"
                 );
             }
-            AIC_ERROR_CODE_LICENSE_INVALID => AicError::LicenseInvalid,
-            AIC_ERROR_CODE_LICENSE_EXPIRED => AicError::LicenseExpired,
-            AIC_ERROR_CODE_UNSUPPORTED_AUDIO_CONFIG => AicError::UnsupportedAudioConfig,
-            AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH => AicError::AudioConfigMismatch,
-            AIC_ERROR_CODE_NOT_INITIALIZED => AicError::NotInitialized,
             AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE => AicError::ParameterOutOfRange,
+            AIC_ERROR_CODE_MODEL_NOT_INITIALIZED => AicError::ModelNotInitialized,
+            AIC_ERROR_CODE_AUDIO_CONFIG_UNSUPPORTED => AicError::AudioConfigUnsupported,
+            AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH => AicError::AudioConfigMismatch,
+            AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED => AicError::EnhancementNotAllowed,
+            AIC_ERROR_CODE_INTERNAL_ERROR => AicError::Internal,
+            AIC_ERROR_CODE_LICENSE_FORMAT_INVALID => AicError::LicenseFormatInvalid,
+            AIC_ERROR_CODE_LICENSE_VERSION_UNSUPPORTED => AicError::LicenseVersionUnsupported,
+            AIC_ERROR_CODE_LICENSE_EXPIRED => AicError::LicenseExpired,
             code => AicError::Unknown(code),
         }
     }
@@ -114,6 +128,18 @@ impl From<ModelType> for AicModelType::Type {
 /// Configurable parameters for audio enhancement
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Parameter {
+    /// Controls whether audio processing is bypassed while preserving algorithmic delay.
+    ///
+    /// When enabled, the input audio passes through unmodified, but the output is still
+    /// delayed by the same amount as during normal processing. This ensures seamless
+    /// transitions when toggling enhancement on/off without audible clicks or timing shifts.
+    ///
+    /// **Range:** 0.0 to 1.0
+    /// - **0.0:** Enhancement active (normal processing)
+    /// - **1.0:** Bypass enabled (latency-compensated passthrough)
+    ///
+    /// **Default:** 0.0
+    Bypass,
     /// Controls the intensity of speech enhancement processing.
     ///
     /// **Range:** 0.0 to 1.0
@@ -147,6 +173,7 @@ pub enum Parameter {
 impl From<Parameter> for AicParameter::Type {
     fn from(parameter: Parameter) -> Self {
         match parameter {
+            Parameter::Bypass => AIC_PARAMETER_BYPASS,
             Parameter::EnhancementLevel => AIC_PARAMETER_ENHANCEMENT_LEVEL,
             Parameter::VoiceGain => AIC_PARAMETER_VOICE_GAIN,
             Parameter::NoiseGateEnable => AIC_PARAMETER_NOISE_GATE_ENABLE,
@@ -202,8 +229,12 @@ impl Model {
     /// let model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// ```
     pub fn new(model_type: ModelType, license_key: &str) -> Result<Self, AicError> {
+        SET_WRAPPER_ID.call_once(|| unsafe {
+            aic_set_sdk_wrapper_id(2);
+        });
+
         let mut model_ptr: *mut AicModel = ptr::null_mut();
-        let c_license_key = CString::new(license_key).map_err(|_| AicError::LicenseInvalid)?;
+        let c_license_key = CString::new(license_key).map_err(|_| AicError::LicenseFormatInvalid)?;
 
         let error_code =
             unsafe { aic_model_create(&mut model_ptr, model_type.into(), c_license_key.as_ptr()) };
