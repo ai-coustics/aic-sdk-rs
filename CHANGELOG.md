@@ -8,7 +8,7 @@
     - **What we collect**: We collect only the processing time used and some diagnostic data
     - **Privacy**: We do not collect any information about your audio content. Your audio never leaves your device during our processing.
     - **Requirements**: Requires a constant internet connection. If the SDK cannot be activated online, enhancement will stop after 10 seconds. If telemetry data cannot be sent, enhancement will stop after 5 minutes. When enhancement is stopped an error will be returned, the audio will be bypassed and the processing delay will be still applied to ensure an uninterrupted audio stream without discontinuities.
-    - **Error Handling**: When processing is bypassed because our backend cannot be reached or does not allow you to process, the process functions will return AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED. Make sure to handle this error code in your implementation.
+    - **Error Handling**: When processing is bypassed because our backend cannot be reached or does not allow you to process, the process functions will return `AicError::EnhancementNotAllowed`. Make sure to handle this error in your implementation.
     - **Offline Licenses**: If you cannot provide a constant internet connection, please contact us to obtain a special offline license that does not require telemetry.
 
 
