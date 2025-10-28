@@ -629,7 +629,7 @@ unsafe impl Sync for Model {}
 /// # Example
 ///
 /// ```rust
-/// let version = aic_sdk::get_version() {
+/// let version = aic_sdk::get_version();
 /// println!("ai-coustics SDK version: {}", version);
 /// ```
 pub fn get_version() -> &'static str {
