@@ -17,6 +17,9 @@ fn main() {
         panic!("Windows is not supported yet. Please use a different platform to build the SDK.");
     }
 
+    // needs to be generated before early return on docs.rs
+    generate_bindings();
+
     if env::var("DOCS_RS").is_ok() {
         // On docs.rs we don't need to link and we don't have network,
         // so we couldn't download anything if we wanted to
@@ -47,8 +50,6 @@ fn main() {
 
     // Add platform-specific system libraries
     add_platform_specific_libs();
-
-    generate_bindings();
 }
 
 fn add_platform_specific_libs() {
