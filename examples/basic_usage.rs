@@ -26,11 +26,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let optimal_sample_rate = model.optimal_sample_rate()?;
     println!("Optimal sample rate: {} Hz", optimal_sample_rate);
 
-    let optimal_num_frames = model.optimal_num_frames()?;
+    let optimal_num_frames = model.optimal_num_frames(optimal_sample_rate)?;
     println!("Optimal frame count: {}", optimal_num_frames);
 
     // Initialize with basic audio config
-    model.initialize(optimal_sample_rate, NUM_CHANNELS, optimal_num_frames)?;
+    model.initialize(optimal_sample_rate, NUM_CHANNELS, optimal_num_frames, true)?;
     println!("Model initialized successfully");
 
     // Get output delay
