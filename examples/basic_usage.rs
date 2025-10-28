@@ -5,11 +5,7 @@ const NUM_CHANNELS: u16 = 2;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Display library version
-    if let Some(version) = aic_sdk::aic_sdk_version() {
-        println!("Library version: {}", version);
-    } else {
-        println!("Could not retrieve library version");
-    }
+    println!("ai-coustics SDK version: {}", aic_sdk::get_version());
 
     // Get license key from environment variable
     let license = env::var("AIC_SDK_LICENSE").map_err(|_| {
