@@ -14,7 +14,7 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 unsafe extern "C" {
     /// Sets the SDK wrapper ID.
-    /// 
+    ///
     /// This function is not included in the C SDK's header file, but it is part of the library.
     pub fn aic_set_sdk_wrapper_id(id: u32);
 }

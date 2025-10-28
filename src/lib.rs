@@ -234,7 +234,8 @@ impl Model {
         });
 
         let mut model_ptr: *mut AicModel = ptr::null_mut();
-        let c_license_key = CString::new(license_key).map_err(|_| AicError::LicenseFormatInvalid)?;
+        let c_license_key =
+            CString::new(license_key).map_err(|_| AicError::LicenseFormatInvalid)?;
 
         let error_code =
             unsafe { aic_model_create(&mut model_ptr, model_type.into(), c_license_key.as_ptr()) };
