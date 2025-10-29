@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1 - 2025-10-29
+### Fixes
+- Fixed documentation build on docs.rs
+
 ## 0.8.0 - 2025-10-28
 
 ### New features

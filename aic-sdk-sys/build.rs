@@ -17,7 +17,7 @@ fn main() {
         panic!("Windows is not supported yet. Please use a different platform to build the SDK.");
     }
 
-    // needs to be generated before early return on docs.rs
+    // Bindings need to be generated before early return on docs.rs
     generate_bindings();
 
     if env::var("DOCS_RS").is_ok() {
