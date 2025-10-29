@@ -1,18 +1,18 @@
 use std::{
     collections::HashMap,
-    env,
     path::{Path, PathBuf},
 };
 
 pub struct Downloader {
     base_url: String,
+    version: String,
     output_path: PathBuf,
     artifact_sha: HashMap<String, String>,
 }
 
 impl Downloader {
     pub fn new(output_path: &Path) -> Self {
-        let version = env::var("CARGO_PKG_VERSION").unwrap();
+        let version = "0.8.0".to_string();
         let base_url = "https://github.com/ai-coustics/aic-sdk-c/releases/download".to_string();
 
         let artifact_sha = HashMap::from([
@@ -40,13 +40,14 @@ impl Downloader {
 
         Downloader {
             base_url,
+            version,
             output_path: output_path.to_path_buf(),
             artifact_sha,
         }
     }
 
     pub fn download(&self) -> PathBuf {
-        let version = env::var("CARGO_PKG_VERSION").unwrap();
+        let version = self.version.as_str();
         let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
         let vendor = std::env::var("CARGO_CFG_TARGET_VENDOR").unwrap();
         let abi = std::env::var("CARGO_CFG_TARGET_ENV").unwrap();
