@@ -1,5 +1,3 @@
-//! # ai-coustics models for speech enhancement
-
 use crate::error::*;
 
 use aic_sdk_sys::{ 
@@ -16,41 +14,49 @@ static SET_WRAPPER_ID: Once = Once::new();
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModelType {
     /// **Specifications:**
+    /// - Window length: 10 ms
     /// - Native sample rate: 48 kHz
     /// - Native num frames: 480
     /// - Processing latency: 30ms
     QuailL48,
     /// **Specifications:**
+    /// - Window length: 10 ms
     /// - Native sample rate: 16 kHz
     /// - Native num frames: 160
     /// - Processing latency: 30ms
     QuailL16,
     /// **Specifications:**
+    /// - Window length: 10 ms
     /// - Native sample rate: 8 kHz
     /// - Native num frames: 80
     /// - Processing latency: 30ms
     QuailL8,
     /// **Specifications:**
+    /// - Window length: 10 ms
     /// - Native sample rate: 48 kHz
     /// - Native num frames: 480
     /// - Processing latency: 30ms
     QuailS48,
     /// **Specifications:**
+    /// - Window length: 10 ms
     /// - Native sample rate: 16 kHz
     /// - Native num frames: 160
     /// - Processing latency: 30ms
     QuailS16,
     /// **Specifications:**
+    /// - Window length: 10 ms
     /// - Native sample rate: 8 kHz
     /// - Native num frames: 80
     /// - Processing latency: 30ms
     QuailS8,
     /// **Specifications:**
+    /// - Window length: 10 ms
     /// - Native sample rate: 48 kHz
     /// - Native num frames: 480
     /// - Processing latency: 10ms
     QuailXS,
     /// **Specifications:**
+    /// - Window length: 10 ms
     /// - Native sample rate: 48 kHz
     /// - Native num frames: 480
     /// - Processing latency: 10ms
@@ -440,7 +446,7 @@ impl Model {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// let enhancement_level = model.get_parameter(EnhancementParameter::EnhancementLevel).unwrap();
-    /// println!("Current enhancement level: {}", enhancement_level);
+    /// println!("Current enhancement level: {enhancement_level}");
     /// ```
     pub fn get_parameter(&self, parameter: Parameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
@@ -528,7 +534,7 @@ impl Model {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// let optimal_rate = model.optimal_sample_rate().unwrap();
-    /// println!("Optimal sample rate: {} Hz", optimal_rate);
+    /// println!("Optimal sample rate: {optimal_rate} Hz");
     /// ```
     pub fn optimal_sample_rate(&self) -> Result<u32, AicError> {
         let mut sample_rate: u32 = 0;
@@ -569,7 +575,7 @@ impl Model {
     /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// # let sample_rate = model.optimal_sample_rate().unwrap();
     /// let optimal_frames = model.optimal_num_frames(sample_rate).unwrap();
-    /// println!("Optimal frame count: {}", optimal_frames);
+    /// println!("Optimal frame count: {optimal_frames}");
     /// ```
     pub fn optimal_num_frames(&self, sample_rate: u32) -> Result<usize, AicError> {
         let mut num_frames: usize = 0;

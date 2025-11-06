@@ -1,5 +1,3 @@
-//! # Voice Activity Detector
-
 use crate::error::*;
 
 use aic_sdk_sys::{ 
@@ -130,8 +128,9 @@ impl Vad {
     /// # use aic_sdk::{Model, ModelType, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// let enhancement_level = model.get_parameter(VadParameter::EnhancementLevel).unwrap();
-    /// println!("Current enhancement level: {}", enhancement_level);
+    /// # let vad = model.create_vad();
+    /// let sensitivity = vad.get_parameter(VadParameter::Sensitivity).unwrap();
+    /// println!("Current sensitivity: {sensitivity}");
     /// ```
     pub fn get_parameter(&self, parameter: VadParameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
