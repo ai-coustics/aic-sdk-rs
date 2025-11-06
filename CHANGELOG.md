@@ -1,6 +1,20 @@
 # Changelog
 
+## 0.9.0 - 2025-11-06
+
+### Features
+- **Voice Activity Detection**: This release adds a new Quail-based VAD. The VAD automatically uses the output of a Quail model to calculate a voice activity prediction.
+
+### Breaking Changes
+- `Parameter` was renamed to `EnhancementParameter`.
+
+## 0.8.2 - 2025-11-06
+
+### Fixes
+- Fixed build error on macOS
+
 ## 0.8.1 - 2025-10-29
+
 ### Fixes
 - Fixed documentation build on docs.rs
 
