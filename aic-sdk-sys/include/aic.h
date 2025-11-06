@@ -22,6 +22,63 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+/**
+ * Configurable parameters for audio enhancement
+ */
+typedef enum AicEnhancementParameter {
+  /**
+   * Controls whether audio processing is bypassed while preserving algorithmic delay.
+   *
+   * When enabled, the input audio passes through unmodified, but the output is still
+   * delayed by the same amount as during normal processing. This ensures seamless
+   * transitions when toggling enhancement on/off without audible clicks or timing shifts.
+   *
+   * **Range:** 0.0 to 1.0
+   * - **0.0:** Enhancement active (normal processing)
+   * - **1.0:** Bypass enabled (latency-compensated passthrough)
+   *
+   * **Default:** 0.0
+   */
+  AIC_ENHANCEMENT_PARAMETER_BYPASS = 0,
+  /**
+   * Controls the intensity of speech enhancement processing.
+   *
+   * **Range:** 0.0 to 1.0
+   * - **0.0:** No enhancement - original signal passes through unchanged
+   * - **1.0:** Full enhancement - maximum noise reduction but also more audible artifacts
+   *
+   * **Default:** 1.0
+   */
+  AIC_ENHANCEMENT_PARAMETER_ENHANCEMENT_LEVEL = 1,
+  /**
+   * Compensates for perceived volume reduction after noise removal.
+   *
+   * **Range:** 0.1 to 4.0 (linear amplitude multiplier)
+   * - **0.1:** Significant volume reduction (-20 dB)
+   * - **1.0:** No gain change (0 dB, default)
+   * - **2.0:** Double amplitude (+6 dB)
+   * - **4.0:** Maximum boost (+12 dB)
+   *
+   * **Formula:** Gain (dB) = 20 × log₁₀(value)
+   * **Default:** 1.0
+   */
+  AIC_ENHANCEMENT_PARAMETER_VOICE_GAIN = 2,
+  /**
+   * Enables/disables a noise gate as a post-processing step.
+   *
+   * The noise gate can be useful for ASR (Automatic Speech Recognition) systems
+   * that should only activate when actual speech is present, preventing false
+   * triggers from background noise artifacts.
+   *
+   * **Valid values:** 0.0 or 1.0
+   * - **0.0:** Noise gate disabled
+   * - **1.0:** Noise gate enabled
+   *
+   * **Default:** 0.0
+   */
+  AIC_ENHANCEMENT_PARAMETER_NOISE_GATE_ENABLE = 3,
+} AicEnhancementParameter;
+
 typedef enum AicErrorCode {
   /**
    * Operation completed successfully
@@ -75,6 +132,7 @@ typedef enum AicErrorCode {
 typedef enum AicModelType {
   /**
    * **Specifications:**
+   * - Window length: 10 ms
    * - Native sample rate: 48 kHz
    * - Native num frames: 480
    * - Processing latency: 30ms
@@ -82,6 +140,7 @@ typedef enum AicModelType {
   AIC_MODEL_TYPE_QUAIL_L48 = 0,
   /**
    * **Specifications:**
+   * - Window length: 10 ms
    * - Native sample rate: 16 kHz
    * - Native num frames: 160
    * - Processing latency: 30ms
@@ -89,6 +148,7 @@ typedef enum AicModelType {
   AIC_MODEL_TYPE_QUAIL_L16 = 1,
   /**
    * **Specifications:**
+   * - Window length: 10 ms
    * - Native sample rate: 8 kHz
    * - Native num frames: 80
    * - Processing latency: 30ms
@@ -96,6 +156,7 @@ typedef enum AicModelType {
   AIC_MODEL_TYPE_QUAIL_L8 = 2,
   /**
    * **Specifications:**
+   * - Window length: 10 ms
    * - Native sample rate: 48 kHz
    * - Native num frames: 480
    * - Processing latency: 30ms
@@ -103,6 +164,7 @@ typedef enum AicModelType {
   AIC_MODEL_TYPE_QUAIL_S48 = 3,
   /**
    * **Specifications:**
+   * - Window length: 10 ms
    * - Native sample rate: 16 kHz
    * - Native num frames: 160
    * - Processing latency: 30ms
@@ -110,6 +172,7 @@ typedef enum AicModelType {
   AIC_MODEL_TYPE_QUAIL_S16 = 4,
   /**
    * **Specifications:**
+   * - Window length: 10 ms
    * - Native sample rate: 8 kHz
    * - Native num frames: 80
    * - Processing latency: 30ms
@@ -117,6 +180,7 @@ typedef enum AicModelType {
   AIC_MODEL_TYPE_QUAIL_S8 = 5,
   /**
    * **Specifications:**
+   * - Window length: 10 ms
    * - Native sample rate: 48 kHz
    * - Native num frames: 480
    * - Processing latency: 10ms
@@ -124,6 +188,7 @@ typedef enum AicModelType {
   AIC_MODEL_TYPE_QUAIL_XS = 6,
   /**
    * **Specifications:**
+   * - Window length: 10 ms
    * - Native sample rate: 48 kHz
    * - Native num frames: 480
    * - Processing latency: 10ms
@@ -132,63 +197,42 @@ typedef enum AicModelType {
 } AicModelType;
 
 /**
- * Configurable parameters for audio enhancement
+ * Configurable parameters for Voice Activity Detection.
  */
-typedef enum AicParameter {
+typedef enum AicVadParameter {
   /**
-   * Controls whether audio processing is bypassed while preserving algorithmic delay.
+   * Controls the lookback buffer size used in the Voice Activity Detector.
    *
-   * When enabled, the input audio passes through unmodified, but the output is still
-   * delayed by the same amount as during normal processing. This ensures seamless
-   * transitions when toggling enhancement on/off without audible clicks or timing shifts.
+   * The lookback buffer size is the number of window-length audio buffers
+   * the VAD has available as a lookback buffer.
    *
-   * **Range:** 0.0 to 1.0
-   * - **0.0:** Enhancement active (normal processing)
-   * - **1.0:** Bypass enabled (latency-compensated passthrough)
+   * The stability of the prediction increases with the buffer size,
+   * at the cost of higher latency.
    *
-   * **Default:** 0.0
+   * **Range:** 1.0 to 20.0
+   *
+   * **Default:** 6.0
    */
-  AIC_PARAMETER_BYPASS = 0,
+  AIC_VAD_PARAMETER_LOOKBACK_BUFFER_SIZE = 0,
   /**
-   * Controls the intensity of speech enhancement processing.
+   * Controls the sensitivity (energy threshold) of the VAD.
    *
-   * **Range:** 0.0 to 1.0
-   * - **0.0:** No enhancement - original signal passes through unchanged
-   * - **1.0:** Full enhancement - maximum noise reduction but also more audible artifacts
+   * This value is used by the VAD as the threshold a
+   * speech audio signal's energy has to exceed in order to be
+   * considered speech.
    *
-   * **Default:** 1.0
+   * **Range:** 1.0 to 15.0
+   *
+   * **Formula:** Energy threshold = 10 ^ (-sensitivity)
+   *
+   * **Default:** 6.0
    */
-  AIC_PARAMETER_ENHANCEMENT_LEVEL = 1,
-  /**
-   * Compensates for perceived volume reduction after noise removal.
-   *
-   * **Range:** 0.1 to 4.0 (linear amplitude multiplier)
-   * - **0.1:** Significant volume reduction (-20 dB)
-   * - **1.0:** No gain change (0 dB, default)
-   * - **2.0:** Double amplitude (+6 dB)
-   * - **4.0:** Maximum boost (+12 dB)
-   *
-   * **Formula:** Gain (dB) = 20 × log₁₀(value)
-   * **Default:** 1.0
-   */
-  AIC_PARAMETER_VOICE_GAIN = 2,
-  /**
-   * Enables/disables a noise gate as a post-processing step.
-   *
-   * The noise gate can be useful for ASR (Automatic Speech Recognition) systems
-   * that should only activate when actual speech is present, preventing false
-   * triggers from background noise artifacts.
-   *
-   * **Valid values:** 0.0 or 1.0
-   * - **0.0:** Noise gate disabled
-   * - **1.0:** Noise gate enabled
-   *
-   * **Default:** 0.0
-   */
-  AIC_PARAMETER_NOISE_GATE_ENABLE = 3,
-} AicParameter;
+  AIC_VAD_PARAMETER_SENSITIVITY = 1,
+} AicVadParameter;
 
 typedef struct AicModel AicModel;
+
+typedef struct AicVad AicVad;
 
 #ifdef __cplusplus
 extern "C" {
@@ -344,7 +388,7 @@ enum AicErrorCode aic_model_process_interleaved(struct AicModel *model,
  * - `AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE`: Value outside valid range
  */
 enum AicErrorCode aic_model_set_parameter(struct AicModel *model,
-                                          enum AicParameter parameter,
+                                          enum AicEnhancementParameter parameter,
                                           float value);
 
 /**
@@ -362,7 +406,7 @@ enum AicErrorCode aic_model_set_parameter(struct AicModel *model,
  * - `AIC_ERROR_CODE_NULL_POINTER`: `model` or `value` is NULL
  */
 enum AicErrorCode aic_model_get_parameter(const struct AicModel *model,
-                                          enum AicParameter parameter,
+                                          enum AicEnhancementParameter parameter,
                                           float *value);
 
 /**
@@ -447,7 +491,7 @@ enum AicErrorCode aic_get_optimal_sample_rate(const struct AicModel *model, uint
  * introduce additional buffering latency on top of its base processing delay.**
  *
  * The optimal frame count varies based on the sample rate. Each model operates on a
- * fixed time window duration, so the required number of frames changes with sample rate.
+ * fixed time window length, so the required number of frames changes with sample rate.
  * For example, a model designed for 10 ms processing windows requires 480 frames at
  * 48 kHz, but only 160 frames at 16 kHz to capture the same duration of audio.
  *
@@ -466,6 +510,95 @@ enum AicErrorCode aic_get_optimal_sample_rate(const struct AicModel *model, uint
 enum AicErrorCode aic_get_optimal_num_frames(const struct AicModel *model,
                                              uint32_t sample_rate,
                                              size_t *num_frames);
+
+/**
+ * Creates a new Voice Activity Detector instance.
+ *
+ * The VAD works automatically using the enhanced audio output of a given model.
+ *
+ * **Important:** If the backing model is destroyed, the VAD instance will stop
+ * producing new data. It is safe to destroy the model without destroying the VAD.
+ *
+ * # Parameters
+ * - `vad`: Receives the handle to the newly created VAD. Must not be NULL.
+ * - `model`: Model instance to use as data source for the VAD.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: VAD created successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `vad` or `model` is NULL
+ */
+enum AicErrorCode aic_vad_create(struct AicVad **vad, const struct AicModel *model);
+
+/**
+ * Releases the VAD instance.
+ *
+ * **Important:** This does **NOT** destroy the backing model.
+ * `aic_model_destroy` must be called separately.
+ *
+ * After calling this function, the VAD handle becomes invalid.
+ * This function is safe to call with NULL.
+ *
+ * # Parameters
+ * - `vad`: VAD instance to destroy. Can be NULL.
+ */
+void aic_vad_destroy(struct AicVad *vad);
+
+/**
+ * Returns the VAD's prediction.
+ *
+ * **Important:**
+ * - The latency of the VAD prediction is equal to
+ *   the backing model's processing latency.
+ * - If the backing model stops being processed,
+ *   the VAD will not update its speech detection prediction.
+ *
+ * # Parameters
+ * - `vad`: VAD instance. Must not be NULL.
+ * - `value`: Receives the VAD prediction. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Prediction retrieved successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `vad` or `value` is NULL
+ */
+enum AicErrorCode aic_vad_is_speech_detected(struct AicVad *vad, bool *value);
+
+/**
+ * Modifies a VAD parameter.
+ *
+ * All parameters can be changed during audio processing.
+ * This function can be called from any thread.
+ *
+ * # Parameters
+ * - `model`: Model instance. Must not be NULL.
+ * - `parameter`: Parameter to modify.
+ * - `value`: New parameter value. See parameter documentation for ranges.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Parameter updated successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `vad` is NULL
+ * - `AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE`: Value outside valid range
+ */
+enum AicErrorCode aic_vad_set_parameter(struct AicVad *vad,
+                                        enum AicVadParameter parameter,
+                                        float value);
+
+/**
+ * Retrieves the current value of a parameter.
+ *
+ * This function can be called from any thread.
+ *
+ * # Parameters
+ * - `model`: Model instance. Must not be NULL.
+ * - `parameter`: Parameter to query.
+ * - `value`: Receives the current parameter value. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Parameter retrieved successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `vad` or `value` is NULL
+ */
+enum AicErrorCode aic_vad_get_parameter(const struct AicVad *vad,
+                                        enum AicVadParameter parameter,
+                                        float *value);
 
 /**
  * Returns the version of the SDK.

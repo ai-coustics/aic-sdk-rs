@@ -2,7 +2,7 @@
 members = ["aic-sdk-sys"]
 
 [workspace.dependencies]
-aic-sdk-sys = { version = "0.8.1", path = "aic-sdk-sys" }
+aic-sdk-sys = { version = "0.9.0", path = "aic-sdk-sys" }
 
 [package]
 categories = ["multimedia::audio"]
@@ -16,11 +16,11 @@ license = "Apache-2.0"
 name = "aic-sdk"
 readme = "README.md"
 repository = "https://github.com/ai-coustics/aic-sdk-rs"
-version = "0.8.1"
+version = "0.9.0"
 
 [dependencies]
 aic-sdk-sys = { workspace = true }
-thiserror = "2.0.16"
+thiserror = "2.0.17"
 
 [features]
 download-lib = ["aic-sdk-sys/download-lib"]

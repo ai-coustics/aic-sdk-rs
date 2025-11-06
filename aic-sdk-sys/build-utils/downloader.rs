@@ -12,29 +12,29 @@ pub struct Downloader {
 
 impl Downloader {
     pub fn new(output_path: &Path) -> Self {
-        let version = "0.8.0".to_string();
+        let version = "0.9.0".to_string();
         let base_url = "https://github.com/ai-coustics/aic-sdk-c/releases/download".to_string();
 
         let artifact_sha = HashMap::from([
             (
                 format!("aic-sdk-aarch64-apple-darwin-{version}.tar.gz"),
-                "030c2948fa8f4d7132de71220e47f67280a2ea60bbad853a6fd619afcf4667ef".to_string(),
+                "ef843628e648624b4253ae2160be32f1564e56b15868cdfcc879c76e5ae7da41".to_string(),
             ),
             (
                 format!("aic-sdk-aarch64-unknown-linux-gnu-{version}.tar.gz"),
-                "fa352fb1c3db29f30ae04eb3d82678e24982c432b045c985cd21592e91b9c0bc".to_string(),
+                "ee7f297e75157038c6faf75f7eedabf1e5d1a85ef282378c5f124a1855896161".to_string(),
             ),
             (
                 format!("aic-sdk-x86_64-apple-darwin-{version}.tar.gz"),
-                "c83f9e2615275bc814852d9cda73df067491dff214d39b12f678b7e1b5fc07ab".to_string(),
+                "86a0612c09b45e29229ec00891e5768551dec3379b824313b30df38013eed05b".to_string(),
             ),
             (
                 format!("aic-sdk-x86_64-pc-windows-msvc-{version}.zip"),
-                "d8e45d8e05674b65d1e654eab810e727b45ec8558a08fb16ec26100c93da3e18".to_string(),
+                "24832b4aeff47abe14856c2ac36215e3a6fab19428f694fa3fb79b41ff2fd990".to_string(),
             ),
             (
                 format!("aic-sdk-x86_64-unknown-linux-gnu-{version}.tar.gz"),
-                "342eb68363e3c28c900814618ab3586d058e4d4f4b1c1f204bea6a18438bc8e6".to_string(),
+                "ae6ade43674ea112c1a5cb307938b0da2cd1d9abae1e001ee6d2d4fe3843e3e7".to_string(),
             ),
         ]);
 
