@@ -24,6 +24,14 @@ pub fn patch_lib(
         .arg("-arch")
         .arg(&target_arch)
         .arg("-r")
+        .arg("-platform_version")
+        .arg("macos")
+        .arg(if target_arch == "arm64" {
+            "11.0"
+        } else {
+            "10.13"
+        })
+        .arg("14.0")
         .arg("-o")
         .arg(&intermediate_obj)
         .arg("-all_load")

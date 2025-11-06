@@ -18,7 +18,7 @@ Enable the `download-lib` feature to automatically download the library when bui
 
 ```toml
 [dependencies]
-aic-sdk = { version = "0.8.1", features = ["download-lib"] }
+aic-sdk = { version = "0.8.2", features = ["download-lib"] }
 ```
 
 If you want to provide your own library, use the `AIC_LIB_PATH` environment variable to specify the path
@@ -98,7 +98,7 @@ Need assistance? We're here to support you:
 - **Technical Support**: [info@ai-coustics.com](mailto:info@ai-coustics.com)
 
 ## License
-This Rust wrapper is distributed under the [Apache 2.0 license](LICENSE), while the core C SDK is distributed under the proprietary [AIC-SDK license](LICENSE.AIC-SDK).
+This Rust wrapper is distributed under the `Apache 2.0 license`, while the core C SDK is distributed under the proprietary `AIC-SDK license`.
 
 ---
 

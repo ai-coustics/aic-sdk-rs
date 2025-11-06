@@ -10,7 +10,7 @@ license = "Apache-2.0"
 name = "aic-sdk-sys"
 readme = "README.md"
 repository = "https://github.com/ai-coustics/aic-sdk-rs"
-version = "0.8.1"
+version = "0.8.2"
 
 [package.metadata.docs.rs]
 features = ["download-lib"]
