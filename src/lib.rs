@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use aic_sdk_sys::{AicErrorCode::*, AicModelType::*, AicParameter::*, *};
 use std::{
     ffi::{CStr, CString},
