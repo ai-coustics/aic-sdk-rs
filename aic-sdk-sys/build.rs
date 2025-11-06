@@ -158,8 +158,9 @@ fn generate_bindings() {
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         // Generate constified enums to avoid name repetition
         .constified_enum_module("AicErrorCode")
-        .constified_enum_module("AicParameter")
+        .constified_enum_module("AicEnhancementParameter")
         .constified_enum_module("AicModelType")
+        .constified_enum_module("AicVadParameter")
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.
