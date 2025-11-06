@@ -46,6 +46,12 @@ impl From<VadParameter> for AicVadParameter::Type {
 
 /// Voice Activity Detector backed by an ai-coustics speech enhancement model.
 ///
+/// The VAD works automatically using the enhanced audio output of the model
+/// that created the VAD.
+///
+/// **Important:** If the backing model is destroyed, the VAD instance will stop
+/// producing new data.
+/// 
 /// # Example
 ///
 /// ```rust
