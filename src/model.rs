@@ -200,12 +200,7 @@ impl Model {
         Ok(Self { inner: model_ptr })
     }
 
-    /// Creates a Voice Activity Detector instance.
-    ///
-    /// The VAD works automatically using the enhanced audio output of a given model.
-    ///
-    /// **Important:** If the backing model is destroyed, the VAD instance will stop
-    /// producing new data.
+    /// Creates a [Voice Activity Detector](crate::vad::Vad) instance.
     ///
     /// # Example
     ///
