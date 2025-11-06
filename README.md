@@ -98,7 +98,7 @@ Need assistance? We're here to support you:
 - **Technical Support**: [info@ai-coustics.com](mailto:info@ai-coustics.com)
 
 ## License
-This Rust wrapper is distributed under the [Apache 2.0 license](LICENSE), while the core C SDK is distributed under the proprietary [AIC-SDK license](LICENSE.AIC-SDK).
+This Rust wrapper is distributed under the `Apache 2.0 license`, while the core C SDK is distributed under the proprietary `AIC-SDK license`.
 
 ---
 
