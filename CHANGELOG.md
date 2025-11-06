@@ -7,6 +7,7 @@
 
 ### Breaking Changes
 - `Parameter` was renamed to `EnhancementParameter`.
+- `handle_error`'s visibility is now `pub(crate)`.
 
 ## 0.8.2 - 2025-11-06
 
