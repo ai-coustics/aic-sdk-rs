@@ -1,9 +1,6 @@
 use crate::error::*;
 
-use aic_sdk_sys::{ 
-    AicVadParameter::*,
-    *,
-};
+use aic_sdk_sys::{AicVadParameter::*, *};
 
 /// Configurable parameters for Voice Activity Detection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,7 +36,6 @@ impl From<VadParameter> for AicVadParameter::Type {
         match parameter {
             VadParameter::LookbackBufferSize => AIC_VAD_PARAMETER_LOOKBACK_BUFFER_SIZE,
             VadParameter::Sensitivity => AIC_VAD_PARAMETER_SENSITIVITY,
-            
         }
     }
 }
@@ -51,7 +47,7 @@ impl From<VadParameter> for AicVadParameter::Type {
 ///
 /// **Important:** If the backing model is destroyed, the VAD instance will stop
 /// producing new data.
-/// 
+///
 /// # Example
 ///
 /// ```rust
@@ -81,17 +77,15 @@ impl Vad {
     ///   the VAD will not update its speech detection prediction.
     pub fn is_speech_detected(&self) -> bool {
         let mut value: bool = false;
-        let error_code = unsafe {
-            aic_vad_is_speech_detected(self.inner, &mut value)
-        };
-        
+        let error_code = unsafe { aic_vad_is_speech_detected(self.inner, &mut value) };
+
         // This should never fail
         assert!(handle_error(error_code).is_ok());
         value
     }
 
     /// Modifies a VAD parameter.
-    /// 
+    ///
     /// # Arguments
     ///
     /// - `parameter` - Parameter to modify
@@ -112,9 +106,7 @@ impl Vad {
     /// vad.set_parameter(VadParameter::Sensitivity, 5.0).unwrap();
     /// ```
     pub fn set_parameter(&mut self, parameter: VadParameter, value: f32) -> Result<(), AicError> {
-        let error_code = unsafe {
-            aic_vad_set_parameter(self.inner, parameter.into(), value)
-        };
+        let error_code = unsafe { aic_vad_set_parameter(self.inner, parameter.into(), value) };
         handle_error(error_code)
     }
 
@@ -140,9 +132,7 @@ impl Vad {
     /// ```
     pub fn get_parameter(&self, parameter: VadParameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
-        let error_code = unsafe {
-            aic_vad_get_parameter(self.inner, parameter.into(), &mut value)
-        };
+        let error_code = unsafe { aic_vad_get_parameter(self.inner, parameter.into(), &mut value) };
         handle_error(error_code)?;
         Ok(value)
     }

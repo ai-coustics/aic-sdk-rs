@@ -1,12 +1,8 @@
 use crate::error::*;
 
-use aic_sdk_sys::{ 
-    AicEnhancementParameter::*, AicModelType::*, *
-};
+use aic_sdk_sys::{AicEnhancementParameter::*, AicModelType::*, *};
 
-use std::{
-    ffi::CString, ptr, sync::Once
-};
+use std::{ffi::CString, ptr, sync::Once};
 
 static SET_WRAPPER_ID: Once = Once::new();
 
@@ -190,9 +186,8 @@ impl Model {
         let c_license_key =
             CString::new(license_key).map_err(|_| AicError::LicenseFormatInvalid)?;
 
-        let error_code = unsafe {
-            aic_model_create(&mut model_ptr, model_type.into(), c_license_key.as_ptr())
-        };
+        let error_code =
+            unsafe { aic_model_create(&mut model_ptr, model_type.into(), c_license_key.as_ptr()) };
 
         handle_error(error_code)?;
 
@@ -223,9 +218,7 @@ impl Model {
     pub fn create_vad(&self) -> crate::Vad {
         let mut vad_ptr: *mut AicVad = ptr::null_mut();
 
-        let error_code = unsafe {
-            aic_vad_create(&mut vad_ptr, self.inner)
-        };
+        let error_code = unsafe { aic_vad_create(&mut vad_ptr, self.inner) };
 
         // This should never fail
         assert!(handle_error(error_code).is_ok());

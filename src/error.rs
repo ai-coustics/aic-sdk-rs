@@ -52,7 +52,7 @@ impl From<AicErrorCode::Type> for AicError {
 }
 
 /// Helper function to convert C error codes into Result.
-pub (crate) fn handle_error(error_code: AicErrorCode::Type) -> Result<(), AicError> {
+pub(crate) fn handle_error(error_code: AicErrorCode::Type) -> Result<(), AicError> {
     match error_code {
         AIC_ERROR_CODE_SUCCESS => Ok(()),
         code => Err(AicError::from(code)),
