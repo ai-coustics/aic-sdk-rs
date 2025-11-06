@@ -27,7 +27,7 @@ pub use vad::*;
 ///
 /// ```rust
 /// let version = aic_sdk::get_version();
-/// println!("ai-coustics SDK version: {}", version);
+/// println!("ai-coustics SDK version: {version}");
 /// ```
 pub fn get_version() -> &'static str {
     let version_ptr = unsafe { aic_get_sdk_version() };
