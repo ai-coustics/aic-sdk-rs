@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 use aic_sdk_sys::aic_get_sdk_version;
 use std::ffi::CStr;
 
