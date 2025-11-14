@@ -10,7 +10,7 @@
 #![allow(dead_code)]
 #![allow(clippy::all)]
 
-include!("bindings.rs");
+include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 unsafe extern "C" {
     /// Sets the SDK wrapper ID.
