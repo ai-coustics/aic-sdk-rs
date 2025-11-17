@@ -68,12 +68,6 @@ Then use the following commands to configure, build and run the example:
 cargo run --example basic_usage --features download-lib
 ```
 
-## Compatibility
-
-This crate currently builds on Linux and macOS. Windows is not yet supported.
-
-If you need Windows support, please take a look at our C/C++ SDKs for now.
-
 ## Support & Resources
 
 ### Documentation
