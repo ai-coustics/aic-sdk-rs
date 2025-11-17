@@ -18,7 +18,7 @@ Enable the `download-lib` feature to automatically download the library when bui
 
 ```toml
 [dependencies]
-aic-sdk = { version = "0.9.0", features = ["download-lib"] }
+aic-sdk = { version = "0.9.1", features = ["download-lib"] }
 ```
 
 If you want to provide your own library, use the `AIC_LIB_PATH` environment variable to specify the path
@@ -67,12 +67,6 @@ Then use the following commands to configure, build and run the example:
 ```sh
 cargo run --example basic_usage --features download-lib
 ```
-
-## Compatibility
-
-This crate currently builds on Linux and macOS. Windows is not yet supported.
-
-If you need Windows support, please take a look at our C/C++ SDKs for now.
 
 ## Support & Resources
 

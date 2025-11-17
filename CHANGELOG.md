@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.1 - 2025-11-17
+
+## Features
+
+- **Internal library patching**: Static libraries are now patched internally to simplify usage from Rust, reducing integration complexity
+- **Windows support**: Added `x86_64-pc-windows-msvc` and `aarch64-pc-windows-msvc` as supported target platforms
+
 ## 0.9.0 - 2025-11-06
 
 ### Features

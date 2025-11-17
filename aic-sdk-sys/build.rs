@@ -1,21 +1,13 @@
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[cfg(feature = "download-lib")]
 #[path = "build-utils/downloader.rs"]
 mod downloader;
 
-#[path = "build-utils/patch-linux.rs"]
-mod patch_linux;
-#[path = "build-utils/patch-macos.rs"]
-mod patch_macos;
-#[path = "build-utils/patch-windows.rs"]
-mod patch_windows;
-
 fn main() {
-    if cfg!(target_os = "windows") {
-        panic!("Windows is not supported yet. Please use a different platform to build the SDK.");
-    }
+    // Rerun the build script if the AIC_LIB_PATH environment variable changes
+    println!("cargo:rerun-if-env-changed=AIC_LIB_PATH");
 
     // Bindings need to be generated before early return on docs.rs
     generate_bindings();
@@ -37,16 +29,11 @@ fn main() {
         env::var("AIC_LIB_PATH").expect("Enable feature `download-lib` or use a local library by setting the environment variable `AIC_LIB_PATH`"),
     );
 
-    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-
     let lib_name = "aic";
-    let lib_name_patched = "aic_patched";
-
-    patch_lib(&lib_path, lib_name, lib_name_patched);
 
     // Link with the curated library
-    println!("cargo:rustc-link-search=native={}", out_dir.display());
-    println!("cargo:rustc-link-lib=static={lib_name_patched}");
+    println!("cargo:rustc-link-search=native={}", lib_path.display());
+    println!("cargo:rustc-link-lib=static={lib_name}");
 
     // Add platform-specific system libraries
     add_platform_specific_libs();
@@ -66,6 +53,7 @@ fn add_platform_specific_libs() {
         println!("cargo:rustc-link-lib=bcrypt");
         println!("cargo:rustc-link-lib=kernel32");
         println!("cargo:rustc-link-lib=ws2_32");
+        println!("cargo:rustc-link-lib=oleaut32");
     } else if cfg!(target_os = "linux") {
         // Linux system libraries
         println!("cargo:rustc-link-lib=pthread");
@@ -82,67 +70,6 @@ fn download_lib() -> PathBuf {
 
     let downloader = Downloader::new(&out_dir);
     downloader.download()
-}
-
-fn patch_lib(lib_path: &Path, lib_name: &str, lib_name_patched: &str) {
-    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-
-    let static_lib_ext = if cfg!(target_os = "windows") {
-        ".lib"
-    } else {
-        ".a"
-    };
-    let static_lib = if cfg!(target_os = "windows") {
-        lib_path.join(format!("{}{}", lib_name, static_lib_ext))
-    } else {
-        lib_path.join(format!("lib{}{}", lib_name, static_lib_ext))
-    };
-
-    let global_symbols_wildcard = "aic_*";
-
-    if !static_lib.exists() {
-        panic!("Please provide the SDK at {}", static_lib.display());
-    }
-
-    let final_lib = if cfg!(target_os = "windows") {
-        out_dir.join(format!("{}{}", lib_name_patched, static_lib_ext))
-    } else {
-        out_dir.join(format!("lib{}{}", lib_name_patched, static_lib_ext))
-    };
-
-    if cfg!(target_os = "linux") {
-        patch_linux::patch_lib(
-            &static_lib,
-            &out_dir,
-            lib_name,
-            lib_name_patched,
-            global_symbols_wildcard,
-            &final_lib,
-        );
-    } else if cfg!(target_os = "macos") {
-        patch_macos::patch_lib(
-            &static_lib,
-            &out_dir,
-            lib_name,
-            lib_name_patched,
-            global_symbols_wildcard,
-            &final_lib,
-        );
-    } else if cfg!(target_os = "windows") {
-        patch_windows::patch_lib(
-            &static_lib,
-            &out_dir,
-            lib_name,
-            lib_name_patched,
-            global_symbols_wildcard,
-            &final_lib,
-        );
-    } else {
-        panic!("Unsupported platform for library patching");
-    }
-
-    // Rerun this script if the static library changes.
-    println!("cargo:rerun-if-changed={}", static_lib.display());
 }
 
 fn generate_bindings() {

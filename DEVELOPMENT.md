@@ -14,4 +14,6 @@ Before creating a release, check that everything can be published to crates.io.
 
 4. Check that the right version number is reflected in [README.md](README.md)
 
+5. Update [changelog](CHANGELOG.md)
+
 5. Create a new release on the GitHub main branch with a tag that has the same version number as the main crate

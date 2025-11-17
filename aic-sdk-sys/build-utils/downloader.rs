@@ -12,29 +12,33 @@ pub struct Downloader {
 
 impl Downloader {
     pub fn new(output_path: &Path) -> Self {
-        let version = "0.9.0".to_string();
+        let version = "0.9.1".to_string();
         let base_url = "https://github.com/ai-coustics/aic-sdk-c/releases/download".to_string();
 
         let artifact_sha = HashMap::from([
             (
                 format!("aic-sdk-aarch64-apple-darwin-{version}.tar.gz"),
-                "ef843628e648624b4253ae2160be32f1564e56b15868cdfcc879c76e5ae7da41".to_string(),
+                "8ab0b43ffbd1f5abc9b1aa87cbd69426c0b8dff6286a67d731e1c3ddd07618ff".to_string(),
+            ),
+            (
+                format!("aic-sdk-aarch64-pc-windows-msvc-{version}.zip"),
+                "ffcf38ab5d626f771f6d1d903ebe17c0cef4a06b4d2f63b13360a31ca2d95e3a".to_string(),
             ),
             (
                 format!("aic-sdk-aarch64-unknown-linux-gnu-{version}.tar.gz"),
-                "ee7f297e75157038c6faf75f7eedabf1e5d1a85ef282378c5f124a1855896161".to_string(),
+                "da227b36b8dcd3ca864b991e6cf87f16e70e59cd80569eaf089d944302fce780".to_string(),
             ),
             (
                 format!("aic-sdk-x86_64-apple-darwin-{version}.tar.gz"),
-                "86a0612c09b45e29229ec00891e5768551dec3379b824313b30df38013eed05b".to_string(),
+                "e6a1b1bde5bd59e7ba56850eb0e080838019f36a5281617778143347c182b42e".to_string(),
             ),
             (
                 format!("aic-sdk-x86_64-pc-windows-msvc-{version}.zip"),
-                "24832b4aeff47abe14856c2ac36215e3a6fab19428f694fa3fb79b41ff2fd990".to_string(),
+                "0ad821138251997a1fb5fece333d20c6fcde3265865922dfa0d81d1a1c9b89ac".to_string(),
             ),
             (
                 format!("aic-sdk-x86_64-unknown-linux-gnu-{version}.tar.gz"),
-                "ae6ade43674ea112c1a5cb307938b0da2cd1d9abae1e001ee6d2d4fe3843e3e7".to_string(),
+                "2b1ea87b58736394aab429c8f6bc308499b9a38a4f165962e6cba87081889adc".to_string(),
             ),
         ]);
 
