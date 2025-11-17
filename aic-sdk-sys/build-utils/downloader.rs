@@ -21,7 +21,7 @@ impl Downloader {
                 "8ab0b43ffbd1f5abc9b1aa87cbd69426c0b8dff6286a67d731e1c3ddd07618ff".to_string(),
             ),
             (
-                format!("aic-sdk-aarch64-pc-windows-msvc-{version}.tar.gz"),
+                format!("aic-sdk-aarch64-pc-windows-msvc-{version}.zip"),
                 "ffcf38ab5d626f771f6d1d903ebe17c0cef4a06b4d2f63b13360a31ca2d95e3a".to_string(),
             ),
             (
