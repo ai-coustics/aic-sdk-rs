@@ -30,11 +30,11 @@ impl Downloader {
             ),
             (
                 format!("aic-sdk-x86_64-apple-darwin-{version}.tar.gz"),
-                "86a0612c09b45e29229ec00891e5768551dec3379b824313b30df38013eed05b".to_string(),
+                "e6a1b1bde5bd59e7ba56850eb0e080838019f36a5281617778143347c182b42e".to_string(),
             ),
             (
                 format!("aic-sdk-x86_64-pc-windows-msvc-{version}.zip"),
-                "e6a1b1bde5bd59e7ba56850eb0e080838019f36a5281617778143347c182b42e".to_string(),
+                "0ad821138251997a1fb5fece333d20c6fcde3265865922dfa0d81d1a1c9b89ac".to_string(),
             ),
             (
                 format!("aic-sdk-x86_64-unknown-linux-gnu-{version}.tar.gz"),
