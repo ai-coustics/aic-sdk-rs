@@ -22,6 +22,137 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+typedef enum AicErrorCode {
+  /**
+   * Operation completed successfully
+   */
+  AIC_ERROR_CODE_SUCCESS = 0,
+  /**
+   * Required pointer argument was NULL. Check all pointer parameters.
+   */
+  AIC_ERROR_CODE_NULL_POINTER = 1,
+  /**
+   * Parameter value is outside the acceptable range. Check documentation for valid values.
+   */
+  AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE = 2,
+  /**
+   * Model must be initialized before calling this operation. Call `aic_model_initialize` first.
+   */
+  AIC_ERROR_CODE_MODEL_NOT_INITIALIZED = 3,
+  /**
+   * Audio configuration (samplerate, num_channels, num_frames) is not supported by the model
+   */
+  AIC_ERROR_CODE_AUDIO_CONFIG_UNSUPPORTED = 4,
+  /**
+   * Audio buffer configuration differs from the one provided during initialization
+   */
+  AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH = 5,
+  /**
+   * SDK key was not authorized or process failed to report usage. Check if you have internet connection.
+   */
+  AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED = 6,
+  /**
+   * Internal error occurred. Contact support.
+   */
+  AIC_ERROR_CODE_INTERNAL_ERROR = 7,
+  /**
+   * The requested parameter is read-only for this model type and cannot be modified.
+   */
+  AIC_ERROR_CODE_PARAMETER_FIXED = 8,
+  /**
+   * License key format is invalid or corrupted. Verify the key was copied correctly.
+   */
+  AIC_ERROR_CODE_LICENSE_FORMAT_INVALID = 50,
+  /**
+   * License version is not compatible with the SDK version. Update SDK or contact support.
+   */
+  AIC_ERROR_CODE_LICENSE_VERSION_UNSUPPORTED = 51,
+  /**
+   * License key has expired. Renew your license to continue.
+   */
+  AIC_ERROR_CODE_LICENSE_EXPIRED = 52,
+} AicErrorCode;
+
+/**
+ * Available model types for audio enhancement.
+ */
+typedef enum AicModelType {
+  /**
+   * **Specifications:**
+   * - Window length: 10 ms
+   * - Native sample rate: 48 kHz
+   * - Native num frames: 480
+   * - Processing latency: 30ms
+   */
+  AIC_MODEL_TYPE_QUAIL_L48 = 0,
+  /**
+   * **Specifications:**
+   * - Window length: 10 ms
+   * - Native sample rate: 16 kHz
+   * - Native num frames: 160
+   * - Processing latency: 30 ms
+   */
+  AIC_MODEL_TYPE_QUAIL_L16 = 1,
+  /**
+   * **Specifications:**
+   * - Window length: 10 ms
+   * - Native sample rate: 8 kHz
+   * - Native num frames: 80
+   * - Processing latency: 30 ms
+   */
+  AIC_MODEL_TYPE_QUAIL_L8 = 2,
+  /**
+   * **Specifications:**
+   * - Window length: 10 ms
+   * - Native sample rate: 48 kHz
+   * - Native num frames: 480
+   * - Processing latency: 30 ms
+   */
+  AIC_MODEL_TYPE_QUAIL_S48 = 3,
+  /**
+   * **Specifications:**
+   * - Window length: 10 ms
+   * - Native sample rate: 16 kHz
+   * - Native num frames: 160
+   * - Processing latency: 30 ms
+   */
+  AIC_MODEL_TYPE_QUAIL_S16 = 4,
+  /**
+   * **Specifications:**
+   * - Window length: 10 ms
+   * - Native sample rate: 8 kHz
+   * - Native num frames: 80
+   * - Processing latency: 30 ms
+   */
+  AIC_MODEL_TYPE_QUAIL_S8 = 5,
+  /**
+   * **Specifications:**
+   * - Window length: 10 ms
+   * - Native sample rate: 48 kHz
+   * - Native num frames: 480
+   * - Processing latency: 10 ms
+   */
+  AIC_MODEL_TYPE_QUAIL_XS = 6,
+  /**
+   * **Specifications:**
+   * - Window length: 10 ms
+   * - Native sample rate: 48 kHz
+   * - Native num frames: 480
+   * - Processing latency: 10 ms
+   */
+  AIC_MODEL_TYPE_QUAIL_XXS = 7,
+  /**
+   * Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
+   * that uses fixed enhancement parameters that cannot be changed during runtime.
+   * **Specifications:**
+   * - Window length: 10 ms
+   * - Native sample rate: 16 kHz
+   * - Native num frames: 160
+   * - Processing latency: 30 ms
+   */
+  AIC_MODEL_TYPE_QUAIL_STT = 8,
+} AicModelType;
+
 /**
  * Configurable parameters for audio enhancement
  */
@@ -63,138 +194,7 @@ typedef enum AicEnhancementParameter {
    * **Default:** 1.0
    */
   AIC_ENHANCEMENT_PARAMETER_VOICE_GAIN = 2,
-  /**
-   * Enables/disables a noise gate as a post-processing step.
-   *
-   * The noise gate can be useful for ASR (Automatic Speech Recognition) systems
-   * that should only activate when actual speech is present, preventing false
-   * triggers from background noise artifacts.
-   *
-   * **Valid values:** 0.0 or 1.0
-   * - **0.0:** Noise gate disabled
-   * - **1.0:** Noise gate enabled
-   *
-   * **Default:** 0.0
-   */
-  AIC_ENHANCEMENT_PARAMETER_NOISE_GATE_ENABLE = 3,
 } AicEnhancementParameter;
-
-typedef enum AicErrorCode {
-  /**
-   * Operation completed successfully
-   */
-  AIC_ERROR_CODE_SUCCESS = 0,
-  /**
-   * Required pointer argument was NULL. Check all pointer parameters.
-   */
-  AIC_ERROR_CODE_NULL_POINTER = 1,
-  /**
-   * Parameter value is outside the acceptable range. Check documentation for valid values.
-   */
-  AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE = 2,
-  /**
-   * Model must be initialized before calling this operation. Call `aic_model_initialize` first.
-   */
-  AIC_ERROR_CODE_MODEL_NOT_INITIALIZED = 3,
-  /**
-   * Audio configuration (samplerate, num_channels, num_frames) is not supported by the model
-   */
-  AIC_ERROR_CODE_AUDIO_CONFIG_UNSUPPORTED = 4,
-  /**
-   * Audio buffer configuration differs from the one provided during initialization
-   */
-  AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH = 5,
-  /**
-   * SDK key was not authorized or process failed to report usage. Check if you have internet connection.
-   */
-  AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED = 6,
-  /**
-   * Internal error occurred. Contact support.
-   */
-  AIC_ERROR_CODE_INTERNAL_ERROR = 7,
-  /**
-   * License key format is invalid or corrupted. Verify the key was copied correctly.
-   */
-  AIC_ERROR_CODE_LICENSE_FORMAT_INVALID = 50,
-  /**
-   * License version is not compatible with the SDK version. Update SDK or contact support.
-   */
-  AIC_ERROR_CODE_LICENSE_VERSION_UNSUPPORTED = 51,
-  /**
-   * License key has expired. Renew your license to continue.
-   */
-  AIC_ERROR_CODE_LICENSE_EXPIRED = 52,
-} AicErrorCode;
-
-/**
- * Available model types for audio enhancement.
- */
-typedef enum AicModelType {
-  /**
-   * **Specifications:**
-   * - Window length: 10 ms
-   * - Native sample rate: 48 kHz
-   * - Native num frames: 480
-   * - Processing latency: 30ms
-   */
-  AIC_MODEL_TYPE_QUAIL_L48 = 0,
-  /**
-   * **Specifications:**
-   * - Window length: 10 ms
-   * - Native sample rate: 16 kHz
-   * - Native num frames: 160
-   * - Processing latency: 30ms
-   */
-  AIC_MODEL_TYPE_QUAIL_L16 = 1,
-  /**
-   * **Specifications:**
-   * - Window length: 10 ms
-   * - Native sample rate: 8 kHz
-   * - Native num frames: 80
-   * - Processing latency: 30ms
-   */
-  AIC_MODEL_TYPE_QUAIL_L8 = 2,
-  /**
-   * **Specifications:**
-   * - Window length: 10 ms
-   * - Native sample rate: 48 kHz
-   * - Native num frames: 480
-   * - Processing latency: 30ms
-   */
-  AIC_MODEL_TYPE_QUAIL_S48 = 3,
-  /**
-   * **Specifications:**
-   * - Window length: 10 ms
-   * - Native sample rate: 16 kHz
-   * - Native num frames: 160
-   * - Processing latency: 30ms
-   */
-  AIC_MODEL_TYPE_QUAIL_S16 = 4,
-  /**
-   * **Specifications:**
-   * - Window length: 10 ms
-   * - Native sample rate: 8 kHz
-   * - Native num frames: 80
-   * - Processing latency: 30ms
-   */
-  AIC_MODEL_TYPE_QUAIL_S8 = 5,
-  /**
-   * **Specifications:**
-   * - Window length: 10 ms
-   * - Native sample rate: 48 kHz
-   * - Native num frames: 480
-   * - Processing latency: 10ms
-   */
-  AIC_MODEL_TYPE_QUAIL_XS = 6,
-  /**
-   * **Specifications:**
-   * - Window length: 10 ms
-   * - Native sample rate: 48 kHz
-   * - Native num frames: 480
-   * - Processing latency: 10ms
-   */
-  AIC_MODEL_TYPE_QUAIL_XXS = 7,
-} AicModelType;
 
 /**
  * Configurable parameters for Voice Activity Detection.
@@ -209,7 +209,7 @@ typedef enum AicVadParameter {
    * The stability of the prediction increases with the buffer size,
    * at the cost of higher latency.
    *
-   * **Range:** 1.0 to 20.0
+   * **Range:** 1.0 to 20.0 (rounded up/down to the closest integer)
    *
    * **Default:** 6.0
    */

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.10.0 - 2025-11-17
+
+### Features
+
+- **Quail STT** (`ModelType::QuailSTT`): Our newest speech enhancement model is optimized for human-to-machine interaction (e.g., voice agents, speech-to-text). This model operates at a native sample rate of 16 kHz and uses fixed enhancement parameters that cannot be changed during runtime. The model is also compatible with our VAD.
+
+- Derived `Hash` on `EnhancementParameter`, `VadParameter` and `ModelType`.
+
+### Breaking Changes
+
+- `Parameter` was renamed to `EnhancementParameter`.
+- Renamed `Model::get_parameter` to `Model::parameter` and `Vad::get_parameter` to `Vad::parameter` to follow Rust standards.
+- Removed Parameter **NoiseGateEnable** as it is now a fixed part of our VAD.
+- Added new error code **ParameterFixed** returned when attempting to modify a parameter of a model with fixed parameters.
+
+## Fixes
+
+- Fixed an issue where `aic_vad_is_speech_detected` always returned `true` when `AIC_VAD_PARAMETER_LOOKBACK_BUFFER_SIZE` was set to `1.0`.
+
 ## 0.9.1 - 2025-11-17
 
 ## Features
@@ -13,7 +32,6 @@
 - **Voice Activity Detection**: This release adds a new Quail-based VAD. The VAD automatically uses the output of a Quail model to calculate a voice activity prediction.
 
 ### Breaking Changes
-- `Parameter` was renamed to `EnhancementParameter`.
 - `handle_error()`'s visibility is now `pub(crate)`.
 
 ## 0.8.2 - 2025-11-06
