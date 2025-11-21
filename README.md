@@ -1,7 +1,7 @@
 # ai-coustics Speech Enhancement SDK for Rust
 
 > [!WARNING]
-> You must use a Rust version different from 1.91.1, which was used to build the static libraries.
+> You must use a Rust version different from 1.91.1, which was used to build the static libraries. A solution is currently in development.
 
 ## What is this SDK?
 

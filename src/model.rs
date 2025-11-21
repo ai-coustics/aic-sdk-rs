@@ -13,56 +13,57 @@ pub enum ModelType {
     /// - Window length: 10 ms
     /// - Native sample rate: 48 kHz
     /// - Native num frames: 480
-    /// - Processing latency: 30ms
+    /// - Processing latency: 30 ms
     QuailL48,
     /// **Specifications:**
     /// - Window length: 10 ms
     /// - Native sample rate: 16 kHz
     /// - Native num frames: 160
-    /// - Processing latency: 30ms
+    /// - Processing latency: 30 ms
     QuailL16,
     /// **Specifications:**
     /// - Window length: 10 ms
     /// - Native sample rate: 8 kHz
     /// - Native num frames: 80
-    /// - Processing latency: 30ms
+    /// - Processing latency: 30 ms
     QuailL8,
     /// **Specifications:**
     /// - Window length: 10 ms
     /// - Native sample rate: 48 kHz
     /// - Native num frames: 480
-    /// - Processing latency: 30ms
+    /// - Processing latency: 30 ms
     QuailS48,
     /// **Specifications:**
     /// - Window length: 10 ms
     /// - Native sample rate: 16 kHz
     /// - Native num frames: 160
-    /// - Processing latency: 30ms
+    /// - Processing latency: 30 ms
     QuailS16,
     /// **Specifications:**
     /// - Window length: 10 ms
     /// - Native sample rate: 8 kHz
     /// - Native num frames: 80
-    /// - Processing latency: 30ms
+    /// - Processing latency: 30 ms
     QuailS8,
     /// **Specifications:**
     /// - Window length: 10 ms
     /// - Native sample rate: 48 kHz
     /// - Native num frames: 480
-    /// - Processing latency: 10ms
+    /// - Processing latency: 10 ms
     QuailXS,
     /// **Specifications:**
     /// - Window length: 10 ms
     /// - Native sample rate: 48 kHz
     /// - Native num frames: 480
-    /// - Processing latency: 10ms
+    /// - Processing latency: 10 ms
     QuailXXS,
-    /// Special model for Speech-to-Text.
+    /// Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
+    /// that uses fixed enhancement parameters that cannot be changed during runtime.
     /// **Specifications:**
     /// - Window length: 10 ms
     /// - Native sample rate: 16 kHz
-    /// - Native num frames: 480
-    /// - Processing latency: 10ms
+    /// - Native num frames: 160
+    /// - Processing latency: 30 ms
     QuailSTT,
 }
 
