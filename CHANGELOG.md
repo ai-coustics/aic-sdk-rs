@@ -6,7 +6,7 @@
 
 - **Quail STT** (`ModelType::QuailSTT`): Our newest speech enhancement model is optimized for human-to-machine interaction (e.g., voice agents, speech-to-text). This model operates at a native sample rate of 16 kHz and uses fixed enhancement parameters that cannot be changed during runtime. The model is also compatible with our VAD.
 
-- Derived `Hash` on `EnhancemenParameter`, `VadParameter` and `ModelType`.
+- Derived `Hash` on `EnhancementParameter`, `VadParameter` and `ModelType`.
 
 ### Breaking Changes
 
