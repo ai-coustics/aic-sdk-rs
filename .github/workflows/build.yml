@@ -19,6 +19,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@beta # Beta to force building with a different toolchain than the one used by the SDK
+      - uses: dtolnay/rust-toolchain@1.91.0
       - name: Build and Run Example
         run: cargo run --example basic_usage --features download-lib
