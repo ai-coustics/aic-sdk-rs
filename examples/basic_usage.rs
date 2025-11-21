@@ -1,4 +1,4 @@
-use aic_sdk::{Model, ModelType, Parameter};
+use aic_sdk::{EnhancementParameter, Model, ModelType, VadParameter};
 use std::env;
 
 const NUM_CHANNELS: u16 = 2;
@@ -34,10 +34,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Output delay: {} samples", delay);
 
     // Test parameter setting and getting
-    model.set_parameter(Parameter::EnhancementLevel, 0.7)?;
+    model.set_parameter(EnhancementParameter::EnhancementLevel, 0.7)?;
     println!("Parameter set successfully");
 
-    let enhancement_level = model.get_parameter(Parameter::EnhancementLevel)?;
+    let enhancement_level = model.parameter(EnhancementParameter::EnhancementLevel)?;
     println!("Enhancement level: {}", enhancement_level);
 
     // Create minimal test audio - planar format (separate buffers for each channel)
@@ -73,6 +73,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match model.reset() {
         Ok(()) => println!("Model reset succeeded"),
         Err(e) => println!("Model reset failed: {}", e),
+    }
+
+    // Voice Activity Detection
+    let mut vad = model.create_vad();
+    vad.set_parameter(VadParameter::LookbackBufferSize, 7.0)?;
+    vad.set_parameter(VadParameter::Sensitivity, 7.0)?;
+
+    let lookback_buffer_size = vad.parameter(VadParameter::LookbackBufferSize)?;
+    println!("Lookback Buffer Size: {}", lookback_buffer_size);
+
+    let sensitivity = vad.parameter(VadParameter::Sensitivity)?;
+    println!("Sensitivity: {}", sensitivity);
+
+    if vad.is_speech_detected() {
+        println!("VAD detected speech");
+    } else {
+        println!("VAD did not detect speech");
     }
 
     // Clean up is handled automatically by Rust's Drop trait

@@ -12,33 +12,33 @@ pub struct Downloader {
 
 impl Downloader {
     pub fn new(output_path: &Path) -> Self {
-        let version = "0.9.1".to_string();
+        let version = "0.10.0".to_string();
         let base_url = "https://github.com/ai-coustics/aic-sdk-c/releases/download".to_string();
 
         let artifact_sha = HashMap::from([
             (
                 format!("aic-sdk-aarch64-apple-darwin-{version}.tar.gz"),
-                "8ab0b43ffbd1f5abc9b1aa87cbd69426c0b8dff6286a67d731e1c3ddd07618ff".to_string(),
+                "e677d07de9c7558115a695ca8e9a315db1d19093c191bbd4f57eaf3fa9ad9e30".to_string(),
             ),
             (
                 format!("aic-sdk-aarch64-pc-windows-msvc-{version}.zip"),
-                "ffcf38ab5d626f771f6d1d903ebe17c0cef4a06b4d2f63b13360a31ca2d95e3a".to_string(),
+                "c07d019646f5979ea291f8a6df7f4797ceafa3e6efac8b1c82229619d72599da".to_string(),
             ),
             (
                 format!("aic-sdk-aarch64-unknown-linux-gnu-{version}.tar.gz"),
-                "da227b36b8dcd3ca864b991e6cf87f16e70e59cd80569eaf089d944302fce780".to_string(),
+                "a1cd0afc8a8c7e2cefcd10f6c57fd859bdf7a3d037149c36658df287c8946af1".to_string(),
             ),
             (
                 format!("aic-sdk-x86_64-apple-darwin-{version}.tar.gz"),
-                "e6a1b1bde5bd59e7ba56850eb0e080838019f36a5281617778143347c182b42e".to_string(),
+                "f785b0fabe955b7645903e81049062832c6b035f916d5e06584fb85ac1688a9b".to_string(),
             ),
             (
                 format!("aic-sdk-x86_64-pc-windows-msvc-{version}.zip"),
-                "0ad821138251997a1fb5fece333d20c6fcde3265865922dfa0d81d1a1c9b89ac".to_string(),
+                "f5aa1e1513276b663406b2593f958c30263a6d31220a29a36ae11707b449da94".to_string(),
             ),
             (
                 format!("aic-sdk-x86_64-unknown-linux-gnu-{version}.tar.gz"),
-                "2b1ea87b58736394aab429c8f6bc308499b9a38a4f165962e6cba87081889adc".to_string(),
+                "e046098dd67b10516033b2a7da5c78703bb604c5034c9df371b0fc9fe800597b".to_string(),
             ),
         ]);
 

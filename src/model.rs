@@ -7,7 +7,7 @@ use std::{ffi::CString, ptr, sync::Once};
 static SET_WRAPPER_ID: Once = Once::new();
 
 /// Available model types for audio enhancement.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ModelType {
     /// **Specifications:**
     /// - Window length: 10 ms
@@ -57,6 +57,13 @@ pub enum ModelType {
     /// - Native num frames: 480
     /// - Processing latency: 10ms
     QuailXXS,
+    /// Special model for Speech-to-Text.
+    /// **Specifications:**
+    /// - Window length: 10 ms
+    /// - Native sample rate: 16 kHz
+    /// - Native num frames: 480
+    /// - Processing latency: 10ms
+    QuailSTT,
 }
 
 impl From<ModelType> for AicModelType::Type {
@@ -70,13 +77,14 @@ impl From<ModelType> for AicModelType::Type {
             ModelType::QuailS8 => AIC_MODEL_TYPE_QUAIL_S8,
             ModelType::QuailXS => AIC_MODEL_TYPE_QUAIL_XS,
             ModelType::QuailXXS => AIC_MODEL_TYPE_QUAIL_XXS,
+            ModelType::QuailSTT => AIC_MODEL_TYPE_QUAIL_STT,
         }
     }
 }
 
 /// Configurable parameters for audio enhancement
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Parameter {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EnhancementParameter {
     /// Controls whether audio processing is bypassed while preserving algorithmic delay.
     ///
     /// When enabled, the input audio passes through unmodified, but the output is still
@@ -108,24 +116,14 @@ pub enum Parameter {
     /// **Formula:** Gain (dB) = 20 × log₁₀(value)
     /// **Default:** 1.0
     VoiceGain,
-    /// Enables/disables a noise gate as a post-processing step,
-    /// before passing the audio buffer to the model.
-    ///
-    /// **Valid values:** 0.0 or 1.0
-    /// - **0.0:** Noise gate disabled
-    /// - **1.0:** Noise gate enabled
-    ///
-    /// **Default:** 0.0
-    NoiseGateEnable,
 }
 
-impl From<Parameter> for AicEnhancementParameter::Type {
-    fn from(parameter: Parameter) -> Self {
+impl From<EnhancementParameter> for AicEnhancementParameter::Type {
+    fn from(parameter: EnhancementParameter) -> Self {
         match parameter {
-            Parameter::Bypass => AIC_ENHANCEMENT_PARAMETER_BYPASS,
-            Parameter::EnhancementLevel => AIC_ENHANCEMENT_PARAMETER_ENHANCEMENT_LEVEL,
-            Parameter::VoiceGain => AIC_ENHANCEMENT_PARAMETER_VOICE_GAIN,
-            Parameter::NoiseGateEnable => AIC_ENHANCEMENT_PARAMETER_NOISE_GATE_ENABLE,
+            EnhancementParameter::Bypass => AIC_ENHANCEMENT_PARAMETER_BYPASS,
+            EnhancementParameter::EnhancementLevel => AIC_ENHANCEMENT_PARAMETER_ENHANCEMENT_LEVEL,
+            EnhancementParameter::VoiceGain => AIC_ENHANCEMENT_PARAMETER_VOICE_GAIN,
         }
     }
 }
@@ -410,7 +408,11 @@ impl Model {
     /// model.set_parameter(EnhancementParameter::EnhancementLevel, 0.8).unwrap();
     /// model.set_parameter(EnhancementParameter::NoiseGateEnable, 1.0).unwrap(); // 1.0 = enabled
     /// ```
-    pub fn set_parameter(&mut self, parameter: Parameter, value: f32) -> Result<(), AicError> {
+    pub fn set_parameter(
+        &mut self,
+        parameter: EnhancementParameter,
+        value: f32,
+    ) -> Result<(), AicError> {
         let error_code = unsafe { aic_model_set_parameter(self.inner, parameter.into(), value) };
         handle_error(error_code)
     }
@@ -436,7 +438,7 @@ impl Model {
     /// let enhancement_level = model.get_parameter(EnhancementParameter::EnhancementLevel).unwrap();
     /// println!("Current enhancement level: {enhancement_level}");
     /// ```
-    pub fn get_parameter(&self, parameter: Parameter) -> Result<f32, AicError> {
+    pub fn parameter(&self, parameter: EnhancementParameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
         let error_code =
             unsafe { aic_model_get_parameter(self.inner, parameter.into(), &mut value) };

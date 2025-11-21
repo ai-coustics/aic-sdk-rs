@@ -3,7 +3,7 @@ use crate::error::*;
 use aic_sdk_sys::{AicVadParameter::*, *};
 
 /// Configurable parameters for Voice Activity Detection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VadParameter {
     /// Controls the lookback buffer size used in the Voice Activity Detector.
     ///
@@ -130,7 +130,7 @@ impl Vad {
     /// let sensitivity = vad.get_parameter(VadParameter::Sensitivity).unwrap();
     /// println!("Current sensitivity: {sensitivity}");
     /// ```
-    pub fn get_parameter(&self, parameter: VadParameter) -> Result<f32, AicError> {
+    pub fn parameter(&self, parameter: VadParameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
         let error_code = unsafe { aic_vad_get_parameter(self.inner, parameter.into(), &mut value) };
         handle_error(error_code)?;

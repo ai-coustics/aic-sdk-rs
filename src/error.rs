@@ -17,6 +17,8 @@ pub enum AicError {
     EnhancementNotAllowed,
     #[error("Internal error")]
     Internal,
+    #[error("Parameter can't be changed for this model type")]
+    ParameterFixed,
     #[error("License key is invalid")]
     LicenseFormatInvalid,
     #[error("License version unsupported")]
@@ -43,6 +45,7 @@ impl From<AicErrorCode::Type> for AicError {
             AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH => AicError::AudioConfigMismatch,
             AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED => AicError::EnhancementNotAllowed,
             AIC_ERROR_CODE_INTERNAL_ERROR => AicError::Internal,
+            AIC_ERROR_CODE_PARAMETER_FIXED => AicError::ParameterFixed,
             AIC_ERROR_CODE_LICENSE_FORMAT_INVALID => AicError::LicenseFormatInvalid,
             AIC_ERROR_CODE_LICENSE_VERSION_UNSUPPORTED => AicError::LicenseVersionUnsupported,
             AIC_ERROR_CODE_LICENSE_EXPIRED => AicError::LicenseExpired,

@@ -1,5 +1,8 @@
 # ai-coustics Speech Enhancement SDK for Rust
 
+> [!WARNING]
+> You must use a Rust version different from 1.91.1, which was used to build the static libraries.
+
 ## What is this SDK?
 
 Our Speech Enhancement SDK delivers state-of-the-art audio processing capabilities, enabling you to enhance speech clarity and intelligibility in real-time.
@@ -18,7 +21,7 @@ Enable the `download-lib` feature to automatically download the library when bui
 
 ```toml
 [dependencies]
-aic-sdk = { version = "0.9.1", features = ["download-lib"] }
+aic-sdk = { version = "0.10.0", features = ["download-lib"] }
 ```
 
 If you want to provide your own library, use the `AIC_LIB_PATH` environment variable to specify the path
