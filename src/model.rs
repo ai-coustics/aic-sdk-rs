@@ -335,10 +335,18 @@ impl Model {
         const MAX_CHANNELS: usize = 16;
 
         let num_channels = audio.len() as u16;
+
+        if num_channels > MAX_CHANNELS as u16 {
+            return Err(AicError::AudioConfigMismatch);
+        }
+
         let num_frames = if audio.is_empty() { 0 } else { audio[0].len() };
 
         let mut audio_ptrs = [std::ptr::null_mut::<f32>(); MAX_CHANNELS];
-        for (i, channel) in audio.iter_mut().enumerate().take(MAX_CHANNELS) {
+        for (i, channel) in audio.iter_mut().enumerate() {
+            if channel.len() != num_frames {
+                return Err(AicError::AudioConfigMismatch);
+            }
             audio_ptrs[i] = channel.as_mut_ptr();
         }
 
@@ -379,6 +387,10 @@ impl Model {
         num_channels: u16,
         num_frames: usize,
     ) -> Result<(), AicError> {
+        if audio.len() != num_channels as usize * num_frames {
+            return Err(AicError::AudioConfigMismatch);
+        }
+
         let error_code = unsafe {
             aic_model_process_interleaved(self.inner, audio.as_mut_ptr(), num_channels, num_frames)
         };
