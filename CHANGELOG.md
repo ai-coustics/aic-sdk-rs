@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.1 - 2025-12-03
+
+### Breaking changes
+
+- Rust version limitation changed from stable 1.91.1 to beta 1.92
+
+### Fixes
+
+- Fixed build errors when building crates with a dependency on the `ring` crate.
+
 ## 0.10.0 - 2025-11-17
 
 ### Features
