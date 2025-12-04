@@ -321,7 +321,9 @@ impl Model {
     ///
     /// # Arguments
     ///
-    /// * `audio` - Array of channel buffer pointers to be enhanced in-place
+    /// * `audio` - Array of channel buffer pointers to be enhanced in-place.
+    ///             Each channel buffer must be exactly of size `num_frames`,
+    ///             or if `allow_variable_frames` was enabled, less than the initialization value).
     ///
     /// # Returns
     ///
@@ -373,8 +375,9 @@ impl Model {
     ///
     /// # Arguments
     ///
-    /// * `audio` - Interleaved audio buffer to be enhanced in-place. Must be exactly of size `num_channels` * `num_frames`
-    /// * `num_channels` - Number of channels (must match initialization)
+    /// * `audio` - Interleaved audio buffer to be enhanced in-place.
+    ///             Must be exactly of size `num_channels` * `num_frames`,
+    ///             or if `allow_variable_frames` was enabled, less than the initialization value per channel).
     ///
     /// # Returns
     ///
