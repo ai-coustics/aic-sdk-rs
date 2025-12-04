@@ -101,7 +101,7 @@ impl Vad {
     /// # use aic_sdk::{Model, ModelType, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// # let vad = model.create_vad();
+    /// # let mut vad = model.create_vad();
     /// vad.set_parameter(VadParameter::LookbackBufferSize, 10.0).unwrap();
     /// vad.set_parameter(VadParameter::Sensitivity, 5.0).unwrap();
     /// ```
@@ -127,7 +127,7 @@ impl Vad {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// # let vad = model.create_vad();
-    /// let sensitivity = vad.get_parameter(VadParameter::Sensitivity).unwrap();
+    /// let sensitivity = vad.parameter(VadParameter::Sensitivity).unwrap();
     /// println!("Current sensitivity: {sensitivity}");
     /// ```
     pub fn parameter(&self, parameter: VadParameter) -> Result<f32, AicError> {
