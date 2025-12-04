@@ -645,7 +645,7 @@ mod tests {
         let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
         let mut left = vec![0.0f32; 480]; // 480 frames
         let mut right = vec![0.0f32; 480]; // 480 frames
-        let mut audio = [&mut left, &mut right]; // 2 channels, 480 frames
+        let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 480 frames
         model.initialize(48000, 2, 480, false).unwrap();
         model.process_planar(&mut audio).unwrap();
     }
@@ -668,13 +668,13 @@ mod tests {
         let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
         let mut left = vec![0.0f32; 480]; // 480 frames
         let mut right = vec![0.0f32; 480]; // 480 frames
-        let mut audio = [&mut left, &mut right]; // 2 channels, 480 frames
+        let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 480 frames
         model.initialize(48000, 2, 480, true).unwrap();
         model.process_planar(&mut audio).unwrap();
 
         let mut left = vec![0.0f32; 20]; // 20 frames
         let mut right = vec![0.0f32; 20]; // 20 frames
-        let mut audio = [&mut left, &mut right]; // 2 channels, 20 frames
+        let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 20 frames
         model.process_planar(&mut audio).unwrap();
     }
 }
