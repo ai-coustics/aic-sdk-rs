@@ -30,7 +30,7 @@ to the directory where the library is located.
 ## Example Usage
 
 ```rust
-use aic_sdk::{Model, ModelType, Parameter};
+use aic_sdk::{Model, ModelType, EnhancementParameter};
 
 let license_key = std::env::var("AIC_SDK_LICENSE")?;
 
