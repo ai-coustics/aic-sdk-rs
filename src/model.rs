@@ -147,11 +147,13 @@ impl From<EnhancementParameter> for AicEnhancementParameter::Type {
 ///
 /// // Process audio data
 /// let mut audio_buffer = vec![0.0f32; 1024];
-/// model.process_interleaved(&mut audio_buffer, 1, 1024).unwrap();
+/// model.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
 pub struct Model {
     /// Raw pointer to the C model structure
     inner: *mut AicModel,
+    /// Configured number of channels
+    num_channels: Option<u16>,
 }
 
 impl Model {
@@ -196,7 +198,10 @@ impl Model {
             "C library returned success but null pointer"
         );
 
-        Ok(Self { inner: model_ptr })
+        Ok(Self {
+            inner: model_ptr,
+            num_channels: None,
+        })
     }
 
     /// Creates a [Voice Activity Detector](crate::vad::Vad) instance.
@@ -276,6 +281,7 @@ impl Model {
         };
 
         handle_error(error_code)?;
+        self.num_channels = Some(num_channels);
         Ok(())
     }
 
@@ -303,6 +309,7 @@ impl Model {
     /// ```
     pub fn reset(&mut self) -> Result<(), AicError> {
         let error_code = unsafe { aic_model_reset(self.inner) };
+        self.num_channels = None;
         handle_error(error_code)
     }
 
@@ -334,9 +341,11 @@ impl Model {
     pub fn process_planar(&mut self, audio: &mut [&mut [f32]]) -> Result<(), AicError> {
         const MAX_CHANNELS: usize = 16;
 
-        let num_channels = audio.len() as u16;
+        let Some(num_channels) = self.num_channels else {
+            return Err(AicError::ModelNotInitialized);
+        };
 
-        if num_channels > MAX_CHANNELS as u16 {
+        if audio.len() != num_channels as usize {
             return Err(AicError::AudioConfigMismatch);
         }
 
@@ -344,6 +353,7 @@ impl Model {
 
         let mut audio_ptrs = [std::ptr::null_mut::<f32>(); MAX_CHANNELS];
         for (i, channel) in audio.iter_mut().enumerate() {
+            // Check that all channels have the same number of frames
             if channel.len() != num_frames {
                 return Err(AicError::AudioConfigMismatch);
             }
@@ -365,7 +375,6 @@ impl Model {
     ///
     /// * `audio` - Interleaved audio buffer to be enhanced in-place. Must be exactly of size `num_channels` * `num_frames`
     /// * `num_channels` - Number of channels (must match initialization)
-    /// * `num_frames` - Number of frames (must match initialization)
     ///
     /// # Returns
     ///
@@ -379,17 +388,18 @@ impl Model {
     /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
     /// model.initialize(48000, 2, 480, false).unwrap();
-    /// model.process_interleaved(&mut audio, 2, 480).unwrap();
+    /// model.process_interleaved(&mut audio).unwrap();
     /// ```
-    pub fn process_interleaved(
-        &mut self,
-        audio: &mut [f32],
-        num_channels: u16,
-        num_frames: usize,
-    ) -> Result<(), AicError> {
-        if audio.len() != num_channels as usize * num_frames {
+    pub fn process_interleaved(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
+        let Some(num_channels) = self.num_channels else {
+            return Err(AicError::ModelNotInitialized);
+        };
+
+        if !audio.len().is_multiple_of(num_channels as usize) {
             return Err(AicError::AudioConfigMismatch);
         }
+
+        let num_frames = audio.len() / num_channels as usize;
 
         let error_code = unsafe {
             aic_model_process_interleaved(self.inner, audio.as_mut_ptr(), num_channels, num_frames)
@@ -635,7 +645,7 @@ mod tests {
         let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
         let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
         model.initialize(48000, 2, 480, false).unwrap();
-        model.process_interleaved(&mut audio, 2, 480).unwrap();
+        model.process_interleaved(&mut audio).unwrap();
     }
 
     #[test]
@@ -655,10 +665,10 @@ mod tests {
         let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
         let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
         model.initialize(48000, 2, 480, true).unwrap();
-        model.process_interleaved(&mut audio, 2, 480).unwrap();
-        
+        model.process_interleaved(&mut audio).unwrap();
+
         let mut audio = vec![0.0f32; 2 * 20]; // 2 channels, 20 frames
-        model.process_interleaved(&mut audio, 2, 480).unwrap();
+        model.process_interleaved(&mut audio).unwrap();
     }
 
     #[test]
@@ -675,5 +685,35 @@ mod tests {
         let mut right = vec![0.0f32; 20]; // 20 frames
         let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 20 frames
         model.process_planar(&mut audio).unwrap();
+    }
+
+    #[test]
+    fn process_interleaved_variable_frames_fails_without_allow_variable_frames() {
+        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+        let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+        let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
+        model.initialize(48000, 2, 480, false).unwrap();
+        model.process_interleaved(&mut audio).unwrap();
+
+        let mut audio = vec![0.0f32; 2 * 20]; // 2 channels, 20 frames
+        let result = model.process_interleaved(&mut audio);
+        assert_eq!(result, Err(AicError::AudioConfigMismatch));
+    }
+
+    #[test]
+    fn process_planar_variable_frames_fails_without_allow_variable_frames() {
+        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+        let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+        let mut left = vec![0.0f32; 480]; // 480 frames
+        let mut right = vec![0.0f32; 480]; // 480 frames
+        let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 480 frames
+        model.initialize(48000, 2, 480, false).unwrap();
+        model.process_planar(&mut audio).unwrap();
+
+        let mut left = vec![0.0f32; 20]; // 20 frames
+        let mut right = vec![0.0f32; 20]; // 20 frames
+        let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 20 frames
+        let result = model.process_planar(&mut audio);
+        assert_eq!(result, Err(AicError::AudioConfigMismatch));
     }
 }
