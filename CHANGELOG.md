@@ -4,7 +4,7 @@
 
 ### Breaking changes
 
-- The `num_channels` and `num_frames` arguments have been removed from `Model::process_interleaved`'s function signature.
+- The `num_channels` and `num_frames` arguments have been removed from `Model::process_interleaved`'s function signature. These arguments are now inferred from the buffer size and the `num_channels` value passed to `Model::initialize`.
 
 ## 0.10.1 - 2025-12-03
 
