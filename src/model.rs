@@ -608,7 +608,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_model_creation_and_basic_operations() -> Result<(), AicError> {
+    fn model_creation_and_basic_operations() -> Result<(), AicError> {
         dbg!(crate::get_version());
 
         // Read license key from environment variable
@@ -631,11 +631,50 @@ mod tests {
     }
 
     #[test]
-    fn processing() {
+    fn process_interleaved_fixed_frames() {
         let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
         let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
         let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
         model.initialize(48000, 2, 480, false).unwrap();
         model.process_interleaved(&mut audio, 2, 480).unwrap();
+    }
+
+    #[test]
+    fn process_planar_fixed_frames() {
+        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+        let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+        let mut left = vec![0.0f32; 480]; // 480 frames
+        let mut right = vec![0.0f32; 480]; // 480 frames
+        let mut audio = [&mut left, &mut right]; // 2 channels, 480 frames
+        model.initialize(48000, 2, 480, false).unwrap();
+        model.process_planar(&mut audio).unwrap();
+    }
+
+    #[test]
+    fn process_interleaved_variable_frames() {
+        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+        let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+        let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
+        model.initialize(48000, 2, 480, true).unwrap();
+        model.process_interleaved(&mut audio, 2, 480).unwrap();
+        
+        let mut audio = vec![0.0f32; 2 * 20]; // 2 channels, 20 frames
+        model.process_interleaved(&mut audio, 2, 480).unwrap();
+    }
+
+    #[test]
+    fn process_planar_variable_frames() {
+        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+        let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+        let mut left = vec![0.0f32; 480]; // 480 frames
+        let mut right = vec![0.0f32; 480]; // 480 frames
+        let mut audio = [&mut left, &mut right]; // 2 channels, 480 frames
+        model.initialize(48000, 2, 480, true).unwrap();
+        model.process_planar(&mut audio).unwrap();
+
+        let mut left = vec![0.0f32; 20]; // 20 frames
+        let mut right = vec![0.0f32; 20]; // 20 frames
+        let mut audio = [&mut left, &mut right]; // 2 channels, 20 frames
+        model.process_planar(&mut audio).unwrap();
     }
 }
