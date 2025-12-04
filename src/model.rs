@@ -309,7 +309,6 @@ impl Model {
     /// ```
     pub fn reset(&mut self) -> Result<(), AicError> {
         let error_code = unsafe { aic_model_reset(self.inner) };
-        self.num_channels = None;
         handle_error(error_code)
     }
 
