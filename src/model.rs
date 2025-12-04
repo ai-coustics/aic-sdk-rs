@@ -340,6 +340,7 @@ impl Model {
     /// model.initialize(48000, 2, 480, false).unwrap();
     /// model.process_planar(&mut audio_refs).unwrap();
     /// ```
+    #[allow(clippy::doc_overindented_list_items)]
     pub fn process_planar(&mut self, audio: &mut [&mut [f32]]) -> Result<(), AicError> {
         const MAX_CHANNELS: usize = 16;
 
@@ -393,6 +394,7 @@ impl Model {
     /// model.initialize(48000, 2, 480, false).unwrap();
     /// model.process_interleaved(&mut audio).unwrap();
     /// ```
+    #[allow(clippy::doc_overindented_list_items)]
     pub fn process_interleaved(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
         let Some(num_channels) = self.num_channels else {
             return Err(AicError::ModelNotInitialized);
