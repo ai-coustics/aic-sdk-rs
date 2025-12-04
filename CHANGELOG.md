@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0 - Unreleased
+
+### Breaking changes
+
+- The `num_channels` and `num_frames` arguments have been removed from `Model::process_interleaved`'s function signature.
+
 ## 0.10.1 - 2025-12-03
 
 ### Breaking changes
