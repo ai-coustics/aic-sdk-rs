@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // The process function is where the actual enhancement is happening
     // This is meant to be called in your real-time audio thread
-    model.process_interleaved(&mut audio_buffer, 1, 480)?;
+    model.process_interleaved(&mut audio_buffer)?;
 
     // You can also adjust parameters during processing
     model.set_parameter(EnhancementParameter::EnhancementLevel, 0.8)?;

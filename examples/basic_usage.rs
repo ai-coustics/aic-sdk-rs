@@ -60,11 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut audio_buffer_interleaved = vec![0.0f32; NUM_CHANNELS as usize * optimal_num_frames];
 
     // Test interleaved audio processing
-    match model.process_interleaved(
-        &mut audio_buffer_interleaved,
-        NUM_CHANNELS,
-        optimal_num_frames,
-    ) {
+    match model.process_interleaved(&mut audio_buffer_interleaved) {
         Ok(()) => println!("Interleaved processing succeeded"),
         Err(e) => println!("Interleaved processing failed: {}", e),
     }
