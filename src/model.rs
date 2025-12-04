@@ -419,7 +419,6 @@ impl Model {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// model.set_parameter(EnhancementParameter::EnhancementLevel, 0.8).unwrap();
-    /// model.set_parameter(EnhancementParameter::NoiseGateEnable, 1.0).unwrap(); // 1.0 = enabled
     /// ```
     pub fn set_parameter(
         &mut self,
@@ -448,7 +447,7 @@ impl Model {
     /// # use aic_sdk::{Model, ModelType, EnhancementParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// let enhancement_level = model.get_parameter(EnhancementParameter::EnhancementLevel).unwrap();
+    /// let enhancement_level = model.parameter(EnhancementParameter::EnhancementLevel).unwrap();
     /// println!("Current enhancement level: {enhancement_level}");
     /// ```
     pub fn parameter(&self, parameter: EnhancementParameter) -> Result<f32, AicError> {
