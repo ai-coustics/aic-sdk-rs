@@ -21,7 +21,7 @@ Enable the `download-lib` feature to automatically download the library when bui
 
 ```toml
 [dependencies]
-aic-sdk = { version = "0.10.1", features = ["download-lib"] }
+aic-sdk = { version = "0.11.0", features = ["download-lib"] }
 ```
 
 If you want to provide your own library, use the `AIC_LIB_PATH` environment variable to specify the path
