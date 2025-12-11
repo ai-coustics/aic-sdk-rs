@@ -119,10 +119,7 @@ fn validate_target_exists(artifact_sha: &HashMap<String, String>, version: &str)
 
     if !artifact_sha.contains_key(&file_name_tar) && !artifact_sha.contains_key(&file_name_zip) {
         panic!(
-            "Target platform '{}' (tried: {} and {}) not found in checksum.txt. Available platforms: {}",
-            target,
-            file_name_tar,
-            file_name_zip,
+            "Target platform not available in aic-sdk. Available platforms: {}",
             artifact_sha
                 .keys()
                 .map(|k| k.as_str())
