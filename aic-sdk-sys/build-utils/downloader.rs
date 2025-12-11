@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fs,
     path::{Path, PathBuf},
 };
 
@@ -12,35 +13,12 @@ pub struct Downloader {
 
 impl Downloader {
     pub fn new(output_path: &Path) -> Self {
-        let version = "0.10.1".to_string();
         let base_url = "https://github.com/ai-coustics/aic-sdk-c/releases/download".to_string();
 
-        let artifact_sha = HashMap::from([
-            (
-                format!("aic-sdk-aarch64-apple-darwin-{version}.tar.gz"),
-                "7a0129e1eb7bd828bc8c019afbc7246b7ff94a0c768f82ffda17b97e41a0726f".to_string(),
-            ),
-            (
-                format!("aic-sdk-aarch64-pc-windows-msvc-{version}.zip"),
-                "58e907a5ff8dcd9d515324b2cd56a9cb87390f415f1fb20f9a76b0628d100d46".to_string(),
-            ),
-            (
-                format!("aic-sdk-aarch64-unknown-linux-gnu-{version}.tar.gz"),
-                "50bcf488537d6149a5d842b3323221721a51022a905ba7c2e15d238ab4524cb3".to_string(),
-            ),
-            (
-                format!("aic-sdk-x86_64-apple-darwin-{version}.tar.gz"),
-                "22fdbb7b50c9b98904e32421d4c3247bc125436083a4b225afbdbce6a62d6c28".to_string(),
-            ),
-            (
-                format!("aic-sdk-x86_64-pc-windows-msvc-{version}.zip"),
-                "12709125f592879be2de51d17abd9f441d66d31edea993c0d5a5544f67a31986".to_string(),
-            ),
-            (
-                format!("aic-sdk-x86_64-unknown-linux-gnu-{version}.tar.gz"),
-                "6bf34be03b16c546c80e97f4a35527e1457c14064471f53821328fdadd7f867b".to_string(),
-            ),
-        ]);
+        let (version, artifact_sha) = read_checksums_from_file();
+
+        // Validate that the current target platform exists in the checksum file
+        validate_target_exists(&artifact_sha, &version);
 
         Downloader {
             base_url,
@@ -98,13 +76,88 @@ impl Downloader {
     }
 }
 
+fn read_checksums_from_file() -> (String, HashMap<String, String>) {
+    let checksum_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("checksum.txt");
+    let checksum_content = fs::read_to_string(&checksum_path).expect("Failed to read checksum.txt");
+
+    let mut artifact_sha = HashMap::new();
+    let mut version = None;
+
+    for line in checksum_content.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() != 2 {
+            continue;
+        }
+
+        let (hash, filename) = (parts[0], parts[1]);
+
+        // Extract version from filename (e.g., "aic-sdk-x86_64-apple-darwin-0.11.0.tar.gz")
+        if version.is_none()
+            && let Some(v) = extract_version_from_filename(filename)
+        {
+            version = Some(v);
+        }
+
+        artifact_sha.insert(filename.to_string(), hash.to_string());
+    }
+
+    let version = version.expect("Could not determine version from checksum.txt");
+    (version, artifact_sha)
+}
+
+fn validate_target_exists(artifact_sha: &HashMap<String, String>, version: &str) {
+    let target = std::env::var("TARGET").expect("TARGET environment variable not set");
+
+    // Check both .tar.gz and .zip extensions
+    let file_name_tar = format!("aic-sdk-{}-{}.tar.gz", target, version);
+    let file_name_zip = format!("aic-sdk-{}-{}.zip", target, version);
+
+    if !artifact_sha.contains_key(&file_name_tar) && !artifact_sha.contains_key(&file_name_zip) {
+        panic!(
+            "Target platform not available in aic-sdk. Available platforms: {}",
+            artifact_sha
+                .keys()
+                .map(|k| k.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+}
+
+fn extract_version_from_filename(filename: &str) -> Option<String> {
+    // Example: "aic-sdk-x86_64-apple-darwin-0.11.0.tar.gz" -> "0.11.0"
+    // Example: "aic-sdk-aarch64-pc-windows-msvc-0.11.0.zip" -> "0.11.0"
+
+    // Remove file extension
+    let name = filename
+        .strip_suffix(".tar.gz")
+        .or_else(|| filename.strip_suffix(".zip"))?;
+
+    // Split by '-' and find the version pattern (starts with digit)
+    let parts: Vec<&str> = name.split('-').collect();
+
+    // Version is typically the last part that starts with a digit
+    for part in parts.iter().rev() {
+        if part.chars().next()?.is_ascii_digit() {
+            return Some(part.to_string());
+        }
+    }
+
+    None
+}
+
 fn fetch_file(source_url: &str) -> Vec<u8> {
     ureq::get(source_url)
         .call()
         .unwrap()
         .body_mut()
         .with_config()
-        .limit(300 * 1024 * 1024) // 300 MB
+        .limit(400 * 1024 * 1024) // 400 MB
         .read_to_vec()
         .unwrap()
 }

@@ -3,8 +3,7 @@
 Before creating a release, check that everything can be published to crates.io.
 
 1. If the C SDK changed:
-  - Update expected C SDK version number in [downloader.rs](aic-sdk-sys/build-utils/downloader.rs)
-  - Update SHAs of library artifacts in [downloader.rs](aic-sdk-sys/build-utils/downloader.rs)
+  - Update the [checksums.txt](aic-sdk-sys/checksums.txt) with the one distributed in the c-sdk
 
 2. If there were changes in `aic-sdk-sys`:
   - Increase version number in [aic-sdk-sys/Cargo.toml](aic-sdk-sys/Cargo.toml)

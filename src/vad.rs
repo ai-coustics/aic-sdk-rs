@@ -100,7 +100,7 @@ impl Vad {
     /// ```rust
     /// # use aic_sdk::{Model, ModelType, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// # let mut vad = model.create_vad();
     /// vad.set_parameter(VadParameter::LookbackBufferSize, 10.0).unwrap();
     /// vad.set_parameter(VadParameter::Sensitivity, 5.0).unwrap();
@@ -125,7 +125,7 @@ impl Vad {
     /// ```rust
     /// # use aic_sdk::{Model, ModelType, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// # let vad = model.create_vad();
     /// let sensitivity = vad.parameter(VadParameter::Sensitivity).unwrap();
     /// println!("Current sensitivity: {sensitivity}");
