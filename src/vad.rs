@@ -123,7 +123,7 @@ impl Vad {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType, VadParameter};0
+    /// # use aic_sdk::{Model, ModelType, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// # let vad = model.create_vad();
