@@ -12,7 +12,7 @@
 
 - The `num_channels` and `num_frames` arguments have been removed from `Model::process_interleaved`'s function signature. These arguments are now inferred from the buffer size and the `num_channels` value passed to `Model::initialize`.
 - `ModelType::QuailSTT` was renamed to `ModelType::QuailSttL16`.
-- `Model::create_vad` signature changed: the model reference is no longer immutable (`&self` instead of previous const semantics).
+- `Model::create_vad` signature changed: the model reference now has to be mutable (`&mut self` instead of `&self`).
 
 ### Fixes
 
