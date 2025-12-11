@@ -2,9 +2,21 @@
 
 ## 0.11.0 - Unreleased
 
+### New features
+
+- Added new Quail Voice Focus STT model (`ModelType::QuailVfSttL16`), purpose-built to isolate and elevate the foreground speaker while suppressing both interfering speech and background noise.
+- Added new variants of the Quail STT model: `ModelType::QuailSttL8`, `ModelType::QuailSttS16`, and `ModelType::QuailSttS8`.
+- Added `Model::process_sequential` for sequential channel data in a single buffer.
+
 ### Breaking changes
 
 - The `num_channels` and `num_frames` arguments have been removed from `Model::process_interleaved`'s function signature. These arguments are now inferred from the buffer size and the `num_channels` value passed to `Model::initialize`.
+- `ModelType::QuailSTT` was renamed to `ModelType::QuailSttL16`.
+- `Model::create_vad` signature changed: the model reference is no longer immutable (`&self` instead of previous const semantics).
+
+### Fixes
+
+- VAD now works correctly when `EnhancementParameter::EnhancementLevel` is set to 0 or `EnhancementParameter::Bypass` is enabled (previously non-functional in these cases).
 
 ## 0.10.1 - 2025-12-03
 

@@ -253,7 +253,7 @@ impl Model {
     /// ```rust
     /// # use aic_sdk::{Model, ModelType};
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// let model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// let vad = model.create_vad();
     /// ```
     pub fn create_vad(&mut self) -> crate::Vad {
@@ -358,13 +358,21 @@ impl Model {
     ///
     /// Enhances speech in the provided audio buffers in-place.
     ///
-    /// The planar function allows a maximum of 16 channels.
+    /// **Memory Layout:**
+    /// - Separate buffer for each channel
+    /// - Each buffer contains `num_frames` floats
+    /// - Maximum of 16 channels supported
+    /// - Example for 2 channels, 4 frames:
+    ///   ```text
+    ///   audio[0] -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3]
+    ///   audio[1] -> [ch1_f0, ch1_f1, ch1_f2, ch1_f3]
+    ///   ```
     ///
     /// # Arguments
     ///
-    /// * `audio` - Array of channel buffer pointers to be enhanced in-place.
+    /// * `audio` - Array of mutable channel buffer slices to be enhanced in-place.
     ///             Each channel buffer must be exactly of size `num_frames`,
-    ///             or if `allow_variable_frames` was enabled, less than the initialization value).
+    ///             or if `allow_variable_frames` was enabled, less than the initialization value.
     ///
     /// # Returns
     ///
@@ -415,11 +423,19 @@ impl Model {
     ///
     /// Enhances speech in the provided audio buffer in-place.
     ///
+    /// **Memory Layout:**
+    /// - Single contiguous buffer with samples alternating between channels
+    /// - Buffer size: `num_channels` * `num_frames` floats
+    /// - Example for 2 channels, 4 frames:
+    ///   ```text
+    ///   audio -> [ch0_f0, ch1_f0, ch0_f1, ch1_f1, ch0_f2, ch1_f2, ch0_f3, ch1_f3]
+    ///   ```
+    ///
     /// # Arguments
     ///
     /// * `audio` - Interleaved audio buffer to be enhanced in-place.
     ///             Must be exactly of size `num_channels` * `num_frames`,
-    ///             or if `allow_variable_frames` was enabled, less than the initialization value per channel).
+    ///             or if `allow_variable_frames` was enabled, less than the initialization value per channel.
     ///
     /// # Returns
     ///
@@ -449,6 +465,57 @@ impl Model {
 
         let error_code = unsafe {
             aic_model_process_interleaved(self.inner, audio.as_mut_ptr(), num_channels, num_frames)
+        };
+
+        handle_error(error_code)
+    }
+
+    /// Processes audio with sequential channel data.
+    ///
+    /// Enhances speech in the provided audio buffer in-place.
+    ///
+    /// **Memory Layout:**
+    /// - Single contiguous buffer with all samples for each channel stored sequentially
+    /// - Buffer size: `num_channels` * `num_frames` floats
+    /// - Example for 2 channels, 4 frames:
+    ///   ```text
+    ///   audio -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3, ch1_f0, ch1_f1, ch1_f2, ch1_f3]
+    ///   ```
+    ///
+    /// # Arguments
+    ///
+    /// * `audio` - Sequential audio buffer to be enhanced in-place.
+    ///             Must be exactly of size `num_channels` * `num_frames`,
+    ///             or if `allow_variable_frames` was enabled, less than the initialization value per channel.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an `AicError` if processing fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use aic_sdk::{Model, ModelType};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames each stored sequentially
+    /// model.initialize(48000, 2, 480, false).unwrap();
+    /// model.process_sequential(&mut audio).unwrap();
+    /// ```
+    #[allow(clippy::doc_overindented_list_items)]
+    pub fn process_sequential(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
+        let Some(num_channels) = self.num_channels else {
+            return Err(AicError::ModelNotInitialized);
+        };
+
+        if !audio.len().is_multiple_of(num_channels as usize) {
+            return Err(AicError::AudioConfigMismatch);
+        }
+
+        let num_frames = audio.len() / num_channels as usize;
+
+        let error_code = unsafe {
+            aic_model_process_sequential(self.inner, audio.as_mut_ptr(), num_channels, num_frames)
         };
 
         handle_error(error_code)

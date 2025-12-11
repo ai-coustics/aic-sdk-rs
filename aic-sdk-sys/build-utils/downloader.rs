@@ -97,10 +97,10 @@ fn read_checksums_from_file() -> (String, HashMap<String, String>) {
         let (hash, filename) = (parts[0], parts[1]);
 
         // Extract version from filename (e.g., "aic-sdk-x86_64-apple-darwin-0.11.0.tar.gz")
-        if version.is_none() {
-            if let Some(v) = extract_version_from_filename(filename) {
-                version = Some(v);
-            }
+        if version.is_none()
+            && let Some(v) = extract_version_from_filename(filename)
+        {
+            version = Some(v);
         }
 
         artifact_sha.insert(filename.to_string(), hash.to_string());
