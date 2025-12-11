@@ -58,13 +58,51 @@ pub enum ModelType {
     /// - Processing latency: 10 ms
     QuailXXS,
     /// Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
-    /// that uses fixed enhancement parameters that cannot be changed during runtime.
+    /// designed specifically to improve STT accuracy across unpredictable, diverse and challenging environments.
+    ///
     /// **Specifications:**
     /// - Window length: 10 ms
     /// - Native sample rate: 16 kHz
     /// - Native num frames: 160
     /// - Processing latency: 30 ms
-    QuailSTT,
+    QuailSttL16,
+    /// Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
+    /// designed specifically to improve STT accuracy across unpredictable, diverse and challenging environments.
+    ///
+    /// **Specifications:**
+    /// - Window length: 10 ms
+    /// - Native sample rate: 8 kHz
+    /// - Native num frames: 80
+    /// - Processing latency: 30 ms
+    QuailSttL8,
+    /// Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
+    /// designed specifically to improve STT accuracy across unpredictable, diverse and challenging environments.
+    ///
+    /// **Specifications:**
+    /// - Window length: 10 ms
+    /// - Native sample rate: 16 kHz
+    /// - Native num frames: 160
+    /// - Processing latency: 30 ms
+    QuailSttS16,
+    /// Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
+    /// designed specifically to improve STT accuracy across unpredictable, diverse and challenging environments.
+    ///
+    /// **Specifications:**
+    /// - Window length: 10 ms
+    /// - Native sample rate: 8 kHz
+    /// - Native num frames: 80
+    /// - Processing latency: 30 ms
+    QuailSttS8,
+    /// Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
+    /// purpose-built to isolate and elevate the foreground speaker while suppressing both
+    /// interfering speech and background noise.
+    ///
+    /// **Specifications:**
+    /// - Window length: 10 ms
+    /// - Native sample rate: 16 kHz
+    /// - Native num frames: 160
+    /// - Processing latency: 30 ms
+    QuailVfSttL16,
 }
 
 impl From<ModelType> for AicModelType::Type {
@@ -78,7 +116,11 @@ impl From<ModelType> for AicModelType::Type {
             ModelType::QuailS8 => AIC_MODEL_TYPE_QUAIL_S8,
             ModelType::QuailXS => AIC_MODEL_TYPE_QUAIL_XS,
             ModelType::QuailXXS => AIC_MODEL_TYPE_QUAIL_XXS,
-            ModelType::QuailSTT => AIC_MODEL_TYPE_QUAIL_STT,
+            ModelType::QuailSttL16 => AIC_MODEL_TYPE_QUAIL_STT_L16,
+            ModelType::QuailSttL8 => AIC_MODEL_TYPE_QUAIL_STT_L8,
+            ModelType::QuailSttS16 => AIC_MODEL_TYPE_QUAIL_STT_S16,
+            ModelType::QuailSttS8 => AIC_MODEL_TYPE_QUAIL_STT_S8,
+            ModelType::QuailVfSttL16 => AIC_MODEL_TYPE_QUAIL_VF_STT_L16,
         }
     }
 }
@@ -214,7 +256,7 @@ impl Model {
     /// let model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// let vad = model.create_vad();
     /// ```
-    pub fn create_vad(&self) -> crate::Vad {
+    pub fn create_vad(&mut self) -> crate::Vad {
         let mut vad_ptr: *mut AicVad = ptr::null_mut();
 
         let error_code = unsafe { aic_vad_create(&mut vad_ptr, self.inner) };

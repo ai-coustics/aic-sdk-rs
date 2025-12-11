@@ -143,14 +143,60 @@ typedef enum AicModelType {
   AIC_MODEL_TYPE_QUAIL_XXS = 7,
   /**
    * Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
-   * that uses fixed enhancement parameters that cannot be changed during runtime.
+   * designed specifically to improve STT accuracy across unpredictable, diverse and challenging environments.
+   *
    * **Specifications:**
    * - Window length: 10 ms
    * - Native sample rate: 16 kHz
    * - Native num frames: 160
    * - Processing latency: 30 ms
    */
-  AIC_MODEL_TYPE_QUAIL_STT = 8,
+  AIC_MODEL_TYPE_QUAIL_STT_L16 = 8,
+  /**
+   * Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
+   * designed specifically to improve STT accuracy across unpredictable, diverse and challenging environments.
+   *
+   * **Specifications:**
+   * - Window length: 10 ms
+   * - Native sample rate: 8 kHz
+   * - Native num frames: 80
+   * - Processing latency: 30 ms
+   */
+  AIC_MODEL_TYPE_QUAIL_STT_L8 = 9,
+  /**
+   * Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
+   * designed specifically to improve STT accuracy across unpredictable, diverse and challenging environments.
+   *
+   * **Specifications:**
+   * - Window length: 10 ms
+   * - Native sample rate: 16 kHz
+   * - Native num frames: 160
+   * - Processing latency: 30 ms
+   */
+  AIC_MODEL_TYPE_QUAIL_STT_S16 = 10,
+  /**
+   * Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
+   * designed specifically to improve STT accuracy across unpredictable, diverse and challenging environments.
+   *
+   * **Specifications:**
+   * - Window length: 10 ms
+   * - Native sample rate: 8 kHz
+   * - Native num frames: 80
+   * - Processing latency: 30 ms
+   */
+  AIC_MODEL_TYPE_QUAIL_STT_S8 = 11,
+  /**
+   * Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
+   * purpose-built to isolate and elevate the foreground speaker while suppressing both
+   * interfering speech and background noise.
+   *
+   * **Specifications:**
+   * - Window length: 10 ms
+   * - Native sample rate: 16 kHz
+   * - Native num frames: 160
+   * - Processing latency: 30 ms
+   */
+  AIC_MODEL_TYPE_QUAIL_VF_STT_L16 = 12,
 } AicModelType;
 
 /**
@@ -328,11 +374,20 @@ enum AicErrorCode aic_model_reset(struct AicModel *model);
  *
  * Enhances speech in the provided audio buffers in-place.
  *
+ * **Memory Layout:**
+ * - `audio` is an array of pointers, one pointer per channel
+ * - Each pointer points to a separate buffer containing `num_frames` samples for that channel
+ * - Example for 2 channels, 4 frames:
+ *   ```
+ *   audio[0] -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3]
+ *   audio[1] -> [ch1_f0, ch1_f1, ch1_f2, ch1_f3]
+ *   ```
+ *
  * The planar function allows a maximum of 16 channels.
  *
  * # Parameters
  * - `model`: Initialized model instance. Must not be NULL.
- * - `audio`: Array of channel buffer pointers. Must not be NULL.
+ * - `audio`: Array of `num_channels` pointers, each pointing to a buffer of `num_frames` floats. Must not be NULL.
  * - `num_channels`: Number of channels (must match initialization).
  * - `num_frames`: Number of samples per channel (must match initialization value, or if `allow_variable_frames` was enabled, must be ≤ initialization value).
  *
@@ -349,15 +404,23 @@ enum AicErrorCode aic_model_process_planar(struct AicModel *model,
                                            size_t num_frames);
 
 /**
- * Processes audio with interleaved channel data.
+ * Processes audio with interleaved channels in a single buffer.
  *
  * Enhances speech in the provided audio buffer in-place.
  *
+ * **Memory Layout:**
+ * - Single contiguous buffer with channels interleaved
+ * - Buffer size: `num_channels` * `num_frames` floats
+ * - Example for 2 channels, 4 frames:
+ *   ```
+ *   audio -> [ch0_f0, ch1_f0, ch0_f1, ch1_f1, ch0_f2, ch1_f2, ch0_f3, ch1_f3]
+ *   ```
+ *
  * # Parameters
  * - `model`: Initialized model instance. Must not be NULL.
- * - `audio`: Interleaved audio buffer. Must not be NULL and exactly of size `num_channels` * `num_frames`.
+ * - `audio`: Single buffer containing interleaved audio data of size `num_channels` * `num_frames`. Must not be NULL.
  * - `num_channels`: Number of channels (must match initialization).
- * - `num_frames`: Number of samples per channel (must match initialization value, or if `variable_num_frames` was enabled, must be ≤ initialization value).
+ * - `num_frames`: Number of samples per channel (must match initialization value, or if `allow_variable_frames` was enabled, must be ≤ initialization value).
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Audio processed successfully
@@ -370,6 +433,37 @@ enum AicErrorCode aic_model_process_interleaved(struct AicModel *model,
                                                 float *audio,
                                                 uint16_t num_channels,
                                                 size_t num_frames);
+
+/**
+ * Processes audio with sequential channel data in a single buffer.
+ *
+ * Enhances speech in the provided audio buffer in-place.
+ *
+ * **Memory Layout:**
+ * - Single contiguous buffer with all samples for each channel stored sequentially
+ * - Buffer size: `num_channels` * `num_frames` floats
+ * - Example for 2 channels, 4 frames:
+ *   ```
+ *   audio -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3, ch1_f0, ch1_f1, ch1_f2, ch1_f3]
+ *   ```
+ *
+ * # Parameters
+ * - `model`: Initialized model instance. Must not be NULL.
+ * - `audio`: Single buffer containing sequential audio data of size `num_channels` * `num_frames`. Must not be NULL.
+ * - `num_channels`: Number of channels (must match initialization).
+ * - `num_frames`: Number of samples per channel (must match initialization value, or if `allow_variable_frames` was enabled, must be ≤ initialization value).
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Audio processed successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `model` or `audio` is NULL
+ * - `AIC_ERROR_CODE_NOT_INITIALIZED`: Model has not been initialized
+ * - `AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH`: Channel or frame count mismatch
+ * - `AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED`: SDK key was not authorized or process failed to report usage. Check if you have internet connection.
+ */
+enum AicErrorCode aic_model_process_sequential(struct AicModel *model,
+                                               float *audio,
+                                               uint16_t num_channels,
+                                               size_t num_frames);
 
 /**
  * Modifies a model parameter.
@@ -527,7 +621,7 @@ enum AicErrorCode aic_get_optimal_num_frames(const struct AicModel *model,
  * - `AIC_ERROR_CODE_SUCCESS`: VAD created successfully
  * - `AIC_ERROR_CODE_NULL_POINTER`: `vad` or `model` is NULL
  */
-enum AicErrorCode aic_vad_create(struct AicVad **vad, const struct AicModel *model);
+enum AicErrorCode aic_vad_create(struct AicVad **vad, struct AicModel *model);
 
 /**
  * Releases the VAD instance.
