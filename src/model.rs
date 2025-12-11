@@ -50,13 +50,13 @@ pub enum ModelType {
     /// - Native sample rate: 48 kHz
     /// - Native num frames: 480
     /// - Processing latency: 10 ms
-    QuailXS,
+    QuailXs,
     /// **Specifications:**
     /// - Window length: 10 ms
     /// - Native sample rate: 48 kHz
     /// - Native num frames: 480
     /// - Processing latency: 10 ms
-    QuailXXS,
+    QuailXxs,
     /// Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
     /// designed specifically to improve STT accuracy across unpredictable, diverse and challenging environments.
     ///
@@ -114,8 +114,8 @@ impl From<ModelType> for AicModelType::Type {
             ModelType::QuailS48 => AIC_MODEL_TYPE_QUAIL_S48,
             ModelType::QuailS16 => AIC_MODEL_TYPE_QUAIL_S16,
             ModelType::QuailS8 => AIC_MODEL_TYPE_QUAIL_S8,
-            ModelType::QuailXS => AIC_MODEL_TYPE_QUAIL_XS,
-            ModelType::QuailXXS => AIC_MODEL_TYPE_QUAIL_XXS,
+            ModelType::QuailXs => AIC_MODEL_TYPE_QUAIL_XS,
+            ModelType::QuailXxs => AIC_MODEL_TYPE_QUAIL_XXS,
             ModelType::QuailSttL16 => AIC_MODEL_TYPE_QUAIL_STT_L16,
             ModelType::QuailSttL8 => AIC_MODEL_TYPE_QUAIL_STT_L8,
             ModelType::QuailSttS16 => AIC_MODEL_TYPE_QUAIL_STT_S16,
