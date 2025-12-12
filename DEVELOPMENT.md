@@ -3,7 +3,8 @@
 Before creating a release, check that everything can be published to crates.io.
 
 1. If the C SDK changed:
-  - Update the [checksums.txt](aic-sdk-sys/checksums.txt) with the one distributed in the c-sdk
+  - Update the [checksums.txt](aic-sdk-sys/checksums.txt) with the one distributed in the C SDK
+  - Update the [aic.h](aic-sdk-sys/include/aic.h) header file with the one distributed in the C SDK
 
 2. If there were changes in `aic-sdk-sys`:
   - Increase version number in [aic-sdk-sys/Cargo.toml](aic-sdk-sys/Cargo.toml)

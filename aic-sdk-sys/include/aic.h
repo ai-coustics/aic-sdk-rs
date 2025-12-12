@@ -247,19 +247,24 @@ typedef enum AicEnhancementParameter {
  */
 typedef enum AicVadParameter {
   /**
-   * Controls the lookback buffer size used in the Voice Activity Detector.
+   * Controls for how long the VAD continues to detect speech after the audio signal
+   * no longer contains speech.
    *
-   * The lookback buffer size is the number of window-length audio buffers
-   * the VAD has available as a lookback buffer.
+   * The VAD reports speech detected if the audio signal contained speech in at least 50%
+   * of the frames processed in the last `speech_hold_duration` seconds.
    *
-   * The stability of the prediction increases with the buffer size,
-   * at the cost of higher latency.
+   * This affects the stability of speech detected -> not detected transitions.
    *
-   * **Range:** 1.0 to 20.0 (rounded up/down to the closest integer)
+   * NOTE: The VAD returns a value per processed buffer, so this duration is rounded
+   * to the closest model window length. For example, if the model has a processing window
+   * length of 10 ms, the VAD will round up/down to the closest multiple of 10 ms.
+   * Because of this, this parameter may return a different value than the one it was last set to.
    *
-   * **Default:** 6.0
+   * **Range:** 0.0 to 20x model window length (value in seconds)
+   *
+   * **Default:** 0.05 (50 ms)
    */
-  AIC_VAD_PARAMETER_LOOKBACK_BUFFER_SIZE = 0,
+  AIC_VAD_PARAMETER_SPEECH_HOLD_DURATION = 0,
   /**
    * Controls the sensitivity (energy threshold) of the VAD.
    *
@@ -274,6 +279,22 @@ typedef enum AicVadParameter {
    * **Default:** 6.0
    */
   AIC_VAD_PARAMETER_SENSITIVITY = 1,
+  /**
+   * Controls for how long speech needs to be present in the audio signal before
+   * the VAD considers it speech.
+   *
+   * This affects the stability of speech not detected -> detected transitions.
+   *
+   * NOTE: The VAD returns a value per processed buffer, so this duration is rounded
+   * to the closest model window length. For example, if the model has a processing window
+   * length of 10 ms, the VAD will round up/down to the closest multiple of 10 ms.
+   * Because of this, this parameter may return a different value than the one it was last set to.
+   *
+   * **Range:** 0.0 to 1.0 (value in seconds)
+   *
+   * **Default:** 0.0
+   */
+  AIC_VAD_PARAMETER_MINIMUM_SPEECH_DURATION = 2,
 } AicVadParameter;
 
 typedef struct AicModel AicModel;

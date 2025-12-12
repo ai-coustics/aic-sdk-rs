@@ -73,11 +73,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Voice Activity Detection
     let mut vad = model.create_vad();
-    vad.set_parameter(VadParameter::LookbackBufferSize, 7.0)?;
+    vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
     vad.set_parameter(VadParameter::Sensitivity, 7.0)?;
 
-    let lookback_buffer_size = vad.parameter(VadParameter::LookbackBufferSize)?;
-    println!("Lookback Buffer Size: {}", lookback_buffer_size);
+    let speech_hold_duration = vad.parameter(VadParameter::SpeechHoldDuration)?;
+    println!("Speech hold duration: {}", speech_hold_duration);
 
     let sensitivity = vad.parameter(VadParameter::Sensitivity)?;
     println!("Sensitivity: {}", sensitivity);
