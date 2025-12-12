@@ -122,7 +122,7 @@ impl Vad {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// # let mut vad = model.create_vad();
-    /// vad.set_parameter(VadParameter::LookbackBufferSize, 10.0).unwrap();
+    /// vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08).unwrap();
     /// vad.set_parameter(VadParameter::Sensitivity, 5.0).unwrap();
     /// ```
     pub fn set_parameter(&mut self, parameter: VadParameter, value: f32) -> Result<(), AicError> {
