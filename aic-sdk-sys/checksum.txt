@@ -1,6 +1,6 @@
-695983d752935e2e386101a8304c9c0bd8b657608887b7be3e92b0222a6a9e58  aic-sdk-aarch64-apple-darwin-0.11.0.tar.gz
-370cbc122b20c37e35164a06dc11d1683cee31463aba305cbaba281276f8344c  aic-sdk-aarch64-unknown-linux-gnu-0.11.0.tar.gz
-2b1a72a1f644ef38b79e0204bed2b4f275d0bbda7c55d7fa2f3dff83d5fc8791  aic-sdk-x86_64-apple-darwin-0.11.0.tar.gz
-825ec88bde5ed2401bb75dc63ce2f7777dd135fa402f59f06c8b0cacaa6da2a0  aic-sdk-x86_64-unknown-linux-gnu-0.11.0.tar.gz
-7fd397f8f660689503c2b17da653e292ca831268a33f0cd48a7f49e98ba87d9a  aic-sdk-aarch64-pc-windows-msvc-0.11.0.zip
-34d71e0bf26d249f63fd0976ad8029e9420d3ecfb33fef7b1e8c8dfaf4fe06f2  aic-sdk-x86_64-pc-windows-msvc-0.11.0.zip
+a6a6706ee38437f8ee90c1175eb7509ef48f1b70bf65a2a23e8a308cc378fde7  aic-sdk-aarch64-apple-darwin-0.12.0.tar.gz
+79203f1744df59b8dcfe97a3f50962395bafe04823c74b6e4f88c018ecc12fce  aic-sdk-aarch64-unknown-linux-gnu-0.12.0.tar.gz
+55c868a6102c55188c57f50dce74676a7aa49540e157591bb68a7b9cf88e7942  aic-sdk-x86_64-apple-darwin-0.12.0.tar.gz
+41c387d5213c69b64a76fcaa0140dd87fa3f18ec2774ecdb13b63128960482c5  aic-sdk-x86_64-unknown-linux-gnu-0.12.0.tar.gz
+c17dc3f5de294a53f4930cba1dfdc30963e10e6fdbf80852e1c9ca0d34cabbbc  aic-sdk-aarch64-pc-windows-msvc-0.12.0.zip
+94bff930225f468b839f8fd80cb9c5b959f2cf5c3908d5b7a63dd3882b102d3b  aic-sdk-x86_64-pc-windows-msvc-0.12.0.zip

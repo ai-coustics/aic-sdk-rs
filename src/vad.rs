@@ -5,18 +5,23 @@ use aic_sdk_sys::{AicVadParameter::*, *};
 /// Configurable parameters for Voice Activity Detection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VadParameter {
-    /// Controls the lookback buffer size used in the Voice Activity Detector.
+    /// Controls for how long the VAD continues to detect speech after the audio signal
+    /// no longer contains speech.
     ///
-    /// The lookback buffer size is the number of window-length audio buffers
-    /// the VAD has available as a lookback buffer.
+    /// The VAD reports speech detected if the audio signal contained speech in at least 50%
+    /// of the frames processed in the last `speech_hold_duration` seconds.
     ///
-    /// The stability of the prediction increases with the buffer size,
-    /// at the cost of higher latency.
+    /// This affects the stability of speech detected -> not detected transitions.
     ///
-    /// **Range:** 1.0 to 20.0
+    /// NOTE: The VAD returns a value per processed buffer, so this duration is rounded
+    /// to the closest model window length. For example, if the model has a processing window
+    /// length of 10 ms, the VAD will round up/down to the closest multiple of 10 ms.
+    /// Because of this, this parameter may return a different value than the one it was last set to.
     ///
-    /// **Default:** 6.0
-    LookbackBufferSize,
+    /// **Range:** 0.0 to 20x model window length (value in seconds)
+    ///
+    /// **Default:** 0.05 (50 ms)
+    SpeechHoldDuration,
     /// Controls the sensitivity (energy threshold) of the VAD.
     ///
     /// This value is used by the VAD as the threshold a
@@ -29,13 +34,28 @@ pub enum VadParameter {
     ///
     /// **Default:** 6.0
     Sensitivity,
+    /// Controls for how long speech needs to be present in the audio signal before
+    /// the VAD considers it speech.
+    ///
+    /// This affects the stability of speech not detected -> detected transitions.
+    ///
+    /// NOTE: The VAD returns a value per processed buffer, so this duration is rounded
+    /// to the closest model window length. For example, if the model has a processing window
+    /// length of 10 ms, the VAD will round up/down to the closest multiple of 10 ms.
+    /// Because of this, this parameter may return a different value than the one it was last set to.
+    ///
+    /// **Range:** 0.0 to 1.0 (value in seconds)
+    ///
+    /// **Default:** 0.0
+    MinimumSpeechDuration,
 }
 
 impl From<VadParameter> for AicVadParameter::Type {
     fn from(parameter: VadParameter) -> Self {
         match parameter {
-            VadParameter::LookbackBufferSize => AIC_VAD_PARAMETER_LOOKBACK_BUFFER_SIZE,
+            VadParameter::SpeechHoldDuration => AIC_VAD_PARAMETER_SPEECH_HOLD_DURATION,
             VadParameter::Sensitivity => AIC_VAD_PARAMETER_SENSITIVITY,
+            VadParameter::MinimumSpeechDuration => AIC_VAD_PARAMETER_MINIMUM_SPEECH_DURATION,
         }
     }
 }
@@ -102,7 +122,7 @@ impl Vad {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// # let mut vad = model.create_vad();
-    /// vad.set_parameter(VadParameter::LookbackBufferSize, 10.0).unwrap();
+    /// vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08).unwrap();
     /// vad.set_parameter(VadParameter::Sensitivity, 5.0).unwrap();
     /// ```
     pub fn set_parameter(&mut self, parameter: VadParameter, value: f32) -> Result<(), AicError> {

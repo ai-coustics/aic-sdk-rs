@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.0 - 2025-12-12
+
+### New features
+
+- Added new VAD parameter `VadParameter::MinimumSpeechDuration` used to control for how long speech needs to be present
+in the audio signal before the VAD considers it speech.
+
+### Breaking changes
+
+- Replaced VAD parameter `VadParameter::LookbackBufferSize` with `VadParameter::SpeechHoldDuration`, used to control
+for how long the VAD continues to detect speech after the audio signal no longer contains speech.
+
 ## 0.11.0 - 2025-12-11
 
 ### New features
