@@ -4,10 +4,12 @@ use std::ffi::CStr;
 
 mod error;
 mod model;
+mod processor;
 mod vad;
 
 pub use error::*;
 pub use model::*;
+pub use processor::*;
 pub use vad::*;
 
 /// Returns the version of the ai-coustics SDK library.
