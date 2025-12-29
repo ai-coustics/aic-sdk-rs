@@ -1,5 +1,5 @@
 #![doc = include_str!("../README.md")]
-use aic_sdk_sys::aic_get_sdk_version;
+use aic_sdk_sys::{aic_get_compatible_model_version, aic_get_sdk_version};
 use std::ffi::CStr;
 
 #[cfg(feature = "download-model")]
@@ -42,4 +42,9 @@ pub fn get_version() -> &'static str {
     }
 
     unsafe { CStr::from_ptr(version_ptr).to_str().unwrap_or("unknown") }
+}
+
+/// Returns the model version number compatible with this SDK build.
+pub fn get_compatible_model_version() -> u32 {
+    unsafe { aic_get_compatible_model_version() }
 }
