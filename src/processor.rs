@@ -2,7 +2,7 @@ use crate::{error::*, model::Model};
 
 use aic_sdk_sys::{AicParameter::*, *};
 
-use std::{ffi::CString, ptr, sync::Once};
+use std::{ffi::CString, marker::PhantomData, ptr, sync::Once};
 
 static SET_WRAPPER_ID: Once = Once::new();
 
@@ -72,14 +72,16 @@ impl From<Parameter> for AicParameter::Type {
 /// let mut audio_buffer = vec![0.0f32; 1024];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
-pub struct Processor {
+pub struct Processor<'a> {
     /// Raw pointer to the C processor structure
     inner: *mut AicProcessor,
     /// Configured number of channels
     num_channels: Option<u16>,
+    /// Phantom data to tie the lifetime to the Model
+    marker: PhantomData<&'a Model>,
 }
 
-impl Processor {
+impl<'a> Processor<'a> {
     /// Creates a new audio enhancement model instance.
     ///
     /// Multiple models can be created to process different audio streams simultaneously
@@ -102,7 +104,7 @@ impl Processor {
     /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// let processor = Processor::new(&model, &license_key).unwrap();
     /// ```
-    pub fn new(model: &Model, license_key: &str) -> Result<Self, AicError> {
+    pub fn new(model: &'a Model, license_key: &str) -> Result<Self, AicError> {
         SET_WRAPPER_ID.call_once(|| unsafe {
             aic_set_sdk_wrapper_id(2);
         });
@@ -130,6 +132,7 @@ impl Processor {
         Ok(Self {
             inner: processor_ptr,
             num_channels: None,
+            marker: PhantomData,
         })
     }
 
@@ -616,7 +619,7 @@ impl Processor {
     }
 }
 
-impl Drop for Processor {
+impl<'a> Drop for Processor<'a> {
     fn drop(&mut self) {
         if !self.inner.is_null() {
             unsafe {
@@ -629,8 +632,8 @@ impl Drop for Processor {
 // SAFETY: The Processor struct manages its own memory and does not share
 // mutable state across threads without synchronization. The underlying C library
 // is assumed to be thread-safe for the operations exposed here.
-unsafe impl Send for Processor {}
-unsafe impl Sync for Processor {}
+unsafe impl<'a> Send for Processor<'a> {}
+unsafe impl<'a> Sync for Processor<'a> {}
 
 #[cfg(test)]
 mod tests {
