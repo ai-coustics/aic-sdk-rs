@@ -684,15 +684,14 @@ mod tests {
         }
     }
 
-    fn load_test_processor() -> Result<(Model, Processor), AicError> {
+    fn load_test_model() -> Result<(Model, String), AicError> {
         let license_key = std::env::var("AIC_SDK_LICENSE")
             .expect("AIC_SDK_LICENSE environment variable must be set for tests");
 
         let model_path = get_quail_xxs_48khz()?;
         let model = Model::from_file(&model_path)?;
-        let processor = Processor::new(&model, &license_key)?;
 
-        Ok((model, processor))
+        Ok((model, license_key))
     }
 
     #[test]
@@ -700,20 +699,22 @@ mod tests {
         dbg!(crate::get_version());
         dbg!(crate::get_compatible_model_version());
 
-        let (_, mut processor) = load_test_processor().unwrap();
-
-        processor.initialize(48000, 2, 480, false).unwrap();
+        let (model, license_key) = load_test_model().unwrap();
+        let mut processor = Processor::new(&model, &license_key).unwrap();
 
         let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
         let mut audio_refs: Vec<&mut [f32]> =
             audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
 
+        processor.initialize(48000, 2, 480, false).unwrap();
         processor.process_planar(&mut audio_refs).unwrap();
     }
 
     #[test]
     fn process_interleaved_fixed_frames() {
-        let (_, mut processor) = load_test_processor().unwrap();
+        let (model, license_key) = load_test_model().unwrap();
+        let mut processor = Processor::new(&model, &license_key).unwrap();
+
         let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
         processor.initialize(48000, 2, 480, false).unwrap();
         processor.process_interleaved(&mut audio).unwrap();
@@ -721,7 +722,9 @@ mod tests {
 
     #[test]
     fn process_planar_fixed_frames() {
-        let (_, mut processor) = load_test_processor().unwrap();
+        let (model, license_key) = load_test_model().unwrap();
+        let mut processor = Processor::new(&model, &license_key).unwrap();
+
         let mut left = vec![0.0f32; 480]; // 480 frames
         let mut right = vec![0.0f32; 480]; // 480 frames
         let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 480 frames
@@ -731,7 +734,9 @@ mod tests {
 
     #[test]
     fn process_interleaved_variable_frames() {
-        let (_, mut processor) = load_test_processor().unwrap();
+        let (model, license_key) = load_test_model().unwrap();
+        let mut processor = Processor::new(&model, &license_key).unwrap();
+
         let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
         processor.initialize(48000, 2, 480, true).unwrap();
         processor.process_interleaved(&mut audio).unwrap();
@@ -742,7 +747,9 @@ mod tests {
 
     #[test]
     fn process_planar_variable_frames() {
-        let (_, mut processor) = load_test_processor().unwrap();
+        let (model, license_key) = load_test_model().unwrap();
+        let mut processor = Processor::new(&model, &license_key).unwrap();
+
         let mut left = vec![0.0f32; 480]; // 480 frames
         let mut right = vec![0.0f32; 480]; // 480 frames
         let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 480 frames
@@ -757,7 +764,9 @@ mod tests {
 
     #[test]
     fn process_interleaved_variable_frames_fails_without_allow_variable_frames() {
-        let (_, mut processor) = load_test_processor().unwrap();
+        let (model, license_key) = load_test_model().unwrap();
+        let mut processor = Processor::new(&model, &license_key).unwrap();
+
         let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
         processor.initialize(48000, 2, 480, false).unwrap();
         processor.process_interleaved(&mut audio).unwrap();
@@ -769,7 +778,9 @@ mod tests {
 
     #[test]
     fn process_planar_variable_frames_fails_without_allow_variable_frames() {
-        let (_, mut processor) = load_test_processor().unwrap();
+        let (model, license_key) = load_test_model().unwrap();
+        let mut processor = Processor::new(&model, &license_key).unwrap();
+
         let mut left = vec![0.0f32; 480]; // 480 frames
         let mut right = vec![0.0f32; 480]; // 480 frames
         let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 480 frames

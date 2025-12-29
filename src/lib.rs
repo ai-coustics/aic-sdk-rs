@@ -48,8 +48,7 @@ pub fn get_compatible_model_version() -> u32 {
 #[doc(hidden)]
 mod _compile_fail_tests {
     //! Compile-fail regression: a `Processor` must not outlive its `Model`.
-    //! This currently compiles (showing a lifetime hole), but once fixed the
-    //! snippet should fail to compile.
+    //! This snippet should fail to compile and ensures we keep that guarantee.
     //!
     //! ```rust,compile_fail
     //! use aic_sdk::{Model, Processor};
