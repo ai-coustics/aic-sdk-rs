@@ -64,17 +64,17 @@ impl Model {
         let manifest_model = manifest
             .models
             .get(model)
-            .ok_or_else(|| AicError::ModelNotFound(model.to_string()))?;
+            .ok_or_else(|| AicError::from(DownloadError::ModelNotFound(model.to_string())))?;
 
         let version = manifest_model.versions.get(&version_key).ok_or_else(|| {
-            AicError::IncompatibleModel {
+            DownloadError::IncompatibleModel {
                 model: model.to_string(),
                 compatible_version,
             }
         })?;
 
         let download_dir = download_dir.as_ref();
-        fs::create_dir_all(download_dir).map_err(|err| AicError::Io(err.to_string()))?;
+        fs::create_dir_all(download_dir).map_err(|err| AicError::from(DownloadError::Io(err.to_string())))?;
 
         let destination = download_dir.join(&version.filename);
         if destination.exists() && checksum_matches(&destination, &version.checksum)? {
@@ -85,14 +85,14 @@ impl Model {
         let bytes = download_bytes(&url)?;
 
         let temp_path = destination.with_extension("download");
-        fs::write(&temp_path, &bytes).map_err(|err| AicError::Io(err.to_string()))?;
+        fs::write(&temp_path, &bytes).map_err(|err| AicError::from(DownloadError::Io(err.to_string())))?;
 
         if !checksum_matches(&temp_path, &version.checksum)? {
             let _ = fs::remove_file(&temp_path);
-            return Err(AicError::ChecksumMismatch);
+            return Err(AicError::from(DownloadError::ChecksumMismatch));
         }
 
-        fs::rename(&temp_path, &destination).map_err(|err| AicError::Io(err.to_string()))?;
+        fs::rename(&temp_path, &destination).map_err(|err| AicError::from(DownloadError::Io(err.to_string())))?;
 
         Ok(destination)
     }
