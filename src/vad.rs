@@ -70,7 +70,7 @@ impl From<VadParameter> for AicVadParameter::Type {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,no_run
 /// use aic_sdk::{Model, Processor};
 ///
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
@@ -118,7 +118,7 @@ impl Vad {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
@@ -144,7 +144,7 @@ impl Vad {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();

@@ -60,7 +60,7 @@ impl From<Parameter> for AicParameter::Type {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,no_run
 /// use aic_sdk::{Model, Processor};
 ///
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
@@ -98,7 +98,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
@@ -140,7 +140,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
@@ -190,7 +190,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
@@ -235,7 +235,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
@@ -273,7 +273,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
@@ -337,7 +337,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
@@ -394,7 +394,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
@@ -443,7 +443,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use aic_sdk::{Model, Parameter, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
@@ -470,7 +470,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use aic_sdk::{Model, Parameter, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
@@ -512,7 +512,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
@@ -560,7 +560,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
@@ -601,7 +601,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
