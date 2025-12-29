@@ -86,9 +86,9 @@ impl Model {
     /// This method fetches the model manifest, checks whether the requested model
     /// exists in a version compatible with this library, and downloads the model
     /// file into the provided directory.
-    /// 
+    ///
     /// # Note
-    /// 
+    ///
     /// This is a blocking operation.
     ///
     /// # Arguments
@@ -101,9 +101,12 @@ impl Model {
     /// Returns the full path to the downloaded model file, or an `AicError` if the
     /// operation fails.
     #[cfg(feature = "download-model")]
-    pub fn download<P: AsRef<Path>>(model: &str, download_dir: P) -> Result<std::path::PathBuf, AicError> {
+    pub fn download<P: AsRef<Path>>(
+        model_id: &str,
+        download_dir: P,
+    ) -> Result<std::path::PathBuf, AicError> {
         let compatible_version = crate::get_compatible_model_version();
-        aic_model_downloader::download(model, compatible_version, download_dir)
+        aic_model_downloader::download(model_id, compatible_version, download_dir)
             .map_err(|err| AicError::ModelDownload(err.to_string()))
     }
 
