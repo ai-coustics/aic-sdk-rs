@@ -1,8 +1,5 @@
-#![cfg(feature = "download-model")]
-
 use crate::{Model, error::*};
 
-use aic_sdk_sys::aic_get_compatible_model_version;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::{
@@ -71,19 +68,6 @@ impl Model {
 
         Ok(destination)
     }
-
-    /// Downloads the default test model `quail-xxs-48khz` into the crate's `target/` directory.
-    /// Returns the path to the downloaded model file.
-    pub fn download_quail_xxs_48khz() -> Result<PathBuf, AicError> {
-        let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
-        Model::download("quail-xxs-48khz", target_dir)
-    }
-}
-
-/// Downloads the default test model `quail-xxs-48khz` into the crate's `target/` directory.
-/// Returns the path to the downloaded model file.
-pub fn download_quail_xxs_48khz() -> Result<PathBuf, AicError> {
-    Model::download_quail_xxs_48khz()
 }
 
 #[derive(Debug, Deserialize)]

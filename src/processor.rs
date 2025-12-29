@@ -632,15 +632,60 @@ impl Drop for Processor {
 unsafe impl Send for Processor {}
 unsafe impl Sync for Processor {}
 
-#[cfg(all(test, feature = "download-model"))]
+#[cfg(test)]
 mod tests {
     use super::*;
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+    };
+
+    fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
+        let entries = fs::read_dir(target_dir).ok()?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|name| name.contains("quail_xxs_48khz") && name.ends_with(".aicmodel"))
+                .unwrap_or(false)
+            {
+                if path.is_file() {
+                    return Some(path);
+                }
+            }
+        }
+        None
+    }
+
+    /// Downloads the default test model `quail-xxs-48khz` into the crate's `target/` directory.
+    /// Returns the path to the downloaded model file.
+    fn get_quail_xxs_48khz() -> Result<PathBuf, AicError> {
+        let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
+
+        if let Some(existing) = find_existing_model(&target_dir) {
+            return Ok(existing);
+        }
+
+        #[cfg(feature = "download-model")]
+        {
+            return Model::download("quail-xxs-48khz", target_dir);
+        }
+
+        #[cfg(not(feature = "download-model"))]
+        {
+            panic!(
+                "Model `quail-xxs-48khz` not found in {} and `download-model` feature is disabled",
+                target_dir.display()
+            );
+        }
+    }
 
     fn load_test_processor() -> Result<(Model, Processor), AicError> {
         let license_key = std::env::var("AIC_SDK_LICENSE")
             .expect("AIC_SDK_LICENSE environment variable must be set for tests");
 
-        let model_path = crate::download_quail_xxs_48khz()?;
+        let model_path = get_quail_xxs_48khz()?;
         let model = Model::from_file(&model_path)?;
         let processor = Processor::new(&model, &license_key)?;
 
@@ -648,21 +693,20 @@ mod tests {
     }
 
     #[test]
-    fn model_creation_and_basic_operations() -> Result<(), AicError> {
+    fn model_creation_and_basic_operations() {
         dbg!(crate::get_version());
-
-        let (_, mut processor) = load_test_processor()?;
+        dbg!(crate::get_compatible_model_version());
+        
+        let (_, mut processor) = load_test_processor().unwrap();
 
         // Test initialization with QuailL48 optimal settings (48000 Hz, 480 frames)
-        processor.initialize(48000, 2, 480, false)?;
+        processor.initialize(48000, 2, 480, false).unwrap();
 
         let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
         let mut audio_refs: Vec<&mut [f32]> =
             audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
 
         processor.process_planar(&mut audio_refs).unwrap();
-
-        Ok(())
     }
 
     #[test]
