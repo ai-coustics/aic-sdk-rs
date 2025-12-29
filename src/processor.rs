@@ -61,16 +61,16 @@ impl From<Parameter> for AicParameter::Type {
 /// # Example
 ///
 /// ```rust
-/// use aic_sdk::{Model, ModelType};
+/// use aic_sdk::{Model, Processor};
 ///
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-/// let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+/// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+/// let mut processor = Processor::new(&model, &license_key).unwrap();
 ///
-/// model.initialize(48000, 1, 1024, false).unwrap();
+/// processor.initialize(48000, 1, 1024, false).unwrap();
 ///
-/// // Process audio data
 /// let mut audio_buffer = vec![0.0f32; 1024];
-/// model.process_interleaved(&mut audio_buffer).unwrap();
+/// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
 pub struct Processor {
     /// Raw pointer to the C processor structure
@@ -87,7 +87,7 @@ impl Processor {
     ///
     /// # Arguments
     ///
-    /// * `model_type` - Selects the enhancement algorithm variant
+    /// * `model` - The loaded model instance
     /// * `license_key` - Valid license key for the AIC SDK
     ///
     /// # Returns
@@ -97,9 +97,10 @@ impl Processor {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
+    /// # use aic_sdk::{Model, Processor};
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// let model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// let processor = Processor::new(&model, &license_key).unwrap();
     /// ```
     pub fn new(model: &Model, license_key: &str) -> Result<Self, AicError> {
         SET_WRAPPER_ID.call_once(|| unsafe {
@@ -137,10 +138,11 @@ impl Processor {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
+    /// # use aic_sdk::{Model, Processor};
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// let vad = model.create_vad();
+    /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// let mut processor = Processor::new(&model, &license_key).unwrap();
+    /// let vad = processor.create_vad();
     /// ```
     pub fn create_vad(&mut self) -> crate::Vad {
         let mut vad_ptr: *mut AicVad = ptr::null_mut();
@@ -186,9 +188,10 @@ impl Processor {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
+    /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let mut model = Processor::new(&model, &license_key).unwrap();
     /// model.initialize(48000, 1, 1024, true).unwrap();
     /// ```
     pub fn initialize(
@@ -230,9 +233,10 @@ impl Processor {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
+    /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let mut model = Processor::new(&model, &license_key).unwrap();
     /// model.reset().unwrap();
     /// ```
     pub fn reset(&mut self) -> Result<(), AicError> {
@@ -267,9 +271,10 @@ impl Processor {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
+    /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let mut model = Processor::new(&model, &license_key).unwrap();
     /// let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
     /// let mut audio_refs: Vec<&mut [f32]> = audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
     /// model.initialize(48000, 2, 480, false).unwrap();
@@ -330,9 +335,10 @@ impl Processor {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
+    /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let mut model = Processor::new(&model, &license_key).unwrap();
     /// let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
     /// model.initialize(48000, 2, 480, false).unwrap();
     /// model.process_interleaved(&mut audio).unwrap();
@@ -386,9 +392,10 @@ impl Processor {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
+    /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let mut model = Processor::new(&model, &license_key).unwrap();
     /// let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames each stored sequentially
     /// model.initialize(48000, 2, 480, false).unwrap();
     /// model.process_sequential(&mut audio).unwrap();
@@ -434,10 +441,11 @@ impl Processor {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType, EnhancementParameter};
+    /// # use aic_sdk::{Model, Parameter, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// model.set_parameter(EnhancementParameter::EnhancementLevel, 0.8).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let mut model = Processor::new(&model, &license_key).unwrap();
+    /// model.set_parameter(Parameter::EnhancementLevel, 0.8).unwrap();
     /// ```
     pub fn set_parameter(&mut self, parameter: Parameter, value: f32) -> Result<(), AicError> {
         let error_code =
@@ -460,10 +468,11 @@ impl Processor {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType, EnhancementParameter};
+    /// # use aic_sdk::{Model, Parameter, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// let enhancement_level = model.parameter(EnhancementParameter::EnhancementLevel).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let mut model = Processor::new(&model, &license_key).unwrap();
+    /// let enhancement_level = model.parameter(Parameter::EnhancementLevel).unwrap();
     /// println!("Current enhancement level: {enhancement_level}");
     /// ```
     pub fn parameter(&self, parameter: Parameter) -> Result<f32, AicError> {
@@ -501,9 +510,10 @@ impl Processor {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
+    /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let mut model = Processor::new(&model, &license_key).unwrap();
     /// let delay = model.output_delay().unwrap();
     /// println!("Output delay: {} samples", delay);
     /// ```
@@ -548,9 +558,10 @@ impl Processor {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
+    /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let mut model = Processor::new(&model, &license_key).unwrap();
     /// let optimal_rate = model.optimal_sample_rate().unwrap();
     /// println!("Optimal sample rate: {optimal_rate} Hz");
     /// ```
@@ -588,9 +599,10 @@ impl Processor {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
+    /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let mut model = Processor::new(&model, &license_key).unwrap();
     /// # let sample_rate = model.optimal_sample_rate().unwrap();
     /// let optimal_frames = model.optimal_num_frames(sample_rate).unwrap();
     /// println!("Optimal frame count: {optimal_frames}");
@@ -620,108 +632,108 @@ impl Drop for Processor {
 unsafe impl Send for Processor {}
 unsafe impl Sync for Processor {}
 
-#[cfg(test)]
+#[cfg(all(test, feature = "download-model"))]
 mod tests {
     use super::*;
+
+    fn load_test_processor() -> Result<(Model, Processor), AicError> {
+        let license_key = std::env::var("AIC_SDK_LICENSE")
+            .expect("AIC_SDK_LICENSE environment variable must be set for tests");
+
+        let model_path = crate::download_quail_xxs_48khz()?;
+        let model = Model::from_file(&model_path)?;
+        let processor = Processor::new(&model, &license_key)?;
+
+        Ok((model, processor))
+    }
 
     #[test]
     fn model_creation_and_basic_operations() -> Result<(), AicError> {
         dbg!(crate::get_version());
 
-        // Read license key from environment variable
-        let license_key = std::env::var("AIC_SDK_LICENSE")
-            .expect("AIC_SDK_LICENSE environment variable must be set for tests");
-
-        // Test model creation with QuailL48 at optimal settings
-        let mut model = Processor::new(ModelType::QuailL48, &license_key)?;
+        let (_, mut processor) = load_test_processor()?;
 
         // Test initialization with QuailL48 optimal settings (48000 Hz, 480 frames)
-        model.initialize(48000, 2, 480, false)?;
+        processor.initialize(48000, 2, 480, false)?;
 
         let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
         let mut audio_refs: Vec<&mut [f32]> =
             audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
 
-        model.process_planar(&mut audio_refs).unwrap();
+        processor.process_planar(&mut audio_refs).unwrap();
 
         Ok(())
     }
 
     #[test]
     fn process_interleaved_fixed_frames() {
-        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-        let mut model = Processor::new(ModelType::QuailS48, &license_key).unwrap();
+        let (_, mut processor) = load_test_processor().unwrap();
         let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
-        model.initialize(48000, 2, 480, false).unwrap();
-        model.process_interleaved(&mut audio).unwrap();
+        processor.initialize(48000, 2, 480, false).unwrap();
+        processor.process_interleaved(&mut audio).unwrap();
     }
 
     #[test]
     fn process_planar_fixed_frames() {
-        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-        let mut model = Processor::new(ModelType::QuailS48, &license_key).unwrap();
+        let (_, mut processor) = load_test_processor().unwrap();
         let mut left = vec![0.0f32; 480]; // 480 frames
         let mut right = vec![0.0f32; 480]; // 480 frames
         let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 480 frames
-        model.initialize(48000, 2, 480, false).unwrap();
-        model.process_planar(&mut audio).unwrap();
+        processor.initialize(48000, 2, 480, false).unwrap();
+        processor.process_planar(&mut audio).unwrap();
     }
 
     #[test]
     fn process_interleaved_variable_frames() {
-        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-        let mut model = Processor::new(ModelType::QuailS48, &license_key).unwrap();
+        let (_, mut processor) = load_test_processor().unwrap();
         let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
-        model.initialize(48000, 2, 480, true).unwrap();
-        model.process_interleaved(&mut audio).unwrap();
+        processor.initialize(48000, 2, 480, true).unwrap();
+        processor.process_interleaved(&mut audio).unwrap();
 
         let mut audio = vec![0.0f32; 2 * 20]; // 2 channels, 20 frames
-        model.process_interleaved(&mut audio).unwrap();
+        processor.process_interleaved(&mut audio).unwrap();
     }
 
     #[test]
     fn process_planar_variable_frames() {
-        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-        let mut model = Processor::new(ModelType::QuailS48, &license_key).unwrap();
+        let (_, mut processor) = load_test_processor().unwrap();
         let mut left = vec![0.0f32; 480]; // 480 frames
         let mut right = vec![0.0f32; 480]; // 480 frames
         let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 480 frames
-        model.initialize(48000, 2, 480, true).unwrap();
-        model.process_planar(&mut audio).unwrap();
+        processor.initialize(48000, 2, 480, true).unwrap();
+        processor.process_planar(&mut audio).unwrap();
 
         let mut left = vec![0.0f32; 20]; // 20 frames
         let mut right = vec![0.0f32; 20]; // 20 frames
         let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 20 frames
-        model.process_planar(&mut audio).unwrap();
+        processor.process_planar(&mut audio).unwrap();
     }
 
     #[test]
     fn process_interleaved_variable_frames_fails_without_allow_variable_frames() {
-        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-        let mut model = Processor::new(ModelType::QuailS48, &license_key).unwrap();
+        let (_, mut processor) = load_test_processor().unwrap();
         let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
-        model.initialize(48000, 2, 480, false).unwrap();
-        model.process_interleaved(&mut audio).unwrap();
+        processor.initialize(48000, 2, 480, false).unwrap();
+        processor.process_interleaved(&mut audio).unwrap();
 
         let mut audio = vec![0.0f32; 2 * 20]; // 2 channels, 20 frames
-        let result = model.process_interleaved(&mut audio);
+        let result = processor.process_interleaved(&mut audio);
         assert_eq!(result, Err(AicError::AudioConfigMismatch));
     }
 
     #[test]
     fn process_planar_variable_frames_fails_without_allow_variable_frames() {
-        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-        let mut model = Processor::new(ModelType::QuailS48, &license_key).unwrap();
+        let (_, mut processor) = load_test_processor().unwrap();
         let mut left = vec![0.0f32; 480]; // 480 frames
         let mut right = vec![0.0f32; 480]; // 480 frames
         let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 480 frames
-        model.initialize(48000, 2, 480, false).unwrap();
-        model.process_planar(&mut audio).unwrap();
+        processor.initialize(48000, 2, 480, false).unwrap();
+        processor.process_planar(&mut audio).unwrap();
 
         let mut left = vec![0.0f32; 20]; // 20 frames
         let mut right = vec![0.0f32; 20]; // 20 frames
         let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 20 frames
-        let result = model.process_planar(&mut audio);
+        let result = processor.process_planar(&mut audio);
         assert_eq!(result, Err(AicError::AudioConfigMismatch));
     }
 }

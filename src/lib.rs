@@ -9,6 +9,8 @@ mod model;
 mod processor;
 mod vad;
 
+#[cfg(feature = "download-model")]
+pub use download::download_quail_xxs_48khz;
 pub use error::*;
 pub use model::*;
 pub use processor::*;

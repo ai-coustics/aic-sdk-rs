@@ -13,16 +13,13 @@ use std::{ffi::CString, path::Path, ptr};
 /// # Example
 ///
 /// ```rust
-/// use aic_sdk::{Model, ModelType};
-///
-/// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-/// let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-///
-/// model.initialize(48000, 1, 1024, false).unwrap();
-///
-/// // Process audio data
+/// # use aic_sdk::{Model, Processor};
+/// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+/// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+/// let mut processor = Processor::new(&model, &license_key).unwrap();
+/// processor.initialize(48000, 1, 1024, false).unwrap();
 /// let mut audio_buffer = vec![0.0f32; 1024];
-/// model.process_interleaved(&mut audio_buffer).unwrap();
+/// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
 pub struct Model {
     /// Raw pointer to the C model structure
@@ -47,9 +44,8 @@ impl Model {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
-    /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// let model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// # use aic_sdk::Model;
+    /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// ```
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, AicError> {
         let mut model_ptr: *mut AicModel = ptr::null_mut();

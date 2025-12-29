@@ -1,8 +1,17 @@
-use aic_sdk::{EnhancementParameter, Model, ModelType, VadParameter};
+#![cfg_attr(not(feature = "download-model"), allow(dead_code, unused_imports))]
+
+#[cfg(feature = "download-model")]
+use aic_sdk::{Model, Parameter, Processor, VadParameter, download_quail_xxs_48khz};
 use std::env;
 
 const NUM_CHANNELS: u16 = 2;
 
+#[cfg(not(feature = "download-model"))]
+fn main() {
+    eprintln!("Enable the `download-model` feature to run this example.");
+}
+
+#[cfg(feature = "download-model")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Display library version
     println!("ai-coustics SDK version: {}", aic_sdk::get_version());
@@ -14,30 +23,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::io::Error::new(std::io::ErrorKind::NotFound, "AIC_SDK_LICENSE not set")
     })?;
 
-    // Model creation with license key
-    let mut model = Model::new(ModelType::QuailS48, &license)?;
-    println!("Model created successfully");
+    // Download the default model once and reuse the file
+    let model_path = download_quail_xxs_48khz()?;
+    let model = Model::from_file(&model_path)?;
+    println!("Model loaded from {}", model_path.display());
+
+    // Create processor with license key
+    let mut processor = Processor::new(&model, &license)?;
+    println!("Processor created successfully");
 
     // Get optimal settings
-    let optimal_sample_rate = model.optimal_sample_rate()?;
+    let optimal_sample_rate = processor.optimal_sample_rate()?;
     println!("Optimal sample rate: {} Hz", optimal_sample_rate);
 
-    let optimal_num_frames = model.optimal_num_frames(optimal_sample_rate)?;
+    let optimal_num_frames = processor.optimal_num_frames(optimal_sample_rate)?;
     println!("Optimal frame count: {}", optimal_num_frames);
 
     // Initialize with basic audio config
-    model.initialize(optimal_sample_rate, NUM_CHANNELS, optimal_num_frames, true)?;
-    println!("Model initialized successfully");
+    processor.initialize(optimal_sample_rate, NUM_CHANNELS, optimal_num_frames, true)?;
+    println!("Processor initialized successfully");
 
     // Get output delay
-    let delay = model.output_delay()?;
+    let delay = processor.output_delay()?;
     println!("Output delay: {} samples", delay);
 
     // Test parameter setting and getting
-    model.set_parameter(EnhancementParameter::EnhancementLevel, 0.7)?;
+    processor.set_parameter(Parameter::EnhancementLevel, 0.7)?;
     println!("Parameter set successfully");
 
-    let enhancement_level = model.parameter(EnhancementParameter::EnhancementLevel)?;
+    let enhancement_level = processor.parameter(Parameter::EnhancementLevel)?;
     println!("Enhancement level: {}", enhancement_level);
 
     // Create minimal test audio - planar format (separate buffers for each channel)
@@ -51,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     // Test planar audio processing
-    match model.process_planar(&mut audio_planar) {
+    match processor.process_planar(&mut audio_planar) {
         Ok(()) => println!("Planar processing succeeded"),
         Err(e) => println!("Planar processing failed: {}", e),
     }
@@ -60,19 +74,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut audio_buffer_interleaved = vec![0.0f32; NUM_CHANNELS as usize * optimal_num_frames];
 
     // Test interleaved audio processing
-    match model.process_interleaved(&mut audio_buffer_interleaved) {
+    match processor.process_interleaved(&mut audio_buffer_interleaved) {
         Ok(()) => println!("Interleaved processing succeeded"),
         Err(e) => println!("Interleaved processing failed: {}", e),
     }
 
     // Test reset functionality
-    match model.reset() {
-        Ok(()) => println!("Model reset succeeded"),
-        Err(e) => println!("Model reset failed: {}", e),
+    match processor.reset() {
+        Ok(()) => println!("Processor reset succeeded"),
+        Err(e) => println!("Processor reset failed: {}", e),
     }
 
     // Voice Activity Detection
-    let mut vad = model.create_vad();
+    let mut vad = processor.create_vad();
     vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
     vad.set_parameter(VadParameter::Sensitivity, 7.0)?;
 

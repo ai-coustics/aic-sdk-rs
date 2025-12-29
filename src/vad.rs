@@ -71,11 +71,12 @@ impl From<VadParameter> for AicVadParameter::Type {
 /// # Example
 ///
 /// ```rust
-/// use aic_sdk::{Model, ModelType};
+/// use aic_sdk::{Model, Processor};
 ///
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-/// let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-/// let vad = model.create_vad();
+/// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+/// let mut processor = Processor::new(&model, &license_key).unwrap();
+/// let vad = processor.create_vad();
 /// ```
 pub struct Vad {
     /// Raw pointer to the C VAD structure
@@ -118,10 +119,11 @@ impl Vad {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType, VadParameter};
+    /// # use aic_sdk::{Model, Processor, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// # let mut vad = model.create_vad();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
+    /// # let mut vad = processor.create_vad();
     /// vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08).unwrap();
     /// vad.set_parameter(VadParameter::Sensitivity, 5.0).unwrap();
     /// ```
@@ -143,10 +145,11 @@ impl Vad {
     /// # Example
     ///
     /// ```rust
-    /// # use aic_sdk::{Model, ModelType, VadParameter};
+    /// # use aic_sdk::{Model, Processor, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// # let vad = model.create_vad();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let vad = processor.create_vad();
     /// let sensitivity = vad.parameter(VadParameter::Sensitivity).unwrap();
     /// println!("Current sensitivity: {sensitivity}");
     /// ```
