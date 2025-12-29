@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "download-model"), allow(dead_code, unused_imports))]
 
 #[cfg(feature = "download-model")]
-use aic_sdk::{Model, Parameter, Processor, VadParameter, download_quail_xxs_48khz};
+use aic_sdk::{Model, Parameter, Processor, VadParameter};
 use std::env;
 
 const NUM_CHANNELS: u16 = 2;
@@ -24,7 +24,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     })?;
 
     // Download the default model once and reuse the file
-    let model_path = download_quail_xxs_48khz()?;
+    let target_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
+    let model_path = Model::download("quail-xxs-48khz", target_dir)?;
     let model = Model::from_file(&model_path)?;
     println!("Model loaded from {}", model_path.display());
 
