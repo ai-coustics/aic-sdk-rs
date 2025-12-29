@@ -29,14 +29,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aic-model-downloader"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
 name = "aic-sdk"
 version = "0.12.0"
 dependencies = [
+ "aic-model-downloader",
  "aic-sdk-sys",
- "reqwest",
- "serde",
- "serde_json",
- "sha2",
  "thiserror",
 ]
 

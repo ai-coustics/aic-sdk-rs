@@ -81,6 +81,32 @@ impl Model {
         Ok(Self { inner: model_ptr })
     }
 
+    /// Downloads a model file from the ai-coustics artifact CDN.
+    ///
+    /// This method fetches the model manifest, checks whether the requested model
+    /// exists in a version compatible with this library, and downloads the model
+    /// file into the provided directory.
+    /// 
+    /// # Note
+    /// 
+    /// This is a blocking operation.
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - The model identifier as listed in the manifest (e.g. `"quail-l-16khz"`).
+    /// * `download_dir` - Directory where the downloaded model file should be stored.
+    ///
+    /// # Returns
+    ///
+    /// Returns the full path to the downloaded model file, or an `AicError` if the
+    /// operation fails.
+    #[cfg(feature = "download-model")]
+    pub fn download<P: AsRef<Path>>(model: &str, download_dir: P) -> Result<std::path::PathBuf, AicError> {
+        let compatible_version = crate::get_compatible_model_version();
+        aic_model_downloader::download(model, compatible_version, download_dir)
+            .map_err(|err| AicError::ModelDownload(err.to_string()))
+    }
+
     pub(crate) fn as_const_ptr(&self) -> *const AicModel {
         self.inner as *const AicModel
     }

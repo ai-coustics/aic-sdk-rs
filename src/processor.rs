@@ -699,7 +699,6 @@ mod tests {
 
         let (_, mut processor) = load_test_processor().unwrap();
 
-        // Test initialization with QuailL48 optimal settings (48000 Hz, 480 frames)
         processor.initialize(48000, 2, 480, false).unwrap();
 
         let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each

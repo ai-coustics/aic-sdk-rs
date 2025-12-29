@@ -1,0 +1,10 @@
+[package]
+name = "aic-model-downloader"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+reqwest = { version = "0.12.9", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+serde = { version = "1.0.215", features = ["derive"] }
+sha2 = "0.10.8"
+thiserror = "2.0.17"

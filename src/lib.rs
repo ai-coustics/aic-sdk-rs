@@ -2,8 +2,6 @@
 use aic_sdk_sys::{aic_get_compatible_model_version, aic_get_sdk_version};
 use std::ffi::CStr;
 
-#[cfg(feature = "download-model")]
-mod download;
 mod error;
 mod model;
 mod processor;
