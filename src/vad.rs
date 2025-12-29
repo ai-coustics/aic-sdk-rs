@@ -98,6 +98,9 @@ impl Vad {
     ///   the VAD will not update its speech detection prediction.
     pub fn is_speech_detected(&self) -> bool {
         let mut value: bool = false;
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live VAD.
+        // - `value` points to stack storage for output.
         let error_code = unsafe { aic_vad_is_speech_detected(self.inner, &mut value) };
 
         // This should never fail
@@ -128,6 +131,8 @@ impl Vad {
     /// vad.set_parameter(VadParameter::Sensitivity, 5.0).unwrap();
     /// ```
     pub fn set_parameter(&mut self, parameter: VadParameter, value: f32) -> Result<(), AicError> {
+        // SAFETY:
+        // - `self.inner` is a live VAD pointer.
         let error_code = unsafe { aic_vad_set_parameter(self.inner, parameter.into(), value) };
         handle_error(error_code)
     }
@@ -155,6 +160,9 @@ impl Vad {
     /// ```
     pub fn parameter(&self, parameter: VadParameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live VAD.
+        // - `value` points to stack storage for output.
         let error_code = unsafe { aic_vad_get_parameter(self.inner, parameter.into(), &mut value) };
         handle_error(error_code)?;
         Ok(value)
@@ -164,9 +172,9 @@ impl Vad {
 impl Drop for Vad {
     fn drop(&mut self) {
         if !self.inner.is_null() {
-            unsafe {
-                aic_vad_destroy(self.inner);
-            }
+            // SAFETY:
+            // - `self.inner` was allocated by the SDK and is still owned by this wrapper.
+            unsafe { aic_vad_destroy(self.inner) };
         }
     }
 }

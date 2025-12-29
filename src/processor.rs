@@ -106,6 +106,8 @@ impl<'a> Processor<'a> {
     /// ```
     pub fn new(model: &'a Model, license_key: &str) -> Result<Self, AicError> {
         SET_WRAPPER_ID.call_once(|| unsafe {
+            // SAFETY:
+            // - This function has no safety requirements, it's unsafe because it's FFI.
             aic_set_sdk_wrapper_id(2);
         });
 
@@ -113,6 +115,9 @@ impl<'a> Processor<'a> {
         let c_license_key =
             CString::new(license_key).map_err(|_| AicError::LicenseFormatInvalid)?;
 
+        // SAFETY:
+        // - `processor_ptr` and `model` pointers are valid for the duration of the call.
+        // - `c_license_key` is a NUL-terminated CString.
         let error_code = unsafe {
             aic_processor_create(
                 &mut processor_ptr,
@@ -150,6 +155,9 @@ impl<'a> Processor<'a> {
     pub fn create_vad(&self) -> crate::Vad {
         let mut vad_ptr: *mut AicVad = ptr::null_mut();
 
+        // SAFETY:
+        // - `vad_ptr` is valid output storage
+        // - `self.inner` is a live processor pointer.
         let error_code = unsafe { aic_vad_create(&mut vad_ptr, self.inner) };
 
         // This should never fail
@@ -204,6 +212,8 @@ impl<'a> Processor<'a> {
         num_frames: usize,
         allow_variable_frames: bool,
     ) -> Result<(), AicError> {
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live processor.
         let error_code = unsafe {
             aic_processor_initialize(
                 self.inner,
@@ -243,6 +253,8 @@ impl<'a> Processor<'a> {
     /// model.reset().unwrap();
     /// ```
     pub fn reset(&mut self) -> Result<(), AicError> {
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live processor.
         let error_code = unsafe { aic_processor_reset(self.inner) };
         handle_error(error_code)
     }
@@ -306,6 +318,9 @@ impl<'a> Processor<'a> {
             audio_ptrs[i] = channel.as_mut_ptr();
         }
 
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live processor.
+        // - `audio_ptrs` holds valid, writable channel pointers containing `num_frames` samples each.
         let error_code = unsafe {
             aic_processor_process_planar(self.inner, audio_ptrs.as_ptr(), num_channels, num_frames)
         };
@@ -358,6 +373,9 @@ impl<'a> Processor<'a> {
 
         let num_frames = audio.len() / num_channels as usize;
 
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live processor.
+        // - `audio` points to a contiguous f32 slice of correct length.
         let error_code = unsafe {
             aic_processor_process_interleaved(
                 self.inner,
@@ -415,6 +433,8 @@ impl<'a> Processor<'a> {
 
         let num_frames = audio.len() / num_channels as usize;
 
+        // SAFETY: `self.inner` is initialized, `audio` points to a contiguous f32 slice of correct length.
+        // SAFETY: `self.inner` is initialized; `audio` length has been validated.
         let error_code = unsafe {
             aic_processor_process_sequential(
                 self.inner,
@@ -451,6 +471,8 @@ impl<'a> Processor<'a> {
     /// model.set_parameter(Parameter::EnhancementLevel, 0.8).unwrap();
     /// ```
     pub fn set_parameter(&mut self, parameter: Parameter, value: f32) -> Result<(), AicError> {
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live processor.
         let error_code =
             unsafe { aic_processor_set_parameter(self.inner, parameter.into(), value) };
         handle_error(error_code)
@@ -480,6 +502,9 @@ impl<'a> Processor<'a> {
     /// ```
     pub fn parameter(&self, parameter: Parameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live processor.
+        // - `value` points to stack storage for output.
         let error_code =
             unsafe { aic_processor_get_parameter(self.inner, parameter.into(), &mut value) };
         handle_error(error_code)?;
@@ -522,6 +547,9 @@ impl<'a> Processor<'a> {
     /// ```
     pub fn output_delay(&self) -> Result<usize, AicError> {
         let mut delay: usize = 0;
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live processor.
+        // - `delay` points to stack storage for output.
         let error_code = unsafe { aic_get_output_delay(self.inner, &mut delay) };
         handle_error(error_code)?;
         Ok(delay)
@@ -570,6 +598,9 @@ impl<'a> Processor<'a> {
     /// ```
     pub fn optimal_sample_rate(&self) -> Result<u32, AicError> {
         let mut sample_rate: u32 = 0;
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live processor.
+        // - `sample_rate` points to stack storage for output.
         let error_code = unsafe { aic_get_optimal_sample_rate(self.inner, &mut sample_rate) };
         handle_error(error_code)?;
         Ok(sample_rate)
@@ -612,6 +643,9 @@ impl<'a> Processor<'a> {
     /// ```
     pub fn optimal_num_frames(&self, sample_rate: u32) -> Result<usize, AicError> {
         let mut num_frames: usize = 0;
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live processor.
+        // - `num_frames` points to stack storage for output.
         let error_code =
             unsafe { aic_get_optimal_num_frames(self.inner, sample_rate, &mut num_frames) };
         handle_error(error_code)?;
@@ -622,9 +656,9 @@ impl<'a> Processor<'a> {
 impl<'a> Drop for Processor<'a> {
     fn drop(&mut self) {
         if !self.inner.is_null() {
-            unsafe {
-                aic_processor_destroy(self.inner);
-            }
+            // SAFETY:
+            // - `self.inner` was allocated by the SDK and is still owned by this wrapper.
+            unsafe { aic_processor_destroy(self.inner) };
         }
     }
 }

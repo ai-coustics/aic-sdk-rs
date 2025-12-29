@@ -32,16 +32,20 @@ pub use vad::*;
 /// println!("ai-coustics SDK version: {version}");
 /// ```
 pub fn get_version() -> &'static str {
+    // SAFETY: FFI call returns a pointer to a static C string owned by the SDK.
+    // The pointer may be null if the version cannot be retrieved.
     let version_ptr = unsafe { aic_get_sdk_version() };
     if version_ptr.is_null() {
         return "unknown";
     }
 
+    // SAFETY: Pointer either came from the SDK or we already bailed if it was null.
     unsafe { CStr::from_ptr(version_ptr).to_str().unwrap_or("unknown") }
 }
 
 /// Returns the model version number compatible with this SDK build.
 pub fn get_compatible_model_version() -> u32 {
+    // SAFETY: FFI call takes no arguments and returns a plain integer.
     unsafe { aic_get_compatible_model_version() }
 }
 

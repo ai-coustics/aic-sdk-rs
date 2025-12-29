@@ -37,9 +37,7 @@ impl From<AicErrorCode::Type> for AicError {
             AIC_ERROR_CODE_NULL_POINTER => {
                 // This should never happen in our Rust wrapper, but if it does,
                 // it indicates a serious bug in our wrapper logic
-                panic!(
-                    "Unexpected null pointer error from C library - this is a bug in the Rust wrapper"
-                );
+                panic!("Unexpected null pointer error from C library - this is a bug in the Rust wrapper");
             }
             AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE => AicError::ParameterOutOfRange,
             AIC_ERROR_CODE_MODEL_NOT_INITIALIZED => AicError::ModelNotInitialized,

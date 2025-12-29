@@ -51,6 +51,9 @@ impl Model {
         let mut model_ptr: *mut AicModel = ptr::null_mut();
         let c_path = CString::new(path.as_ref().to_string_lossy().as_bytes()).unwrap();
 
+        // SAFETY:
+        // - `model_ptr` points to stack memory we own
+        // - `c_path` is a valid, NUL-terminated string.
         let error_code = unsafe { aic_model_create_from_file(&mut model_ptr, c_path.as_ptr()) };
 
         handle_error(error_code)?;
@@ -67,8 +70,11 @@ impl Model {
     pub fn from_buffer(buffer: &[u8]) -> Result<Self, AicError> {
         let mut model_ptr: *mut AicModel = ptr::null_mut();
 
-        let error_code =
-            unsafe { aic_model_create_from_buffer(&mut model_ptr, buffer.as_ptr(), buffer.len()) };
+        // SAFETY:
+        // - `buffer` is a valid slice; its pointer/len are passed verbatim to C which only reads.
+        let error_code = unsafe {
+            aic_model_create_from_buffer(&mut model_ptr, buffer.as_ptr(), buffer.len())
+        };
 
         handle_error(error_code)?;
 
@@ -118,9 +124,9 @@ impl Model {
 impl Drop for Model {
     fn drop(&mut self) {
         if !self.inner.is_null() {
-            unsafe {
-                aic_model_destroy(self.inner);
-            }
+            // SAFETY:
+            // - `inner` was allocated by the SDK and is still owned by this wrapper.
+            unsafe { aic_model_destroy(self.inner) };
         }
     }
 }
