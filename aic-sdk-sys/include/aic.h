@@ -753,6 +753,18 @@ enum AicErrorCode aic_vad_get_parameter(const struct AicVad *vad,
  */
 const char *aic_get_sdk_version(void);
 
+/**
+ * Returns the model version compatible with the SDK.
+ *
+ * # Returns
+ * Model version compatible with this version of the SDK.
+ *
+ * # Safety
+ * - Real-time safe: Can be called from audio processing threads.
+ * - Thread-safe: Can be called from any thread.
+ */
+uint32_t aic_get_compatible_model_version(void);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

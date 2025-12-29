@@ -6,6 +6,9 @@ use std::path::PathBuf;
 mod downloader;
 
 fn main() {
+    // Rerun the build script if the header file changes
+    println!("cargo:rerun-if-changed=include/aic.h");
+
     // Rerun the build script if the AIC_LIB_PATH environment variable changes
     println!("cargo:rerun-if-env-changed=AIC_LIB_PATH");
 
