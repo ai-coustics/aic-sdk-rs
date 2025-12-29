@@ -33,7 +33,7 @@ impl Model {
         const MODEL_BASE_URL: &str = "https://d3lqwskupyztjd.cloudfront.net/";
 
         let manifest = fetch_manifest(MANIFEST_URL)?;
-        let compatible_version = unsafe { aic_get_compatible_model_version() };
+        let compatible_version = crate::get_compatible_model_version();
         let version_key = format!("v{compatible_version}");
 
         let manifest_model = manifest
