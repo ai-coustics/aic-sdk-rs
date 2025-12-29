@@ -26,7 +26,7 @@ for how long the VAD continues to detect speech after the audio signal no longer
 - `ModelType::QuailSTT` was renamed to `ModelType::QuailSttL16`.
 - `ModelType::QuailXS` was renamed to `ModelType::QuailXs`.
 - `ModelType::QuailXXS` was renamed to `ModelType::QuailXxs`.
-- `Model::create_vad` signature changed: the model reference now has to be mutable (`&mut self` instead of `&self`).
+- `Processor::create_vad` now takes `&self` instead of `&mut self`.
 
 ### Fixes
 

@@ -144,10 +144,10 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor};
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// let mut processor = Processor::new(&model, &license_key).unwrap();
+    /// let processor = Processor::new(&model, &license_key).unwrap();
     /// let vad = processor.create_vad();
     /// ```
-    pub fn create_vad(&mut self) -> crate::Vad {
+    pub fn create_vad(&self) -> crate::Vad {
         let mut vad_ptr: *mut AicVad = ptr::null_mut();
 
         let error_code = unsafe { aic_vad_create(&mut vad_ptr, self.inner) };

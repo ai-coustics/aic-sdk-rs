@@ -75,7 +75,7 @@ impl From<VadParameter> for AicVadParameter::Type {
 ///
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-/// let mut processor = Processor::new(&model, &license_key).unwrap();
+/// let processor = Processor::new(&model, &license_key).unwrap();
 /// let vad = processor.create_vad();
 /// ```
 pub struct Vad {
