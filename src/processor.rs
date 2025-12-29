@@ -1,7 +1,4 @@
-use crate::{
-    error::*,
-    model::Model,
-};
+use crate::{error::*, model::Model};
 
 use aic_sdk_sys::{AicParameter::*, *};
 
@@ -113,8 +110,13 @@ impl Processor {
         let c_license_key =
             CString::new(license_key).map_err(|_| AicError::LicenseFormatInvalid)?;
 
-        let error_code =
-            unsafe { aic_processor_create(&mut processor_ptr, model.as_const_ptr(), c_license_key.as_ptr()) };
+        let error_code = unsafe {
+            aic_processor_create(
+                &mut processor_ptr,
+                model.as_const_ptr(),
+                c_license_key.as_ptr(),
+            )
+        };
 
         handle_error(error_code)?;
 
@@ -348,7 +350,12 @@ impl Processor {
         let num_frames = audio.len() / num_channels as usize;
 
         let error_code = unsafe {
-            aic_processor_process_interleaved(self.inner, audio.as_mut_ptr(), num_channels, num_frames)
+            aic_processor_process_interleaved(
+                self.inner,
+                audio.as_mut_ptr(),
+                num_channels,
+                num_frames,
+            )
         };
 
         handle_error(error_code)
@@ -399,7 +406,12 @@ impl Processor {
         let num_frames = audio.len() / num_channels as usize;
 
         let error_code = unsafe {
-            aic_processor_process_sequential(self.inner, audio.as_mut_ptr(), num_channels, num_frames)
+            aic_processor_process_sequential(
+                self.inner,
+                audio.as_mut_ptr(),
+                num_channels,
+                num_frames,
+            )
         };
 
         handle_error(error_code)
@@ -427,12 +439,9 @@ impl Processor {
     /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
     /// model.set_parameter(EnhancementParameter::EnhancementLevel, 0.8).unwrap();
     /// ```
-    pub fn set_parameter(
-        &mut self,
-        parameter: Parameter,
-        value: f32,
-    ) -> Result<(), AicError> {
-        let error_code = unsafe { aic_processor_set_parameter(self.inner, parameter.into(), value) };
+    pub fn set_parameter(&mut self, parameter: Parameter, value: f32) -> Result<(), AicError> {
+        let error_code =
+            unsafe { aic_processor_set_parameter(self.inner, parameter.into(), value) };
         handle_error(error_code)
     }
 

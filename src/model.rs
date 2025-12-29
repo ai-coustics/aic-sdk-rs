@@ -54,9 +54,8 @@ impl Model {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, AicError> {
         let mut model_ptr: *mut AicModel = ptr::null_mut();
         let c_path = CString::new(path.as_ref().to_string_lossy().as_bytes()).unwrap();
-        
-        let error_code =
-            unsafe { aic_model_create_from_file(&mut model_ptr, c_path.as_ptr()) };
+
+        let error_code = unsafe { aic_model_create_from_file(&mut model_ptr, c_path.as_ptr()) };
 
         handle_error(error_code)?;
 
@@ -66,14 +65,12 @@ impl Model {
             "C library returned success but null pointer"
         );
 
-        Ok(Self {
-            inner: model_ptr,
-        })
+        Ok(Self { inner: model_ptr })
     }
 
     pub fn from_buffer(buffer: &[u8]) -> Result<Self, AicError> {
         let mut model_ptr: *mut AicModel = ptr::null_mut();
-        
+
         let error_code =
             unsafe { aic_model_create_from_buffer(&mut model_ptr, buffer.as_ptr(), buffer.len()) };
 
@@ -85,9 +82,7 @@ impl Model {
             "C library returned success but null pointer"
         );
 
-        Ok(Self {
-            inner: model_ptr,
-        })
+        Ok(Self { inner: model_ptr })
     }
 
     pub(crate) fn as_const_ptr(&self) -> *const AicModel {
