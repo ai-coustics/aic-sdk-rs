@@ -7,18 +7,19 @@ const MANIFEST_URL: &str = "https://d3lqwskupyztjd.cloudfront.net/manifest.json"
 
 #[derive(Debug, Deserialize)]
 pub struct Manifest {
-    models: HashMap<String, ManifestModel>,
+    models: HashMap<String, Model>,
 }
 
 #[derive(Debug, Deserialize)]
-struct ManifestModel {
-    versions: HashMap<String, Model>,
+struct Model {
+    versions: HashMap<String, ModelMetadata>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct Model {
+pub struct ModelMetadata {
     #[serde(rename(deserialize = "file"))]
     pub url_path: String,
+    #[serde(rename(deserialize = "filename"))]
     pub file_name: String,
     pub checksum: String,
 }
@@ -35,24 +36,95 @@ impl Manifest {
             .map_err(|err| Error::ManifestParse(err.to_string()))
     }
 
-    pub fn model(
-        &self,
-        id: &str,
-        version: u32,
-    ) -> Result<&Model, Error> {
-        let manifest_model = self
-            .models
+    pub fn metadata_for_model(&self, id: &str, version: u32) -> Result<&ModelMetadata, Error> {
+        let manifest_model = self.model_entry(id)?;
+
+        manifest_model.version(version, id)
+    }
+
+    pub fn available_models(&self, version: u32) -> impl Iterator<Item = &str> + '_ {
+        let version_key = Self::version_key(version);
+        self.models
+            .iter()
+            .filter_map(move |(model, manifest_model)| {
+                manifest_model
+                    .versions
+                    .get(&version_key)
+                    .map(|_| model.as_str())
+            })
+    }
+
+    fn model_entry(&self, id: &str) -> Result<&Model, Error> {
+        self.models
             .get(id)
-            .ok_or_else(|| Error::ModelNotFound(id.to_string()))?;
+            .ok_or_else(|| Error::ModelNotFound(id.to_string()))
+    }
 
-        let version_key = format!("v{version}");
+    fn version_key(version: u32) -> String {
+        format!("v{version}")
+    }
+}
 
-        manifest_model
-            .versions
-            .get(&version_key)
+impl Model {
+    fn version(&self, version: u32, id: &str) -> Result<&ModelMetadata, Error> {
+        self.versions
+            .get(&Manifest::version_key(version))
             .ok_or_else(|| Error::IncompatibleModel {
                 model: id.to_string(),
                 compatible_version: version,
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    fn load_manifest() -> Manifest {
+        serde_json::from_str(include_str!("../reference/manifest.json")).unwrap()
+    }
+
+    #[test]
+    fn metadata_for_model_returns_requested_version() {
+        let manifest = load_manifest();
+
+        let model = manifest.metadata_for_model("quail-xxs-48khz", 1).unwrap();
+
+        assert_eq!(model.file_name, "quail_xxs_48khz_wsur2zkw_v7.aicmodel");
+        assert_eq!(
+            model.url_path,
+            "models/quail-xxs-48khz/v1/quail_xxs_48khz_wsur2zkw_v7.aicmodel"
+        );
+        assert_eq!(
+            model.checksum,
+            "fc536364e0b6e851a37ad9790721ee2368ba06e761a78485fabbd6629d6c4cf8"
+        );
+    }
+
+    #[test]
+    fn available_models_lists_all_matching_ids_for_version() {
+        let manifest = load_manifest();
+
+        let models: HashSet<&str> = manifest.available_models(1).collect();
+
+        let expected = HashSet::from([
+            "quail-l-16khz",
+            "quail-l-48khz",
+            "quail-l-8khz",
+            "quail-s-16khz",
+            "quail-s-48khz",
+            "quail-s-8khz",
+            "quail-stt-l-16khz",
+            "quail-stt-l-8khz",
+            "quail-stt-s-16khz",
+            "quail-stt-s-8khz",
+            "quail-vf-stt-l-16khz",
+            "quail-xs-48khz",
+            "quail-xxs-48khz",
+            "starling-l-48khz",
+        ]);
+
+        assert_eq!(models, expected);
     }
 }

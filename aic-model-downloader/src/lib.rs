@@ -8,7 +8,7 @@ use thiserror::Error;
 
 mod manifest;
 
-use manifest::Manifest;
+pub use manifest::Manifest;
 
 const MODEL_BASE_URL: &str = "https://d3lqwskupyztjd.cloudfront.net/";
 
@@ -44,7 +44,7 @@ pub fn download<P: AsRef<Path>>(
     download_dir: P,
 ) -> Result<PathBuf, Error> {
     let manifest = Manifest::download()?;
-    let model = manifest.model(model_id, model_version)?;
+    let model = manifest.metadata_for_model(model_id, model_version)?;
 
     let download_dir = download_dir.as_ref();
     fs::create_dir_all(download_dir).map_err(|err| Error::Io(err.to_string()))?;
