@@ -25,6 +25,23 @@ pub enum AicError {
     LicenseVersionUnsupported,
     #[error("License key expired")]
     LicenseExpired,
+    #[error("I/O error: {0}")]
+    Io(String),
+    #[error("Failed to download manifest: {0}")]
+    ManifestDownload(String),
+    #[error("Failed to parse manifest: {0}")]
+    ManifestParse(String),
+    #[error("Model `{0}` not found in manifest")]
+    ModelNotFound(String),
+    #[error("Model `{model}` missing compatible version v{compatible_version}")]
+    IncompatibleModel {
+        model: String,
+        compatible_version: u32,
+    },
+    #[error("Failed to download model file: {0}")]
+    ModelDownload(String),
+    #[error("Checksum mismatch for downloaded model")]
+    ChecksumMismatch,
     #[error("Unknown error code: {0}")]
     Unknown(AicErrorCode::Type),
 }
