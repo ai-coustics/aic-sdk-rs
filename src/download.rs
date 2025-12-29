@@ -1,4 +1,4 @@
-use crate::{Model, error::*};
+use crate::{Model, error::AicError};
 
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -8,6 +8,34 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
 };
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum DownloadError {
+    #[error("I/O error: {0}")]
+    Io(String),
+    #[error("Failed to download manifest: {0}")]
+    ManifestDownload(String),
+    #[error("Failed to parse manifest: {0}")]
+    ManifestParse(String),
+    #[error("Model `{0}` not found in manifest")]
+    ModelNotFound(String),
+    #[error("Model `{model}` missing compatible version v{compatible_version}")]
+    IncompatibleModel {
+        model: String,
+        compatible_version: u32,
+    },
+    #[error("Failed to download model file: {0}")]
+    ModelDownload(String),
+    #[error("Checksum mismatch for downloaded model")]
+    ChecksumMismatch,
+}
+
+impl From<DownloadError> for AicError {
+    fn from(err: DownloadError) -> Self {
+        AicError::ModelDownload(err.to_string())
+    }
+}
 
 impl Model {
     /// Downloads a model file compatible with the current SDK version.
@@ -87,38 +115,38 @@ struct ManifestVersion {
     checksum: String,
 }
 
-fn fetch_manifest(url: &str) -> Result<Manifest, AicError> {
+fn fetch_manifest(url: &str) -> Result<Manifest, DownloadError> {
     let response = reqwest::blocking::get(url)
-        .map_err(|err| AicError::ManifestDownload(err.to_string()))?
+        .map_err(|err| DownloadError::ManifestDownload(err.to_string()))?
         .error_for_status()
-        .map_err(|err| AicError::ManifestDownload(err.to_string()))?;
+        .map_err(|err| DownloadError::ManifestDownload(err.to_string()))?;
 
     response
         .json::<Manifest>()
-        .map_err(|err| AicError::ManifestParse(err.to_string()))
+        .map_err(|err| DownloadError::ManifestParse(err.to_string()))
 }
 
-fn download_bytes(url: &str) -> Result<Vec<u8>, AicError> {
+fn download_bytes(url: &str) -> Result<Vec<u8>, DownloadError> {
     let response = reqwest::blocking::get(url)
-        .map_err(|err| AicError::ModelDownload(err.to_string()))?
+        .map_err(|err| DownloadError::ModelDownload(err.to_string()))?
         .error_for_status()
-        .map_err(|err| AicError::ModelDownload(err.to_string()))?;
+        .map_err(|err| DownloadError::ModelDownload(err.to_string()))?;
 
     response
         .bytes()
         .map(|b| b.to_vec())
-        .map_err(|err| AicError::ModelDownload(err.to_string()))
+        .map_err(|err| DownloadError::ModelDownload(err.to_string()))
 }
 
-fn checksum_matches(path: &Path, expected: &str) -> Result<bool, AicError> {
-    let mut file = File::open(path).map_err(|err| AicError::Io(err.to_string()))?;
+fn checksum_matches(path: &Path, expected: &str) -> Result<bool, DownloadError> {
+    let mut file = File::open(path).map_err(|err| DownloadError::Io(err.to_string()))?;
     let mut hasher = Sha256::new();
     let mut buffer = [0u8; 8192];
 
     loop {
         let read = file
             .read(&mut buffer)
-            .map_err(|err| AicError::Io(err.to_string()))?;
+            .map_err(|err| DownloadError::Io(err.to_string()))?;
         if read == 0 {
             break;
         }

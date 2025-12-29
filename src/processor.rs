@@ -696,7 +696,7 @@ mod tests {
     fn model_creation_and_basic_operations() {
         dbg!(crate::get_version());
         dbg!(crate::get_compatible_model_version());
-        
+
         let (_, mut processor) = load_test_processor().unwrap();
 
         // Test initialization with QuailL48 optimal settings (48000 Hz, 480 frames)
