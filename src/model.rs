@@ -71,6 +71,28 @@ impl Model {
         Ok(Self { inner: model_ptr })
     }
 
+    /// Creates a new model instance from an in-memory buffer.
+    ///
+    /// The buffer must remain valid and unchanged for the lifetime of the model,
+    /// and it must be 64-byte aligned as required by `aic_model_create_from_buffer`.
+    /// Consider using [`include_model!`] to embed a model file at compile time with
+    /// the correct alignment.
+    ///
+    /// # Arguments
+    ///
+    /// * `buffer` - Raw bytes of the model file.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Result` containing the new `Model` instance or an `AicError` if creation fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{include_model, Model};
+    /// static MODEL_BYTES: &'static [u8] = include_model!("path/to/model.aicmodel");
+    /// let model = Model::from_buffer(MODEL_BYTES).unwrap();
+    /// ```
     pub fn from_buffer(buffer: &[u8]) -> Result<Self, AicError> {
         let mut model_ptr: *mut AicModel = ptr::null_mut();
 
