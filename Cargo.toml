@@ -1,5 +1,5 @@
 [workspace]
-members = ["aic-model-downloader","aic-sdk-sys"]
+members = ["aic-model-downloader", "aic-sdk-sys"]
 
 [workspace.dependencies]
 aic-model-downloader = { version = "0.1.0", path = "aic-model-downloader" }
@@ -20,8 +20,8 @@ repository = "https://github.com/ai-coustics/aic-sdk-rs"
 version = "1.0.0"
 
 [dependencies]
-aic-sdk-sys = { workspace = true }
 aic-model-downloader = { workspace = true, optional = true }
+aic-sdk-sys = { workspace = true }
 thiserror = "2.0.17"
 
 [features]
