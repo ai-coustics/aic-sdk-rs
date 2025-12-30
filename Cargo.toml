@@ -26,7 +26,7 @@ thiserror = "2.0.17"
 
 [features]
 download-lib = ["aic-sdk-sys/download-lib"]
-download-model = ["aic-model-downloader"]
+download-model = ["dep:aic-model-downloader"]
 
 [[example]]
 name = "basic_usage"
