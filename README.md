@@ -30,7 +30,7 @@ to the directory where the library is located.
 ## Example Usage
 
 ```rust,no_run
-use aic_sdk::{Model, Parameter, Processor};
+use aic_sdk::{Config, Model, Parameter, Processor};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let license_key = std::env::var("AIC_SDK_LICENSE")?;
@@ -42,9 +42,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut processor = Processor::new(&model, &license_key)?;
 
     // Initialize the processor with your audio settings
-    processor.initialize(48000, 1, 480, true)?;
+    let config = Config { num_channels: 2, allow_variable_frames: true, ..processor.optimal_config() };
+    processor.initialize(&config)?;
 
-    let mut audio_buffer = vec![0.0f32; 480];
+    let mut audio_buffer = vec![0.0f32; config.num_frames * config.num_channels];
 
     // The process function is where the actual enhancement is happening
     // This is meant to be called in your real-time audio thread
@@ -54,9 +55,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     processor.set_parameter(Parameter::EnhancementLevel, 0.8)?;
 
     // For planar audio processing (separate channel buffers)
-    let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
+    let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels];
     let mut audio_refs: Vec<&mut [f32]> = audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
-    processor.initialize(48000, 2, 480, true)?;
     processor.process_planar(&mut audio_refs)?;
 
     Ok(())

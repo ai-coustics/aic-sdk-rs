@@ -1,10 +1,8 @@
 #![cfg_attr(not(feature = "download-model"), allow(dead_code, unused_imports))]
 
 #[cfg(feature = "download-model")]
-use aic_sdk::{Model, Parameter, Processor, VadParameter};
+use aic_sdk::{Config, Model, Parameter, Processor, VadParameter};
 use std::env;
-
-const NUM_CHANNELS: u16 = 2;
 
 #[cfg(not(feature = "download-model"))]
 fn main() {
@@ -34,18 +32,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Processor created successfully");
 
     // Get optimal settings
-    let optimal_sample_rate = processor.optimal_sample_rate()?;
-    println!("Optimal sample rate: {} Hz", optimal_sample_rate);
-
-    let optimal_num_frames = processor.optimal_num_frames(optimal_sample_rate)?;
-    println!("Optimal frame count: {}", optimal_num_frames);
+    let base_config = processor.optimal_config();
+    let config = Config {
+        num_channels: 2,
+        allow_variable_frames: true,
+        ..base_config
+    };
+    println!(
+        "Optimal configuration: sample_rate={}Hz, frames={}, channels={}",
+        config.sample_rate, config.num_frames, config.num_channels
+    );
 
     // Initialize with basic audio config
-    processor.initialize(optimal_sample_rate, NUM_CHANNELS, optimal_num_frames, true)?;
+    processor.initialize(&config)?;
     println!("Processor initialized successfully");
 
     // Get output delay
-    let delay = processor.output_delay()?;
+    let delay = processor.output_delay();
     println!("Output delay: {} samples", delay);
 
     // Test parameter setting and getting
@@ -56,8 +59,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Enhancement level: {}", enhancement_level);
 
     // Create minimal test audio - planar format (separate buffers for each channel)
-    let mut audio_buffer_left = vec![0.0f32; optimal_num_frames];
-    let mut audio_buffer_right = vec![0.0f32; optimal_num_frames];
+    let mut audio_buffer_left = vec![0.0f32; config.num_frames];
+    let mut audio_buffer_right = vec![0.0f32; config.num_frames];
 
     // Create mutable references for planar processing
     let mut audio_planar = vec![
@@ -72,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Create interleaved test audio (all channels mixed together)
-    let mut audio_buffer_interleaved = vec![0.0f32; NUM_CHANNELS as usize * optimal_num_frames];
+    let mut audio_buffer_interleaved = vec![0.0f32; config.num_channels * config.num_frames];
 
     // Test interleaved audio processing
     match processor.process_interleaved(&mut audio_buffer_interleaved) {

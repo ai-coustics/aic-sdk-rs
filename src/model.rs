@@ -18,13 +18,11 @@ use std::{ffi::CString, path::Path, ptr};
 /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
 /// let mut processor = Processor::new(&model, &license_key).unwrap();
 /// let config = Config {
-///     sample_rate: 48_000,
-///     num_channels: 1,
-///     num_frames: 1024,
-///     allow_variable_frames: false,
+///     num_channels: 2,
+///     ..processor.optimal_config()
 /// };
 /// processor.initialize(&config).unwrap();
-/// let mut audio_buffer = vec![0.0f32; 1024];
+/// let mut audio_buffer = vec![0.0f32; config.num_channels * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
 pub struct Model {
