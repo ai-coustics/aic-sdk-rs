@@ -61,3 +61,10 @@ pub(crate) fn handle_error(error_code: AicErrorCode::Type) -> Result<(), AicErro
         code => Err(AicError::from(code)),
     }
 }
+
+pub(crate) fn assert_success(
+    error_code: AicErrorCode::Type,
+    message: &str,
+) {
+    assert_eq!(error_code, AIC_ERROR_CODE_SUCCESS, "{}", message);
+}

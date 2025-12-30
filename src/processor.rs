@@ -6,6 +6,22 @@ use std::{ffi::CString, marker::PhantomData, ptr, sync::Once};
 
 static SET_WRAPPER_ID: Once = Once::new();
 
+/// Audio processing configuration passed to [`Processor::initialize`].
+///
+/// Use [`Processor::optimal_config`] as a starting point, then adjust fields
+/// to match your stream layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Config {
+    /// Sample rate in Hz (8000 - 192000).
+    pub sample_rate: u32,
+    /// Number of audio channels in the stream (1 for mono, 2 for stereo, etc).
+    pub num_channels: u16,
+    /// Samples per channel provided to each processing call.
+    pub num_frames: usize,
+    /// Allows frame counts below `num_frames` at the cost of added latency.
+    pub allow_variable_frames: bool,
+}
+
 /// Configurable parameters for audio enhancement
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Parameter {
@@ -61,13 +77,19 @@ impl From<Parameter> for AicParameter::Type {
 /// # Example
 ///
 /// ```rust,no_run
-/// use aic_sdk::{Model, Processor};
+/// use aic_sdk::{Config, Model, Processor};
 ///
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
 /// let mut processor = Processor::new(&model, &license_key).unwrap();
 ///
-/// processor.initialize(48000, 1, 1024, false).unwrap();
+/// let config = Config {
+///     sample_rate: 48_000,
+///     num_channels: 1,
+///     num_frames: 1024,
+///     allow_variable_frames: false,
+/// };
+/// processor.initialize(&config).unwrap();
 ///
 /// let mut audio_buffer = vec![0.0f32; 1024];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
@@ -141,10 +163,6 @@ impl<'a> Processor<'a> {
         })
     }
 
-    fn as_const_ptr(&self) -> *const AicProcessor {
-        self.inner as *const AicProcessor
-    }
-
     /// Creates a [Voice Activity Detector](crate::vad::Vad) instance.
     ///
     /// # Example
@@ -180,14 +198,11 @@ impl<'a> Processor<'a> {
     ///
     /// This function must be called before processing any audio.
     /// For the lowest delay use the sample rate and frame size returned by
-    /// `optimal_sample_rate` and `optimal_num_frames`.
+    /// [`Processor::optimal_sample_rate`] and [`Processor::optimal_num_frames`].
     ///
     /// # Arguments
     ///
-    /// * `sample_rate` - Audio sample rate in Hz (8000 - 192000)
-    /// * `num_channels` - Number of audio channels (1 for mono, 2 for stereo, etc.)
-    /// * `num_frames` - Number of samples per channel in each process call
-    /// * `allow_variable_frames` - Allows varying frame counts per process call (up to `num_frames`), but increases delay.
+    /// * `config` - Audio processing configuration
     ///
     /// # Returns
     ///
@@ -207,30 +222,45 @@ impl<'a> Processor<'a> {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(&model, &license_key).unwrap();
-    /// processor.initialize(48000, 1, 1024, true).unwrap();
+    /// let config = processor.optimal_config();
+    /// processor.initialize(&config).unwrap();
     /// ```
     pub fn initialize(
         &mut self,
-        sample_rate: u32,
-        num_channels: u16,
-        num_frames: usize,
-        allow_variable_frames: bool,
+        config: &Config,
     ) -> Result<(), AicError> {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
         let error_code = unsafe {
             aic_processor_initialize(
                 self.inner,
-                sample_rate,
-                num_channels,
-                num_frames,
-                allow_variable_frames,
+                config.sample_rate,
+                config.num_channels,
+                config.num_frames,
+                config.allow_variable_frames,
             )
         };
 
         handle_error(error_code)?;
-        self.num_channels = Some(num_channels);
+        self.num_channels = Some(config.num_channels);
         Ok(())
+    }
+
+    /// Returns a [`Config`] pre-filled with the model's optimal sample rate and frame size.
+    ///
+    /// This helper uses [`Processor::optimal_sample_rate`] and
+    /// [`Processor::optimal_num_frames`] to minimize latency, and defaults to
+    /// mono processing with fixed frame counts. Adjust `num_channels` or
+    /// `allow_variable_frames` as needed before calling [`Processor::initialize`].
+    pub fn optimal_config(&self) -> Config {
+        let sample_rate = self.optimal_sample_rate();
+        let num_frames = self.optimal_num_frames(sample_rate);
+        Config {
+            sample_rate,
+            num_channels: 1,
+            num_frames,
+            allow_variable_frames: false,
+        }
     }
 
     /// Clears all internal state and buffers.
@@ -290,13 +320,14 @@ impl<'a> Processor<'a> {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use aic_sdk::{Model, Processor};
+    /// # use aic_sdk::{Config, Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(&model, &license_key).unwrap();
+    /// # let config = Config { sample_rate: 48_000, num_channels: 2, num_frames: 480, allow_variable_frames: false };
     /// let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
     /// let mut audio_refs: Vec<&mut [f32]> = audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
-    /// processor.initialize(48000, 2, 480, false).unwrap();
+    /// processor.initialize(&config).unwrap();
     /// processor.process_planar(&mut audio_refs).unwrap();
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
@@ -357,12 +388,13 @@ impl<'a> Processor<'a> {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use aic_sdk::{Model, Processor};
+    /// # use aic_sdk::{Config, Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(&model, &license_key).unwrap();
+    /// # let config = Config { sample_rate: 48_000, num_channels: 2, num_frames: 480, allow_variable_frames: false };
     /// let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
-    /// processor.initialize(48000, 2, 480, false).unwrap();
+    /// processor.initialize(&config).unwrap();
     /// processor.process_interleaved(&mut audio).unwrap();
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
@@ -417,12 +449,13 @@ impl<'a> Processor<'a> {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use aic_sdk::{Model, Processor};
+    /// # use aic_sdk::{Config, Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(&model, &license_key).unwrap();
+    /// # let config = Config { sample_rate: 48_000, num_channels: 2, num_frames: 480, allow_variable_frames: false };
     /// let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames each stored sequentially
-    /// processor.initialize(48000, 2, 480, false).unwrap();
+    /// processor.initialize(&config).unwrap();
     /// processor.process_sequential(&mut audio).unwrap();
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
@@ -539,7 +572,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(delay_samples)` or an `AicError` if the query fails.
+    /// Returns the delay in samples.
     ///
     /// # Example
     ///
@@ -548,20 +581,24 @@ impl<'a> Processor<'a> {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let processor = Processor::new(&model, &license_key).unwrap();
-    /// let delay = processor.output_delay().unwrap();
+    /// let delay = processor.output_delay();
     /// println!("Output delay: {} samples", delay);
     /// ```
-    pub fn output_delay(&self) -> Result<usize, AicError> {
+    pub fn output_delay(&self) -> usize {
         let mut delay: usize = 0;
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor.
         // - `delay` points to stack storage for output.
         let error_code = unsafe { aic_get_output_delay(self.as_const_ptr(), &mut delay) };
-        handle_error(error_code)?;
-        Ok(delay)
+
+        // This should never fail. If it does, it's a bug in the SDK.
+        // `aic_get_output_delay` is documented to always succeed if given a valid processor pointer.
+        assert_success(error_code, "`aic_get_output_delay` failed. This is a bug, please open an issue on GitHub for further investigation.");
+
+        delay
     }
 
-    /// Retrieves the native sample rate of the selected model.
+    /// Retrieves the native sample rate of the processor's model.
     ///
     /// Each model is optimized for a specific sample rate, which determines the frequency
     /// range of the enhanced audio output. While you can process audio at any sample rate,
@@ -590,7 +627,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(sample_rate)` or an `AicError` if the query fails.
+    /// Returns the model's native sample rate.
     ///
     /// # Example
     ///
@@ -599,18 +636,23 @@ impl<'a> Processor<'a> {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let processor = Processor::new(&model, &license_key).unwrap();
-    /// let optimal_rate = processor.optimal_sample_rate().unwrap();
+    /// let optimal_rate = processor.optimal_sample_rate();
     /// println!("Optimal sample rate: {optimal_rate} Hz");
     /// ```
-    pub fn optimal_sample_rate(&self) -> Result<u32, AicError> {
+    pub fn optimal_sample_rate(&self) -> u32 {
         let mut sample_rate: u32 = 0;
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor.
         // - `sample_rate` points to stack storage for output.
         let error_code =
             unsafe { aic_get_optimal_sample_rate(self.as_const_ptr(), &mut sample_rate) };
-        handle_error(error_code)?;
-        Ok(sample_rate)
+
+        // This should never fail. If it does, it's a bug in the SDK.
+        // `aic_get_optimal_sample_rate` is documented to always succeed if given a valid processor pointer.
+        assert_success(error_code, "`aic_get_optimal_sample_rate` failed. This is a bug, please open an issue on GitHub for further investigation.");
+
+        // This should never fail
+        sample_rate
     }
 
     /// Retrieves the optimal number of frames for the selected model at a given sample rate.
@@ -626,8 +668,8 @@ impl<'a> Processor<'a> {
     /// For example, a model designed for 10 ms processing windows requires 480 frames at
     /// 48 kHz, but only 160 frames at 16 kHz to capture the same duration of audio.
     ///
-    /// Call this function with your intended sample rate before calling `aic_model_initialize`
-    /// to determine the best frame count for minimal latency.
+    /// Call this function with your intended sample rate before calling
+    /// [`Processor::initialize`] to determine the best frame count for minimal latency.
     ///
     /// # Arguments
     ///
@@ -635,7 +677,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(num_frames)` or an `AicError` if the query fails.
+    /// Returns the optimal frame count.
     ///
     /// # Example
     ///
@@ -644,19 +686,27 @@ impl<'a> Processor<'a> {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let processor = Processor::new(&model, &license_key).unwrap();
-    /// # let sample_rate = processor.optimal_sample_rate().unwrap();
-    /// let optimal_frames = processor.optimal_num_frames(sample_rate).unwrap();
+    /// # let sample_rate = processor.optimal_sample_rate();
+    /// let optimal_frames = processor.optimal_num_frames(sample_rate);
     /// println!("Optimal frame count: {optimal_frames}");
     /// ```
-    pub fn optimal_num_frames(&self, sample_rate: u32) -> Result<usize, AicError> {
+    pub fn optimal_num_frames(&self, sample_rate: u32) -> usize {
         let mut num_frames: usize = 0;
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor.
         // - `num_frames` points to stack storage for output.
         let error_code =
             unsafe { aic_get_optimal_num_frames(self.as_const_ptr(), sample_rate, &mut num_frames) };
-        handle_error(error_code)?;
-        Ok(num_frames)
+        
+        // This should never fail. If it does, it's a bug in the SDK.
+        // `aic_get_optimal_num_frames` is documented to always succeed if given valid pointers.
+        assert_success(error_code, "`aic_get_optimal_num_frames` failed. This is a bug, please open an issue on GitHub for further investigation.");
+
+        num_frames
+    }
+
+    fn as_const_ptr(&self) -> *const AicProcessor {
+        self.inner as *const AicProcessor
     }
 }
 
@@ -747,7 +797,12 @@ mod tests {
         let mut audio_refs: Vec<&mut [f32]> =
             audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
 
-        processor.initialize(48000, 2, 480, false).unwrap();
+        let config = Config {
+            num_channels: 2,
+            ..processor.optimal_config()
+        };
+
+        processor.initialize(&config).unwrap();
         processor.process_planar(&mut audio_refs).unwrap();
     }
 

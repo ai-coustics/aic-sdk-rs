@@ -13,11 +13,17 @@ use std::{ffi::CString, path::Path, ptr};
 /// # Example
 ///
 /// ```rust,no_run
-/// # use aic_sdk::{Model, Processor};
+/// # use aic_sdk::{Config, Model, Processor};
 /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
 /// let mut processor = Processor::new(&model, &license_key).unwrap();
-/// processor.initialize(48000, 1, 1024, false).unwrap();
+/// let config = Config {
+///     sample_rate: 48_000,
+///     num_channels: 1,
+///     num_frames: 1024,
+///     allow_variable_frames: false,
+/// };
+/// processor.initialize(&config).unwrap();
 /// let mut audio_buffer = vec![0.0f32; 1024];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
