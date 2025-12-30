@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.0.0 - Unreleased
+
+This release integrates ai-coustics C library version 1.0, which comes with a number of new features and several breaking changes.
+
+Most notably, the C library does no longer include any models, which significantly reduces the library's binary size. The models are now available
+separately for download at https://artifacts.ai-coustics.com.
+
+### New features
+
+- Added optional `download-model` feature and `Model::download` helper to fetch models from the ai-coustics artifact repository with manifest lookup, checksum verification, and compatibility checks via the new `get_compatible_model_version` API.
+- Added `Model::from_buffer` and an `include_model!` macro that embeds model binaries with guaranteed 64-byte alignment, making it easier to ship models without separate files.
+- Added a `Config` helper returned by `Processor::optimal_config` to pre-fill optimal sample rate and frame count before initialization.
+
+### Breaking changes
+
+- Separated model loading from audio processing: `Model` now only loads `.aicmodel` assets from disk or memory, while processing moved to a new `Processor` created from a borrowed `Model`.
+- Removed `ModelType` and the `Model::new`/`initialize`/`process_*` processing APIs.
+- Use `Model::from_file`/`from_buffer` to load models and `Processor::*` (`initialize`, `process_*`, `output_delay`, VAD creation) for processing.
+- `Processor` is now lifetime-bound to the `Model` it was created from, preventing it from outliving the model.
+- `Processor::initialize` now takes a `Config` struct (returned by `optimal_config`) instead of discrete arguments.
+- `optimal_sample_rate` and `optimal_num_frames` now live on `Processor` and return plain values instead of `Result`.
+- `EnhancementParameter` was renamed to `Parameter`, and `set_parameter`/`parameter` moved to `Processor`.
+- `set_parameter` and `reset` now take `&self` instead of `&mut self`.
+- `output_delay` now returns `usize` directly instead of `Result`.
+- `AicError` gained a `ModelDownload` variant; exhaustive matches must handle it.
+- VAD construction moved from `Model::create_vad` to `Processor::create_vad` and now only needs `&self`.
+
+### Fixes
+
+- Corrected VAD creation and docs for the new processor API, preventing misuse when reusing a model across processors.
+- `process_planar` now rejects channel counts above the 16-channel maximum instead of panicking when `num_channels` exceeded the supported limit.
+
 ## 0.12.0 - 2025-12-12
 
 ### New features
