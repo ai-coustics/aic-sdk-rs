@@ -149,7 +149,6 @@ unsafe impl Sync for Model {}
 /// ```
 /// use aic_sdk::include_model;
 ///
-/// // Aligns the data to 16 bytes
 /// static MODEL: &'static [u8] = include_model!("path/to/model.aicmodel");
 /// ```
 #[macro_export]
@@ -163,4 +162,19 @@ macro_rules! include_model {
 
         &__DATA.0
     }};
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn include_model_aligns_to_64_bytes() {
+        // Use the README.md as a dummy file for testing
+        let data = include_model!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/README.md"
+        ));
+
+        let ptr = data.as_ptr() as usize;
+        assert!(ptr.is_multiple_of(64), "include_model should align data to 64 bytes");
+    }
 }
