@@ -2,7 +2,7 @@ use crate::error::*;
 
 use aic_sdk_sys::*;
 
-use std::{ffi::CString, path::Path, ptr};
+use std::{ffi::CString, marker::PhantomData, path::Path, ptr};
 
 /// High-level wrapper for the ai-coustics audio enhancement model.
 ///
@@ -25,12 +25,14 @@ use std::{ffi::CString, path::Path, ptr};
 /// let mut audio_buffer = vec![0.0f32; config.num_channels * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
-pub struct Model {
+pub struct Model<'a> {
     /// Raw pointer to the C model structure
     inner: *mut AicModel,
+    /// Phantom data to tie the lifetime to the backing buffer (if any)
+    marker: PhantomData<&'a [u8]>,
 }
 
-impl Model {
+impl<'a> Model<'a> {
     /// Creates a new audio enhancement model instance.
     ///
     /// Multiple models can be created to process different audio streams simultaneously
@@ -51,7 +53,7 @@ impl Model {
     /// # use aic_sdk::Model;
     /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// ```
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, AicError> {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Model<'static>, AicError> {
         let mut model_ptr: *mut AicModel = ptr::null_mut();
         let c_path = CString::new(path.as_ref().to_string_lossy().as_bytes()).unwrap();
 
@@ -68,7 +70,10 @@ impl Model {
             "C library returned success but null pointer"
         );
 
-        Ok(Self { inner: model_ptr })
+        Ok(Model {
+            inner: model_ptr,
+            marker: PhantomData,
+        })
     }
 
     /// Creates a new model instance from an in-memory buffer.
@@ -88,12 +93,12 @@ impl Model {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```rust,ignore
     /// # use aic_sdk::{include_model, Model};
-    /// static MODEL_BYTES: &'static [u8] = include_model!("path/to/model.aicmodel");
+    /// static MODEL_BYTES: &'static [u8] = include_model!("/path/to/model.aicmodel");
     /// let model = Model::from_buffer(MODEL_BYTES).unwrap();
     /// ```
-    pub fn from_buffer(buffer: &[u8]) -> Result<Self, AicError> {
+    pub fn from_buffer(buffer: &'a [u8]) -> Result<Self, AicError> {
         let mut model_ptr: *mut AicModel = ptr::null_mut();
 
         // SAFETY:
@@ -110,7 +115,10 @@ impl Model {
             "C library returned success but null pointer"
         );
 
-        Ok(Self { inner: model_ptr })
+        Ok(Self {
+            inner: model_ptr,
+            marker: PhantomData,
+        })
     }
 
     /// Downloads a model file from the ai-coustics artifact CDN.
@@ -147,7 +155,7 @@ impl Model {
     }
 }
 
-impl Drop for Model {
+impl<'a> Drop for Model<'a> {
     fn drop(&mut self) {
         if !self.inner.is_null() {
             // SAFETY:
@@ -160,8 +168,8 @@ impl Drop for Model {
 // SAFETY:
 // - The Model wraps a raw pointer to an AicModel which is immutable after creation and it
 //   does not provide access to it through its public API.
-unsafe impl Send for Model {}
-unsafe impl Sync for Model {}
+unsafe impl<'a> Send for Model<'a> {}
+unsafe impl<'a> Sync for Model<'a> {}
 
 /// Embeds the bytes of model file, ensuring proper alignment.
 /// 
@@ -170,10 +178,10 @@ unsafe impl Sync for Model {}
 ///
 /// # Example
 ///
-/// ```
+/// ```rust,ignore
 /// use aic_sdk::include_model;
 ///
-/// static MODEL: &'static [u8] = include_model!("path/to/model.aicmodel");
+/// static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
 /// ```
 #[macro_export]
 macro_rules! include_model {
@@ -201,4 +209,23 @@ mod tests {
         let ptr = data.as_ptr() as usize;
         assert!(ptr.is_multiple_of(64), "include_model should align data to 64 bytes");
     }
+}
+
+#[doc(hidden)]
+mod _compile_fail_tests {
+    //! Compile-fail regression: a `Model` created from a buffer must not outlive the buffer.
+    //!
+    //! ```rust,compile_fail
+    //! use aic_sdk::Model;
+    //!
+    //! fn leak_model_from_buffer() -> Model<'static> {
+    //!     let bytes = vec![0u8; 64];
+    //!     let model = Model::from_buffer(&bytes).unwrap();
+    //!     model
+    //! }
+    //!
+    //! fn main() {
+    //!     let _ = leak_model_from_buffer();
+    //! }
+    //! ```
 }

@@ -94,16 +94,16 @@ impl From<Parameter> for AicParameter::Type {
 /// let mut audio_buffer = vec![0.0f32; config.num_channels * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
-pub struct Processor<'a> {
+pub struct Processor<'a, 'm> {
     /// Raw pointer to the C processor structure
     inner: *mut AicProcessor,
     /// Configured number of channels
     num_channels: Option<usize>,
     /// Phantom data to tie the lifetime to the Model
-    marker: PhantomData<&'a Model>,
+    marker: PhantomData<&'a Model<'m>>,
 }
 
-impl<'a> Processor<'a> {
+impl<'a, 'm> Processor<'a, 'm> {
     /// Creates a new audio enhancement model instance.
     ///
     /// Multiple models can be created to process different audio streams simultaneously
@@ -126,7 +126,7 @@ impl<'a> Processor<'a> {
     /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// let processor = Processor::new(&model, &license_key).unwrap();
     /// ```
-    pub fn new(model: &'a Model, license_key: &str) -> Result<Self, AicError> {
+    pub fn new(model: &'a Model<'m>, license_key: &str) -> Result<Self, AicError> {
         SET_WRAPPER_ID.call_once(|| unsafe {
             // SAFETY:
             // - This function has no safety requirements, it's unsafe because it's FFI.
@@ -731,7 +731,7 @@ impl<'a> Processor<'a> {
     }
 }
 
-impl<'a> Drop for Processor<'a> {
+impl<'a, 'm> Drop for Processor<'a, 'm> {
     fn drop(&mut self) {
         if !self.inner.is_null() {
             // SAFETY:
@@ -744,8 +744,8 @@ impl<'a> Drop for Processor<'a> {
 // SAFETY:
 // - The Processor struct safely wraps the AicProcessor object and uses the C library's APIs
 //   according to the documented thread-safety guarantees.
-unsafe impl<'a> Send for Processor<'a> {}
-unsafe impl<'a> Sync for Processor<'a> {}
+unsafe impl<'a, 'm> Send for Processor<'a, 'm> {}
+unsafe impl<'a, 'm> Sync for Processor<'a, 'm> {}
 
 #[cfg(test)]
 mod tests {
@@ -796,7 +796,7 @@ mod tests {
         }
     }
 
-    fn load_test_model() -> Result<(Model, String), AicError> {
+    fn load_test_model() -> Result<(Model<'static>, String), AicError> {
         let license_key = std::env::var("AIC_SDK_LICENSE")
             .expect("AIC_SDK_LICENSE environment variable must be set for tests");
 
@@ -1006,10 +1006,11 @@ mod _compile_fail_tests {
     //! ```rust,compile_fail
     //! use aic_sdk::{Model, Processor};
     //!
-    //! fn leak_processor() -> Processor {
+    //! fn leak_processor<'a>() -> Processor<'a, 'a> {
     //!     let license_key = "dummy-license";
     //!     let processor = {
-    //!         let model = Model::from_file("some/path.aicmodel").unwrap();
+    //!         let bytes = vec![0u8; 64];
+    //!         let model = Model::from_buffer(&bytes).unwrap();
     //!         Processor::new(&model, license_key).unwrap()
     //!     };
     //!     processor
