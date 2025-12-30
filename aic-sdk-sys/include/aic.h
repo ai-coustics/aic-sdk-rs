@@ -689,7 +689,7 @@ void aic_vad_destroy(struct AicVad *vad);
  * - Real-time safe: Can be called from audio processing threads.
  * - Thread-safe: Can be called from any thread.
  */
-enum AicErrorCode aic_vad_is_speech_detected(struct AicVad *vad, bool *value);
+enum AicErrorCode aic_vad_is_speech_detected(const struct AicVad *vad, bool *value);
 
 /**
  * Modifies a VAD parameter.
@@ -711,7 +711,7 @@ enum AicErrorCode aic_vad_is_speech_detected(struct AicVad *vad, bool *value);
  * - Real-time safe: Can be called from audio processing threads.
  * - Thread-safe: Can be called from any thread.
  */
-enum AicErrorCode aic_vad_set_parameter(struct AicVad *vad,
+enum AicErrorCode aic_vad_set_parameter(const struct AicVad *vad,
                                         enum AicVadParameter parameter,
                                         float value);
 
