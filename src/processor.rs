@@ -141,6 +141,10 @@ impl<'a> Processor<'a> {
         })
     }
 
+    fn as_const_ptr(&self) -> *const AicProcessor {
+        self.inner as *const AicProcessor
+    }
+
     /// Creates a [Voice Activity Detector](crate::vad::Vad) instance.
     ///
     /// # Example
@@ -156,9 +160,9 @@ impl<'a> Processor<'a> {
         let mut vad_ptr: *mut AicVad = ptr::null_mut();
 
         // SAFETY:
-        // - `vad_ptr` is valid output storage
-        // - `self.inner` is a live processor pointer.
-        let error_code = unsafe { aic_vad_create(&mut vad_ptr, self.inner) };
+        // - `vad_ptr` is valid output storage.
+        // - `self.as_const_ptr()` is a live processor pointer.
+        let error_code = unsafe { aic_vad_create(&mut vad_ptr, self.as_const_ptr()) };
 
         // This should never fail
         assert!(handle_error(error_code).is_ok());
@@ -202,8 +206,8 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut model = Processor::new(&model, &license_key).unwrap();
-    /// model.initialize(48000, 1, 1024, true).unwrap();
+    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
+    /// processor.initialize(48000, 1, 1024, true).unwrap();
     /// ```
     pub fn initialize(
         &mut self,
@@ -249,13 +253,13 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut model = Processor::new(&model, &license_key).unwrap();
-    /// model.reset().unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// processor.reset().unwrap();
     /// ```
-    pub fn reset(&mut self) -> Result<(), AicError> {
+    pub fn reset(&self) -> Result<(), AicError> {
         // SAFETY:
-        // - `self.inner` is a valid pointer to a live processor.
-        let error_code = unsafe { aic_processor_reset(self.inner) };
+        // - `self.as_const_ptr()` is a valid pointer to a live processor.
+        let error_code = unsafe { aic_processor_reset(self.as_const_ptr()) };
         handle_error(error_code)
     }
 
@@ -289,11 +293,11 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut model = Processor::new(&model, &license_key).unwrap();
+    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
     /// let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
     /// let mut audio_refs: Vec<&mut [f32]> = audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
-    /// model.initialize(48000, 2, 480, false).unwrap();
-    /// model.process_planar(&mut audio_refs).unwrap();
+    /// processor.initialize(48000, 2, 480, false).unwrap();
+    /// processor.process_planar(&mut audio_refs).unwrap();
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
     pub fn process_planar(&mut self, audio: &mut [&mut [f32]]) -> Result<(), AicError> {
@@ -356,10 +360,10 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut model = Processor::new(&model, &license_key).unwrap();
+    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
     /// let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
-    /// model.initialize(48000, 2, 480, false).unwrap();
-    /// model.process_interleaved(&mut audio).unwrap();
+    /// processor.initialize(48000, 2, 480, false).unwrap();
+    /// processor.process_interleaved(&mut audio).unwrap();
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
     pub fn process_interleaved(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
@@ -416,10 +420,10 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut model = Processor::new(&model, &license_key).unwrap();
+    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
     /// let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames each stored sequentially
-    /// model.initialize(48000, 2, 480, false).unwrap();
-    /// model.process_sequential(&mut audio).unwrap();
+    /// processor.initialize(48000, 2, 480, false).unwrap();
+    /// processor.process_sequential(&mut audio).unwrap();
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
     pub fn process_sequential(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
@@ -467,14 +471,15 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Parameter, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut model = Processor::new(&model, &license_key).unwrap();
-    /// model.set_parameter(Parameter::EnhancementLevel, 0.8).unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// processor.set_parameter(Parameter::EnhancementLevel, 0.8).unwrap();
     /// ```
-    pub fn set_parameter(&mut self, parameter: Parameter, value: f32) -> Result<(), AicError> {
+    pub fn set_parameter(&self, parameter: Parameter, value: f32) -> Result<(), AicError> {
         // SAFETY:
-        // - `self.inner` is a valid pointer to a live processor.
-        let error_code =
-            unsafe { aic_processor_set_parameter(self.inner, parameter.into(), value) };
+        // - `self.as_const_ptr()` is a valid pointer to a live processor.
+        let error_code = unsafe {
+            aic_processor_set_parameter(self.as_const_ptr(), parameter.into(), value)
+        };
         handle_error(error_code)
     }
 
@@ -496,17 +501,18 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Parameter, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut model = Processor::new(&model, &license_key).unwrap();
-    /// let enhancement_level = model.parameter(Parameter::EnhancementLevel).unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// let enhancement_level = processor.parameter(Parameter::EnhancementLevel).unwrap();
     /// println!("Current enhancement level: {enhancement_level}");
     /// ```
     pub fn parameter(&self, parameter: Parameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
         // SAFETY:
-        // - `self.inner` is a valid pointer to a live processor.
+        // - `self.as_const_ptr()` is a valid pointer to a live processor.
         // - `value` points to stack storage for output.
-        let error_code =
-            unsafe { aic_processor_get_parameter(self.inner, parameter.into(), &mut value) };
+        let error_code = unsafe {
+            aic_processor_get_parameter(self.as_const_ptr(), parameter.into(), &mut value)
+        };
         handle_error(error_code)?;
         Ok(value)
     }
@@ -541,16 +547,16 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut model = Processor::new(&model, &license_key).unwrap();
-    /// let delay = model.output_delay().unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// let delay = processor.output_delay().unwrap();
     /// println!("Output delay: {} samples", delay);
     /// ```
     pub fn output_delay(&self) -> Result<usize, AicError> {
         let mut delay: usize = 0;
         // SAFETY:
-        // - `self.inner` is a valid pointer to a live processor.
+        // - `self.as_const_ptr()` is a valid pointer to a live processor.
         // - `delay` points to stack storage for output.
-        let error_code = unsafe { aic_get_output_delay(self.inner, &mut delay) };
+        let error_code = unsafe { aic_get_output_delay(self.as_const_ptr(), &mut delay) };
         handle_error(error_code)?;
         Ok(delay)
     }
@@ -592,16 +598,17 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut model = Processor::new(&model, &license_key).unwrap();
-    /// let optimal_rate = model.optimal_sample_rate().unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// let optimal_rate = processor.optimal_sample_rate().unwrap();
     /// println!("Optimal sample rate: {optimal_rate} Hz");
     /// ```
     pub fn optimal_sample_rate(&self) -> Result<u32, AicError> {
         let mut sample_rate: u32 = 0;
         // SAFETY:
-        // - `self.inner` is a valid pointer to a live processor.
+        // - `self.as_const_ptr()` is a valid pointer to a live processor.
         // - `sample_rate` points to stack storage for output.
-        let error_code = unsafe { aic_get_optimal_sample_rate(self.inner, &mut sample_rate) };
+        let error_code =
+            unsafe { aic_get_optimal_sample_rate(self.as_const_ptr(), &mut sample_rate) };
         handle_error(error_code)?;
         Ok(sample_rate)
     }
@@ -636,18 +643,18 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut model = Processor::new(&model, &license_key).unwrap();
-    /// # let sample_rate = model.optimal_sample_rate().unwrap();
-    /// let optimal_frames = model.optimal_num_frames(sample_rate).unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let sample_rate = processor.optimal_sample_rate().unwrap();
+    /// let optimal_frames = processor.optimal_num_frames(sample_rate).unwrap();
     /// println!("Optimal frame count: {optimal_frames}");
     /// ```
     pub fn optimal_num_frames(&self, sample_rate: u32) -> Result<usize, AicError> {
         let mut num_frames: usize = 0;
         // SAFETY:
-        // - `self.inner` is a valid pointer to a live processor.
+        // - `self.as_const_ptr()` is a valid pointer to a live processor.
         // - `num_frames` points to stack storage for output.
         let error_code =
-            unsafe { aic_get_optimal_num_frames(self.inner, sample_rate, &mut num_frames) };
+            unsafe { aic_get_optimal_num_frames(self.as_const_ptr(), sample_rate, &mut num_frames) };
         handle_error(error_code)?;
         Ok(num_frames)
     }

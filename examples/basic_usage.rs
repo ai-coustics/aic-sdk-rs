@@ -87,7 +87,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Voice Activity Detection
-    let mut vad = processor.create_vad();
+    let vad = processor.create_vad();
     vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
     vad.set_parameter(VadParameter::Sensitivity, 7.0)?;
 

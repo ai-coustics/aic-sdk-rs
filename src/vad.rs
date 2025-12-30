@@ -89,6 +89,10 @@ impl Vad {
         Self { inner: vad_ptr }
     }
 
+    fn as_const_ptr(&self) -> *const AicVad {
+        self.inner as *const AicVad
+    }
+
     /// Returns the VAD's prediction.
     ///
     /// **Important:**
@@ -99,9 +103,9 @@ impl Vad {
     pub fn is_speech_detected(&self) -> bool {
         let mut value: bool = false;
         // SAFETY:
-        // - `self.inner` is a valid pointer to a live VAD.
+        // - `self.as_const_ptr()` is a valid pointer to a live VAD.
         // - `value` points to stack storage for output.
-        let error_code = unsafe { aic_vad_is_speech_detected(self.inner, &mut value) };
+        let error_code = unsafe { aic_vad_is_speech_detected(self.as_const_ptr(), &mut value) };
 
         // This should never fail
         assert!(handle_error(error_code).is_ok());
@@ -125,15 +129,16 @@ impl Vad {
     /// # use aic_sdk::{Model, Processor, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
-    /// # let mut vad = processor.create_vad();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let vad = processor.create_vad();
     /// vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08).unwrap();
     /// vad.set_parameter(VadParameter::Sensitivity, 5.0).unwrap();
     /// ```
-    pub fn set_parameter(&mut self, parameter: VadParameter, value: f32) -> Result<(), AicError> {
+    pub fn set_parameter(&self, parameter: VadParameter, value: f32) -> Result<(), AicError> {
         // SAFETY:
-        // - `self.inner` is a live VAD pointer.
-        let error_code = unsafe { aic_vad_set_parameter(self.inner, parameter.into(), value) };
+        // - `self.as_const_ptr()` is a live VAD pointer.
+        let error_code =
+            unsafe { aic_vad_set_parameter(self.as_const_ptr(), parameter.into(), value) };
         handle_error(error_code)
     }
 
@@ -161,9 +166,10 @@ impl Vad {
     pub fn parameter(&self, parameter: VadParameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
         // SAFETY:
-        // - `self.inner` is a valid pointer to a live VAD.
+        // - `self.as_const_ptr()` is a valid pointer to a live VAD.
         // - `value` points to stack storage for output.
-        let error_code = unsafe { aic_vad_get_parameter(self.inner, parameter.into(), &mut value) };
+        let error_code =
+            unsafe { aic_vad_get_parameter(self.as_const_ptr(), parameter.into(), &mut value) };
         handle_error(error_code)?;
         Ok(value)
     }
