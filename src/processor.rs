@@ -225,10 +225,7 @@ impl<'a, 'm> Processor<'a, 'm> {
     /// let config = processor.optimal_config();
     /// processor.initialize(&config).unwrap();
     /// ```
-    pub fn initialize(
-        &mut self,
-        config: &Config,
-    ) -> Result<(), AicError> {
+    pub fn initialize(&mut self, config: &Config) -> Result<(), AicError> {
         let num_channels_u16: u16 = config
             .num_channels
             .try_into()
@@ -317,9 +314,9 @@ impl<'a, 'm> Processor<'a, 'm> {
     /// * `audio` - Array of mutable channel buffer slices to be enhanced in-place.
     ///             Each channel buffer must be exactly of size `num_frames`,
     ///             or if `allow_variable_frames` was enabled, less than the initialization value.
-    /// 
+    ///
     /// # Note
-    /// 
+    ///
     /// Maximum supported number of channels is 16. Exceeding this will return an error.
     ///
     /// # Returns
@@ -371,12 +368,7 @@ impl<'a, 'm> Processor<'a, 'm> {
         // - `self.inner` is a valid pointer to a live processor.
         // - `audio_ptrs` holds valid, writable channel pointers containing `num_frames` samples each.
         let error_code = unsafe {
-            aic_processor_process_planar(
-                self.inner,
-                audio_ptrs.as_ptr(),
-                num_channels,
-                num_frames,
-            )
+            aic_processor_process_planar(self.inner, audio_ptrs.as_ptr(), num_channels, num_frames)
         };
 
         handle_error(error_code)
@@ -531,9 +523,8 @@ impl<'a, 'm> Processor<'a, 'm> {
     pub fn set_parameter(&self, parameter: Parameter, value: f32) -> Result<(), AicError> {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor.
-        let error_code = unsafe {
-            aic_processor_set_parameter(self.as_const_ptr(), parameter.into(), value)
-        };
+        let error_code =
+            unsafe { aic_processor_set_parameter(self.as_const_ptr(), parameter.into(), value) };
         handle_error(error_code)
     }
 
@@ -614,7 +605,10 @@ impl<'a, 'm> Processor<'a, 'm> {
 
         // This should never fail. If it does, it's a bug in the SDK.
         // `aic_get_output_delay` is documented to always succeed if given a valid processor pointer.
-        assert_success(error_code, "`aic_get_output_delay` failed. This is a bug, please open an issue on GitHub for further investigation.");
+        assert_success(
+            error_code,
+            "`aic_get_output_delay` failed. This is a bug, please open an issue on GitHub for further investigation.",
+        );
 
         delay
     }
@@ -670,7 +664,10 @@ impl<'a, 'm> Processor<'a, 'm> {
 
         // This should never fail. If it does, it's a bug in the SDK.
         // `aic_get_optimal_sample_rate` is documented to always succeed if given a valid processor pointer.
-        assert_success(error_code, "`aic_get_optimal_sample_rate` failed. This is a bug, please open an issue on GitHub for further investigation.");
+        assert_success(
+            error_code,
+            "`aic_get_optimal_sample_rate` failed. This is a bug, please open an issue on GitHub for further investigation.",
+        );
 
         // This should never fail
         sample_rate
@@ -716,12 +713,16 @@ impl<'a, 'm> Processor<'a, 'm> {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor.
         // - `num_frames` points to stack storage for output.
-        let error_code =
-            unsafe { aic_get_optimal_num_frames(self.as_const_ptr(), sample_rate, &mut num_frames) };
-        
+        let error_code = unsafe {
+            aic_get_optimal_num_frames(self.as_const_ptr(), sample_rate, &mut num_frames)
+        };
+
         // This should never fail. If it does, it's a bug in the SDK.
         // `aic_get_optimal_num_frames` is documented to always succeed if given valid pointers.
-        assert_success(error_code, "`aic_get_optimal_num_frames` failed. This is a bug, please open an issue on GitHub for further investigation.");
+        assert_success(
+            error_code,
+            "`aic_get_optimal_num_frames` failed. This is a bug, please open an issue on GitHub for further investigation.",
+        );
 
         num_frames
     }

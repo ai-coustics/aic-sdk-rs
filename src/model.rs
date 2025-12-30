@@ -103,9 +103,8 @@ impl<'a> Model<'a> {
 
         // SAFETY:
         // - `buffer` is a valid slice; its pointer/len are passed verbatim to C which only reads.
-        let error_code = unsafe {
-            aic_model_create_from_buffer(&mut model_ptr, buffer.as_ptr(), buffer.len())
-        };
+        let error_code =
+            unsafe { aic_model_create_from_buffer(&mut model_ptr, buffer.as_ptr(), buffer.len()) };
 
         handle_error(error_code)?;
 
@@ -172,7 +171,7 @@ unsafe impl<'a> Send for Model<'a> {}
 unsafe impl<'a> Sync for Model<'a> {}
 
 /// Embeds the bytes of model file, ensuring proper alignment.
-/// 
+///
 /// This macro uses Rust's standard library's [`include_bytes!`](std::include_bytes) macro
 /// to include the model file at compile time.
 ///
@@ -201,13 +200,13 @@ mod tests {
     #[test]
     fn include_model_aligns_to_64_bytes() {
         // Use the README.md as a dummy file for testing
-        let data = include_model!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/README.md"
-        ));
+        let data = include_model!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"));
 
         let ptr = data.as_ptr() as usize;
-        assert!(ptr.is_multiple_of(64), "include_model should align data to 64 bytes");
+        assert!(
+            ptr.is_multiple_of(64),
+            "include_model should align data to 64 bytes"
+        );
     }
 }
 
