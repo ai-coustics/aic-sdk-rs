@@ -138,3 +138,29 @@ impl Drop for Model {
 // SAFETY: The Model struct can be safely sent and shared between threads
 unsafe impl Send for Model {}
 unsafe impl Sync for Model {}
+
+/// Embeds the bytes of model file, ensuring proper alignment.
+/// 
+/// This macro uses Rust's standard library's [`include_bytes!`](std::include_bytes) macro
+/// to include the model file at compile time.
+///
+/// # Example
+///
+/// ```
+/// use aic_sdk::include_model;
+///
+/// // Aligns the data to 16 bytes
+/// static MODEL: &'static [u8] = include_model!("path/to/model.aicmodel");
+/// ```
+#[macro_export]
+macro_rules! include_model {
+    ($path:expr) => {{
+        #[repr(C, align(64))]
+        struct __Aligned<T: ?Sized>(T);
+
+        const __DATA: &'static __Aligned<[u8; include_bytes!($path).len()]> =
+            &__Aligned(*include_bytes!($path));
+
+        &__DATA.0
+    }};
+}
