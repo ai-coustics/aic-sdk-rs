@@ -80,7 +80,7 @@ impl<'a> Model<'a> {
     ///
     /// The buffer must be 64-byte aligned.
     ///
-    /// Consider using [`include_model!`](macro@include_model) to embed a model file at compile time with
+    /// Consider using [`include_model!`](macro@crate::include_model) to embed a model file at compile time with
     /// the correct alignment.
     ///
     /// # Arguments
