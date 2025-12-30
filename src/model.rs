@@ -78,9 +78,9 @@ impl<'a> Model<'a> {
 
     /// Creates a new model instance from an in-memory buffer.
     ///
-    /// The buffer must remain valid and unchanged for the lifetime of the model,
-    /// and it must be 64-byte aligned as required by `aic_model_create_from_buffer`.
-    /// Consider using [`include_model!`] to embed a model file at compile time with
+    /// The buffer must be 64-byte aligned.
+    ///
+    /// Consider using [`include_model!`](macro@include_model) to embed a model file at compile time with
     /// the correct alignment.
     ///
     /// # Arguments
