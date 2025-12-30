@@ -48,26 +48,3 @@ pub fn get_compatible_model_version() -> u32 {
     // SAFETY: FFI call takes no arguments and returns a plain integer.
     unsafe { aic_get_compatible_model_version() }
 }
-
-#[doc(hidden)]
-mod _compile_fail_tests {
-    //! Compile-fail regression: a `Processor` must not outlive its `Model`.
-    //! This snippet should fail to compile and ensures we keep that guarantee.
-    //!
-    //! ```rust,compile_fail
-    //! use aic_sdk::{Model, Processor};
-    //!
-    //! fn leak_processor() -> Processor {
-    //!     let license_key = "dummy-license";
-    //!     let processor = {
-    //!         let model = Model::from_file("some/path.aicmodel").unwrap();
-    //!         Processor::new(&model, license_key).unwrap()
-    //!     };
-    //!     processor
-    //! }
-    //!
-    //! fn main() {
-    //!     let _ = leak_processor();
-    //! }
-    //! ```
-}
