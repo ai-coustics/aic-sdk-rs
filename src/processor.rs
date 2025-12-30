@@ -774,6 +774,16 @@ mod tests {
     }
 
     #[test]
+    fn process_sequential_fixed_frames() {
+        let (model, license_key) = load_test_model().unwrap();
+        let mut processor = Processor::new(&model, &license_key).unwrap();
+
+        let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
+        processor.initialize(48000, 2, 480, false).unwrap();
+        processor.process_sequential(&mut audio).unwrap();
+    }
+
+    #[test]
     fn process_interleaved_variable_frames() {
         let (model, license_key) = load_test_model().unwrap();
         let mut processor = Processor::new(&model, &license_key).unwrap();
@@ -801,6 +811,19 @@ mod tests {
         let mut right = vec![0.0f32; 20]; // 20 frames
         let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 20 frames
         processor.process_planar(&mut audio).unwrap();
+    }
+
+    #[test]
+    fn process_sequential_variable_frames() {
+        let (model, license_key) = load_test_model().unwrap();
+        let mut processor = Processor::new(&model, &license_key).unwrap();
+
+        let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
+        processor.initialize(48000, 2, 480, true).unwrap();
+        processor.process_sequential(&mut audio).unwrap();
+
+        let mut audio = vec![0.0f32; 2 * 20]; // 2 channels, 20 frames
+        processor.process_sequential(&mut audio).unwrap();
     }
 
     #[test]
@@ -832,6 +855,20 @@ mod tests {
         let mut right = vec![0.0f32; 20]; // 20 frames
         let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 20 frames
         let result = processor.process_planar(&mut audio);
+        assert_eq!(result, Err(AicError::AudioConfigMismatch));
+    }
+
+    #[test]
+    fn process_sequential_variable_frames_fails_without_allow_variable_frames() {
+        let (model, license_key) = load_test_model().unwrap();
+        let mut processor = Processor::new(&model, &license_key).unwrap();
+
+        let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
+        processor.initialize(48000, 2, 480, false).unwrap();
+        processor.process_sequential(&mut audio).unwrap();
+
+        let mut audio = vec![0.0f32; 2 * 20]; // 2 channels, 20 frames
+        let result = processor.process_sequential(&mut audio);
         assert_eq!(result, Err(AicError::AudioConfigMismatch));
     }
 }
