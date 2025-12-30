@@ -135,7 +135,9 @@ impl Drop for Model {
     }
 }
 
-// SAFETY: The Model struct can be safely sent and shared between threads
+// SAFETY:
+// - The Model wraps a raw pointer to an AicModel which is immutable after creation and it
+//   does not provide access to it through its public API.
 unsafe impl Send for Model {}
 unsafe impl Sync for Model {}
 

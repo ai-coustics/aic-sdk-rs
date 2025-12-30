@@ -741,9 +741,9 @@ impl<'a> Drop for Processor<'a> {
     }
 }
 
-// SAFETY: The Processor struct manages its own memory and does not share
-// mutable state across threads without synchronization. The underlying C library
-// is assumed to be thread-safe for the operations exposed here.
+// SAFETY:
+// - The Processor struct safely wraps the AicProcessor object and uses the C library's APIs
+//   according to the documented thread-safety guarantees.
 unsafe impl<'a> Send for Processor<'a> {}
 unsafe impl<'a> Sync for Processor<'a> {}
 
