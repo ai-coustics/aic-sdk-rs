@@ -70,7 +70,7 @@ mod tests {
     use std::collections::HashSet;
 
     fn load_manifest() -> Manifest {
-        serde_json::from_str(include_str!("../reference/manifest.json")).unwrap()
+        serde_json::from_str(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/reference/manifest.json"))).unwrap()
     }
 
     #[test]
