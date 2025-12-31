@@ -1,8 +1,7 @@
 [workspace]
-members = ["aic-model-downloader", "aic-sdk-sys"]
+members = ["aic-sdk-sys"]
 
 [workspace.dependencies]
-aic-model-downloader = { version = "0.1.0", path = "aic-model-downloader" }
 aic-sdk-sys = { version = "1.0.0", path = "aic-sdk-sys" }
 
 [package]
@@ -20,13 +19,22 @@ repository = "https://github.com/ai-coustics/aic-sdk-rs"
 version = "1.0.0"
 
 [dependencies]
-aic-model-downloader = { workspace = true, optional = true }
 aic-sdk-sys = { workspace = true }
 thiserror = "2.0.17"
+reqwest = { version = "0.13", optional = true, default-features = false, features = [
+  "blocking",
+  "json",
+  "rustls",
+] }
+serde = { version = "1", optional = true, features = ["derive"] }
+sha2 = { version = "0.10.8", optional = true }
+
+[dev-dependencies]
+serde_json = "1"
 
 [features]
 download-lib = ["aic-sdk-sys/download-lib"]
-download-model = ["dep:aic-model-downloader"]
+download-model = ["dep:reqwest", "dep:serde", "dep:sha2"]
 
 [[example]]
 name = "basic_usage"
