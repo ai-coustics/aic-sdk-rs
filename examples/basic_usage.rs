@@ -5,8 +5,8 @@ use aic_sdk::{Config, Model, Parameter, Processor, VadParameter};
 use std::env;
 
 #[cfg(not(feature = "download-model"))]
-fn main() {
-    eprintln!("Enable the `download-model` feature to run this example.");
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    Err("Enable the `download-model` feature to run this example.".into())
 }
 
 #[cfg(feature = "download-model")]
