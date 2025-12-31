@@ -35,7 +35,7 @@ serde_json = { workspace = true }
 
 [features]
 download-lib = ["aic-sdk-sys/download-lib"]
-download-model = ["dep:ureq", "dep:serde", "dep:serde_json", "dep:sha2"]
+download-model = ["dep:serde", "dep:serde_json", "dep:sha2", "dep:ureq"]
 
 [[example]]
 name = "basic_usage"
