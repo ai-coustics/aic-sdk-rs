@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::Error;
+use super::Error;
 
 const MANIFEST_URL: &str = "https://d3lqwskupyztjd.cloudfront.net/manifest.json";
 
@@ -40,18 +40,6 @@ impl Manifest {
         let manifest_model = self.model_entry(id)?;
 
         manifest_model.version(version, id)
-    }
-
-    pub fn available_models(&self, version: u32) -> impl Iterator<Item = &str> + '_ {
-        let version_key = Self::version_key(version);
-        self.models
-            .iter()
-            .filter_map(move |(model, manifest_model)| {
-                manifest_model
-                    .versions
-                    .get(&version_key)
-                    .map(|_| model.as_str())
-            })
     }
 
     fn model_entry(&self, id: &str) -> Result<&Model, Error> {
@@ -100,31 +88,5 @@ mod tests {
             model.checksum,
             "fc536364e0b6e851a37ad9790721ee2368ba06e761a78485fabbd6629d6c4cf8"
         );
-    }
-
-    #[test]
-    fn available_models_lists_all_matching_ids_for_version() {
-        let manifest = load_manifest();
-
-        let models: HashSet<&str> = manifest.available_models(1).collect();
-
-        let expected = HashSet::from([
-            "quail-l-16khz",
-            "quail-l-48khz",
-            "quail-l-8khz",
-            "quail-s-16khz",
-            "quail-s-48khz",
-            "quail-s-8khz",
-            "quail-stt-l-16khz",
-            "quail-stt-l-8khz",
-            "quail-stt-s-16khz",
-            "quail-stt-s-8khz",
-            "quail-vf-stt-l-16khz",
-            "quail-xs-48khz",
-            "quail-xxs-48khz",
-            "starling-l-48khz",
-        ]);
-
-        assert_eq!(models, expected);
     }
 }
