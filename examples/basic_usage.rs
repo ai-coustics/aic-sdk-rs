@@ -31,21 +31,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut processor = Processor::new(&model, &license)?;
     println!("Processor created successfully");
 
-    // Get optimal settings
-    let base_config = processor.optimal_config();
+    // Set up configuration
     let config = Config {
         num_channels: 2,
         allow_variable_frames: true,
-        ..base_config
+        ..processor.optimal_config()
     };
+
+    // Initialize the processor
+    processor.initialize(&config)?;
     println!(
-        "Optimal configuration: sample_rate={}Hz, frames={}, channels={}",
+        "Processor initialized: Sample rate: {} Hz, Frames: {}, Channels: {}",
         config.sample_rate, config.num_frames, config.num_channels
     );
-
-    // Initialize with basic audio config
-    processor.initialize(&config)?;
-    println!("Processor initialized successfully");
 
     // Get output delay
     let delay = processor.output_delay();
