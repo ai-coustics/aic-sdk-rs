@@ -70,14 +70,14 @@ pub fn download<P: AsRef<Path>>(
 }
 
 fn download_bytes(url: &str) -> Result<Vec<u8>, Error> {
-    let response = reqwest::blocking::get(url)
-        .map_err(|err| Error::ModelDownload(err.to_string()))?
-        .error_for_status()
+    let response = ureq::get(url)
+        .call()
         .map_err(|err| Error::ModelDownload(err.to_string()))?;
 
     response
-        .bytes()
-        .map(|b| b.to_vec())
+        .into_body()
+        .into_with_config()
+        .read_to_vec()
         .map_err(|err| Error::ModelDownload(err.to_string()))
 }
 

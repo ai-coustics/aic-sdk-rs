@@ -26,14 +26,16 @@ pub struct ModelMetadata {
 
 impl Manifest {
     pub fn download() -> Result<Self, Error> {
-        let response = reqwest::blocking::get(MANIFEST_URL)
-            .map_err(|err| Error::ManifestDownload(err.to_string()))?
-            .error_for_status()
+        let mut response = ureq::get(MANIFEST_URL)
+            .call()
             .map_err(|err| Error::ManifestDownload(err.to_string()))?;
 
-        response
-            .json::<Manifest>()
-            .map_err(|err| Error::ManifestParse(err.to_string()))
+        let body = response
+            .body_mut()
+            .read_to_string()
+            .map_err(|err| Error::ManifestDownload(err.to_string()))?;
+
+        serde_json::from_str(&body).map_err(|err| Error::ManifestParse(err.to_string()))
     }
 
     pub fn metadata_for_model(&self, id: &str, version: u32) -> Result<&ModelMetadata, Error> {
@@ -67,7 +69,6 @@ impl Model {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
 
     fn load_manifest() -> Manifest {
         serde_json::from_str(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/reference/manifest.json"))).unwrap()
