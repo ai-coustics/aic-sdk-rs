@@ -9,7 +9,7 @@ use thiserror::Error;
 mod manifest;
 use manifest::Manifest;
 
-const MODEL_BASE_URL: &str = "https://d3lqwskupyztjd.cloudfront.net/";
+const MODEL_BASE_URL: &str = "https://artifacts.ai-coustics.io/";
 
 #[derive(Debug, Error)]
 pub enum Error {

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use super::Error;
 
-const MANIFEST_URL: &str = "https://d3lqwskupyztjd.cloudfront.net/manifest.json";
+const MANIFEST_URL: &str = "https://artifacts.ai-coustics.io/manifest.json";
 
 #[derive(Debug, Deserialize)]
 pub struct Manifest {
