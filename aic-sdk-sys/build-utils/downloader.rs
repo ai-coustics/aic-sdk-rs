@@ -4,6 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+const CRATE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub struct Downloader {
     base_url: String,
     version: String,
@@ -97,16 +99,28 @@ fn read_checksums_from_file() -> (String, HashMap<String, String>) {
         let (hash, filename) = (parts[0], parts[1]);
 
         // Extract version from filename (e.g., "aic-sdk-x86_64-apple-darwin-0.11.0.tar.gz")
-        if version.is_none()
-            && let Some(v) = extract_version_from_filename(filename)
-        {
-            version = Some(v);
+        if let Some(v) = extract_version_from_filename(filename) {
+            if v != CRATE_VERSION {
+                panic!(
+                    "Checksum manifest version ({}) does not match aic-sdk-sys crate version ({}). Update checksum.txt to match the crate version.",
+                    v, CRATE_VERSION
+                );
+            }
+
+            if version.is_none() {
+                version = Some(CRATE_VERSION.to_string());
+            }
         }
 
         artifact_sha.insert(filename.to_string(), hash.to_string());
     }
 
-    let version = version.expect("Could not determine version from checksum.txt");
+    let version = version.unwrap_or_else(|| {
+        panic!(
+            "Could not determine version from checksum.txt. Expected aic-sdk version {}",
+            CRATE_VERSION
+        )
+    });
     (version, artifact_sha)
 }
 
