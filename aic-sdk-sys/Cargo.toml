@@ -25,3 +25,7 @@ sha2 = { workspace = true, optional = true }
 tar = { version = "0.4", optional = true }
 ureq = { workspace = true, optional = true, features = ["rustls"] }
 zip = { version = "2.1", optional = true }
+
+# cargo shear can not track optional build dependencies
+[package.metadata.cargo-shear]
+ignored = ["flate2", "sha2", "tar", "ureq", "zip"]
