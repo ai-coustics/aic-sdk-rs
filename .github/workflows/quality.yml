@@ -51,3 +51,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.91.0
       - run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --document-private-items --all-features
+
+  unused-dependencies:
+    name: Unused Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Cargo Shear
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-shear
+      - name: Run Cargo Shear
+        run: |
+          cargo shear
