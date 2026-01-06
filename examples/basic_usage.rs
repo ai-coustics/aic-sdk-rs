@@ -15,11 +15,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("ai-coustics SDK version: {}", aic_sdk::get_version());
 
     // Get license key from environment variable
-    let license = env::var("AIC_SDK_LICENSE").map_err(|_| "AIC_SDK_LICENSE not set")?;
+    let license = env::var("AIC_SDK_LICENSE").expect("AIC_SDK_LICENSE environment variable");
 
     // Download the default model once and reuse the file
-    let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR not set");
-    let model_path = Model::download("quail-xxs-48khz", out_dir)?;
+    let model_path = Model::download("quail-xxs-48khz", "target")?;
     let model = Model::from_file(&model_path)?;
     println!("Model loaded from {}", model_path.display());
 
