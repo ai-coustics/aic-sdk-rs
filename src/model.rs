@@ -178,9 +178,10 @@ unsafe impl<'a> Sync for Model<'a> {}
 /// # Example
 ///
 /// ```rust,ignore
-/// use aic_sdk::include_model;
+/// # use aic_sdk::{include_model, Model};
 ///
 /// static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
+/// let model = Model::from_buffer(MODEL).unwrap();
 /// ```
 #[macro_export]
 macro_rules! include_model {
