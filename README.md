@@ -57,8 +57,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a processor using the model and your license
     let mut processor = Processor::new(&model, &license_key)?;
 
-    // Initialize the processor with your audio settings
-    let config = Config { num_channels: 2, allow_variable_frames: true, ..processor.optimal_config() };
+    // Set up your desired audio settings
+    let config = Config {
+        num_channels: 2,
+        allow_variable_frames: true,
+        ..processor.optimal_config()
+    };
+
+    // Initialize the processor
     processor.initialize(&config)?;
 
     let mut audio_buffer = vec![0.0f32; config.num_frames * config.num_channels];
