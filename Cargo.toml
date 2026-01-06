@@ -1,5 +1,5 @@
 [workspace]
-members = ["aic-sdk-sys", "examples/build-time-download"]
+members = ["aic-sdk-sys"]
 
 [workspace.dependencies]
 aic-sdk-sys = { version = "1.0.0", path = "aic-sdk-sys" }
@@ -40,3 +40,7 @@ download-model = ["dep:serde", "dep:serde_json", "dep:sha2", "dep:ureq"]
 [[example]]
 name = "basic_usage"
 path = "examples/basic_usage.rs"
+
+[[example]]
+name = "build-time-download"
+path = "examples/build-time-download"

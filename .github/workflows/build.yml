@@ -23,4 +23,4 @@ jobs:
       - name: Build and Run Example
         run: |
           cargo run --example basic_usage --all-features
-          cargo run -p build-time-download
+          cargo run --example build-time-download
