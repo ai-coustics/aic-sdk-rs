@@ -46,7 +46,7 @@ Key features:
 To run the example:
 
 ```bash
-cargo run --example build-time-download
+cargo run --package build-time-download
 ```
 
 See the [build-time-download/README.md](build-time-download/README.md) for more details on how the build-time download pattern works.

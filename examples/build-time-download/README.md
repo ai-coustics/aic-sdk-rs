@@ -29,5 +29,5 @@ The `main.rs` application:
 ## Running the Example
 
 ```bash
-cargo run --example build-time-download
+cargo run --package build-time-download
 ```
