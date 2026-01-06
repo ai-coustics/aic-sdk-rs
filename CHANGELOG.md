@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.0.0 - Unreleased
+## 0.13.0 - Unreleased
 
-This release integrates ai-coustics C library version 1.0, which comes with a number of new features and several breaking changes.
+This release integrates ai-coustics C library version 0.13.0, which comes with a number of new features and several breaking changes.
 
 Most notably, the C library does no longer include any models, which significantly reduces the library's binary size. The models are now available
 separately for download at https://artifacts.ai-coustics.io.
