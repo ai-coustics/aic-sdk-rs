@@ -21,4 +21,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.91.0
       - name: Build and Run Example
-        run: cargo run --example basic_usage --all-features
+        run: |
+          cargo run --example basic_usage --all-features
+          cargo run -p build-time-download

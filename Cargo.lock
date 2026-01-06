@@ -103,7 +103,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "build_time_download"
+name = "build-time-download"
 version = "0.1.0"
 dependencies = [
  "aic-sdk",
