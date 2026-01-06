@@ -17,6 +17,8 @@ To use this SDK, you'll need to generate an **SDK license key** from our [Develo
 
 ## Integration
 
+### Library
+
 Enable the `download-lib` feature to automatically download the library when building the crate.
 
 ```toml
@@ -27,16 +29,30 @@ aic-sdk = { version = "0.13.0", features = ["download-lib"] }
 If you want to provide your own library, use the `AIC_LIB_PATH` environment variable to specify the path
 to the directory where the library is located.
 
+### Models
+
+Enable the `download-model` feature to enable the `Model::download` API.
+
+```toml
+[dependencies]
+aic-sdk = { version = "0.13.0", features = ["download-model"] }
+```
+
+Our models are available for download at https://artifacts.ai-coustics.io.
+We recommend that the selected model is downloaded and embedded into your binary using the `include_model` macro.
+
 ## Example Usage
 
 ```rust,no_run
-use aic_sdk::{Config, Model, Parameter, Processor};
+use aic_sdk::{include_model, Config, Model, Parameter, Processor};
+
+static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let license_key = std::env::var("AIC_SDK_LICENSE")?;
 
-    // Load a model file you already have on disk
-    let model = Model::from_file("/path/to/model.aicmodel")?;
+    // Load the embedded model
+    let model = Model::from_buffer(MODEL)?;
 
     // Create a processor using the model and your license
     let mut processor = Processor::new(&model, &license_key)?;
