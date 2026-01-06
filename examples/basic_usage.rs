@@ -22,8 +22,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     })?;
 
     // Download the default model once and reuse the file
-    let target_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
-    let model_path = Model::download("quail-xxs-48khz", target_dir)?;
+    let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR not set");
+    let model_path = Model::download("quail-xxs-48khz", out_dir)?;
     let model = Model::from_file(&model_path)?;
     println!("Model loaded from {}", model_path.display());
 

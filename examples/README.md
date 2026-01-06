@@ -34,6 +34,23 @@ cargo run --example basic_usage --features download-lib
 
 This example mirrors the C example that comes with the AIC SDK library, showing how to use the Rust API to perform the same operations in a safe, idiomatic way.
 
+### Build-Time Model Download Example
+
+The `build-time-download` example demonstrates how to download a model at build-time and embed it directly into your binary using the `include_model!` macro.
+
+Key features:
+- Downloads the model during compilation via `build.rs`
+- Embeds the model bytes directly into the binary
+- Creates a self-contained executable with no runtime model loading
+
+To run the example:
+
+```bash
+cargo run --example build-time-download
+```
+
+See the [build-time-download/README.md](build-time-download/README.md) for more details on how the build-time download pattern works.
+
 ## Example Output
 
 When successful, you should see output similar to:
