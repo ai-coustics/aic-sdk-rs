@@ -250,10 +250,35 @@ impl<'a, 'm> Processor<'a, 'm> {
 
     /// Returns a [`Config`] pre-filled with the model's optimal sample rate and frame size.
     ///
-    /// This helper uses [`Processor::optimal_sample_rate`] and
-    /// [`Processor::optimal_num_frames`] to minimize latency, and defaults to
-    /// mono processing with fixed frame counts. Adjust `num_channels` or
-    /// `allow_variable_frames` as needed before calling [`Processor::initialize`].
+    /// Adjust the number of channels and enable variable frames by using struct-update syntax.
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Config, Model, Processor};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// let config = Config {
+    ///     num_channels: 2,
+    ///     allow_variable_frames: true,
+    ///     ..processor.optimal_config()
+    /// };
+    /// ```
+    ///
+    /// If you need to configure a non-optimal sample rate or number of frames,
+    /// construct the [`Config`] struct directly. For example:
+    /// ```rust,no_run
+    /// # use aic_sdk::{Config, Model, Processor};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// let config = Config {
+    ///     num_channels: 2,
+    ///     sample_rate: 44100,
+    ///     num_frames: processor.optimal_num_frames(44100),
+    ///     allow_variable_frames: true,
+    /// };
+    /// ```
+    ///
     pub fn optimal_config(&self) -> Config {
         let sample_rate = self.optimal_sample_rate();
         let num_frames = self.optimal_num_frames(sample_rate);
