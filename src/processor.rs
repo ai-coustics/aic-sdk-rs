@@ -15,7 +15,7 @@ pub struct Config {
     /// Sample rate in Hz (8000 - 192000).
     pub sample_rate: u32,
     /// Number of audio channels in the stream (1 for mono, 2 for stereo, etc).
-    pub num_channels: usize,
+    pub num_channels: u16,
     /// Samples per channel provided to each processing call.
     /// Note that using a non-optimal number of frames increases latency.
     pub num_frames: usize,
@@ -98,7 +98,7 @@ pub struct Processor<'a, 'm> {
     /// Raw pointer to the C processor structure
     inner: *mut AicProcessor,
     /// Configured number of channels
-    num_channels: Option<usize>,
+    num_channels: Option<u16>,
     /// Phantom data to tie the lifetime to the Model
     marker: PhantomData<&'a Model<'m>>,
 }
@@ -338,13 +338,13 @@ impl<'a, 'm> Processor<'a, 'm> {
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
     pub fn process_planar(&mut self, audio: &mut [&mut [f32]]) -> Result<(), AicError> {
-        const MAX_CHANNELS: usize = 16;
+        const MAX_CHANNELS: u16 = 16;
 
         let Some(num_channels) = self.num_channels else {
             return Err(AicError::ModelNotInitialized);
         };
 
-        if audio.len() != num_channels {
+        if audio.len() != num_channels as usize {
             return Err(AicError::AudioConfigMismatch);
         }
 
@@ -355,7 +355,7 @@ impl<'a, 'm> Processor<'a, 'm> {
         let num_frames = if audio.is_empty() { 0 } else { audio[0].len() };
         let num_channels = num_channels as u16;
 
-        let mut audio_ptrs = [std::ptr::null_mut::<f32>(); MAX_CHANNELS];
+        let mut audio_ptrs = [std::ptr::null_mut::<f32>(); MAX_CHANNELS as usize];
         for (i, channel) in audio.iter_mut().enumerate() {
             // Check that all channels have the same number of frames
             if channel.len() != num_frames {
@@ -414,11 +414,11 @@ impl<'a, 'm> Processor<'a, 'm> {
             return Err(AicError::ModelNotInitialized);
         };
 
-        if !audio.len().is_multiple_of(num_channels) {
+        if !audio.len().is_multiple_of(num_channels as usize) {
             return Err(AicError::AudioConfigMismatch);
         }
 
-        let num_frames = audio.len() / num_channels;
+        let num_frames = audio.len() / num_channels as usize;
         let num_channels = num_channels as u16;
 
         // SAFETY:
@@ -476,11 +476,11 @@ impl<'a, 'm> Processor<'a, 'm> {
             return Err(AicError::ModelNotInitialized);
         };
 
-        if !audio.len().is_multiple_of(num_channels) {
+        if !audio.len().is_multiple_of(num_channels as usize) {
             return Err(AicError::AudioConfigMismatch);
         }
 
-        let num_frames = audio.len() / num_channels;
+        let num_frames = audio.len() / num_channels as usize;
         let num_channels = num_channels as u16;
 
         // SAFETY: `self.inner` is initialized, `audio` points to a contiguous f32 slice of correct length.
@@ -820,7 +820,9 @@ mod tests {
             ..processor.optimal_config()
         };
 
-        let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels];
+        let num_channels = config.num_channels as usize;
+
+        let mut audio = vec![vec![0.0f32; config.num_frames]; num_channels];
         let mut audio_refs: Vec<&mut [f32]> =
             audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
 
@@ -838,7 +840,9 @@ mod tests {
             ..processor.optimal_config()
         };
 
-        let mut audio = vec![0.0f32; config.num_channels * config.num_frames];
+        let num_channels = config.num_channels as usize;
+
+        let mut audio = vec![0.0f32; num_channels * config.num_frames];
         processor.initialize(&config).unwrap();
         processor.process_interleaved(&mut audio).unwrap();
     }
@@ -871,7 +875,9 @@ mod tests {
             ..processor.optimal_config()
         };
 
-        let mut audio = vec![0.0f32; config.num_channels * config.num_frames];
+        let num_channels = config.num_channels as usize;
+
+        let mut audio = vec![0.0f32; num_channels * config.num_frames];
         processor.initialize(&config).unwrap();
         processor.process_sequential(&mut audio).unwrap();
     }
@@ -887,11 +893,13 @@ mod tests {
             ..processor.optimal_config()
         };
 
-        let mut audio = vec![0.0f32; config.num_channels * config.num_frames];
+        let num_channels = config.num_channels as usize;
+
+        let mut audio = vec![0.0f32; num_channels * config.num_frames];
         processor.initialize(&config).unwrap();
         processor.process_interleaved(&mut audio).unwrap();
 
-        let mut audio = vec![0.0f32; config.num_channels * 20];
+        let mut audio = vec![0.0f32; num_channels * 20];
         processor.process_interleaved(&mut audio).unwrap();
     }
 
@@ -929,11 +937,13 @@ mod tests {
             ..processor.optimal_config()
         };
 
-        let mut audio = vec![0.0f32; config.num_channels * config.num_frames];
+        let num_channels = config.num_channels as usize;
+
+        let mut audio = vec![0.0f32; num_channels * config.num_frames];
         processor.initialize(&config).unwrap();
         processor.process_sequential(&mut audio).unwrap();
 
-        let mut audio = vec![0.0f32; config.num_channels * 20];
+        let mut audio = vec![0.0f32; num_channels * 20];
         processor.process_sequential(&mut audio).unwrap();
     }
 
@@ -947,11 +957,13 @@ mod tests {
             ..processor.optimal_config()
         };
 
-        let mut audio = vec![0.0f32; config.num_channels * config.num_frames];
+        let num_channels = config.num_channels as usize;
+
+        let mut audio = vec![0.0f32; num_channels * config.num_frames];
         processor.initialize(&config).unwrap();
         processor.process_interleaved(&mut audio).unwrap();
 
-        let mut audio = vec![0.0f32; config.num_channels * 20];
+        let mut audio = vec![0.0f32; num_channels * 20];
         let result = processor.process_interleaved(&mut audio);
         assert_eq!(result, Err(AicError::AudioConfigMismatch));
     }
@@ -989,11 +1001,13 @@ mod tests {
             ..processor.optimal_config()
         };
 
-        let mut audio = vec![0.0f32; config.num_channels * config.num_frames];
+        let num_channels = config.num_channels as usize;
+
+        let mut audio = vec![0.0f32; num_channels * config.num_frames];
         processor.initialize(&config).unwrap();
         processor.process_sequential(&mut audio).unwrap();
 
-        let mut audio = vec![0.0f32; config.num_channels * 20];
+        let mut audio = vec![0.0f32; num_channels * 20];
         let result = processor.process_sequential(&mut audio);
         assert_eq!(result, Err(AicError::AudioConfigMismatch));
     }
