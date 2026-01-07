@@ -267,6 +267,26 @@ enum AicErrorCode aic_model_create_from_buffer(struct AicModel **model,
 void aic_model_destroy(struct AicModel *model);
 
 /**
+ * Returns a pointer to the model identifier.
+ *
+ * The returned string is UTF-8 encoded and null-terminated.
+ *
+ * # Parameters
+ * - `model`: Model instance. Must not be NULL.
+ *
+ * # Returns
+ * - Pointer to the null-terminated model ID string. Returns NULL if `model` is NULL.
+ *
+ * # Safety
+ * - The pointer is only valid while the `AicModel` remains alive. Do not use it
+ *   after calling `aic_model_destroy`.
+ * - Read-only: do not modify or free the returned pointer.
+ * - Not thread-safe with concurrent model destruction. Ensure no other thread can
+ *   destroy the model while this pointer is in use.
+ */
+const char *aic_model_get_id(const struct AicModel *model);
+
+/**
  * Creates a new audio processor instance.
  *
  * Multiple processors can be created to process different audio streams simultaneously
@@ -539,8 +559,8 @@ enum AicErrorCode aic_processor_get_parameter(const struct AicProcessor *process
  * - `delay`: Receives the delay in samples. Must not be NULL.
  *
  * # Returns
- * - `AIC_ERROR_CODE_SUCCESS`: Latency retrieved successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `latency` is NULL
+ * - `AIC_ERROR_CODE_SUCCESS`: Delay retrieved successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `delay` is NULL
  *
  * # Safety
  * - Real-time safe: Can be called from audio processing threads.

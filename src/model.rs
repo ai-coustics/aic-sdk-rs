@@ -2,7 +2,12 @@ use crate::error::*;
 
 use aic_sdk_sys::*;
 
-use std::{ffi::CString, marker::PhantomData, path::Path, ptr};
+use std::{
+    ffi::{CStr, CString},
+    marker::PhantomData,
+    path::Path,
+    ptr,
+};
 
 /// High-level wrapper for the ai-coustics audio enhancement model.
 ///
@@ -118,6 +123,22 @@ impl<'a> Model<'a> {
             inner: model_ptr,
             marker: PhantomData,
         })
+    }
+
+    /// Returns the model identifier string.
+    ///
+    /// # Note
+    /// The returned string is owned by the underlying model and remains valid
+    /// for the lifetime of this `Model` instance.
+    pub fn id(&self) -> &str {
+        // SAFETY: `self` owns a valid model pointer created by the SDK.
+        let id_ptr = unsafe { aic_model_get_id(self.as_const_ptr()) };
+        if id_ptr.is_null() {
+            return "unknown";
+        }
+
+        // SAFETY: Pointer either came from the SDK or we already bailed if it was null.
+        unsafe { CStr::from_ptr(id_ptr).to_str().unwrap_or("unknown") }
     }
 
     /// Downloads a model file from the ai-coustics artifact CDN.
