@@ -103,6 +103,7 @@ cargo run --example basic_usage --features "download-lib,download-model"
 
 ### Documentation
 - **[Basic Example](examples/basic_usage.rs)** - Sample code and integration patterns
+- **[Build-Time Download Example](examples/build-time-download)** - Download and embed models at compile-time
 
 ### Looking for Other Languages?
 The ai-coustics Speech Enhancement SDK is available in multiple programming languages to fit your development needs:

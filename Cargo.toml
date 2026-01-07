@@ -1,5 +1,5 @@
 [workspace]
-members = ["aic-sdk-sys"]
+members = ["aic-sdk-sys", "examples/build-time-download"]
 
 [workspace.dependencies]
 aic-sdk-sys = { version = "0.13.0", path = "aic-sdk-sys" }
