@@ -18,16 +18,16 @@ use std::{
 /// # Example
 ///
 /// ```rust,no_run
-/// # use aic_sdk::{Config, Model, Processor};
+/// # use aic_sdk::{Model, ProcessorConfig, Processor};
 /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
 /// let mut processor = Processor::new(&model, &license_key).unwrap();
-/// let config = Config {
+/// let config = ProcessorConfig {
 ///     num_channels: 2,
-///     ..processor.optimal_config()
+///     ..ProcessorConfig::optimal(&model)
 /// };
 /// processor.initialize(&config).unwrap();
-/// let mut audio_buffer = vec![0.0f32; config.num_channels * config.num_frames];
+/// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
 pub struct Model<'a> {
@@ -178,9 +178,8 @@ impl<'a> Model<'a> {
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(&model, &license_key).unwrap();
-    /// let optimal_rate = processor.optimal_sample_rate();
-    /// println!("Optimal sample rate: {optimal_rate} Hz");
+    /// let optimal_sample_rate = model.optimal_sample_rate();
+    /// println!("Optimal sample rate: {optimal_sample_rate} Hz");
     /// ```
     pub fn optimal_sample_rate(&self) -> u32 {
         let mut sample_rate: u32 = 0;
@@ -206,28 +205,27 @@ impl<'a> Model<'a> {
     /// Adjust the number of channels and enable variable frames by using struct-update syntax.
     ///
     /// ```rust,no_run
-    /// # use aic_sdk::{Config, Model, Processor};
+    /// # use aic_sdk::{Model, ProcessorConfig, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let processor = Processor::new(&model, &license_key).unwrap();
-    /// let config = Config {
+    /// let config = ProcessorConfig {
     ///     num_channels: 2,
     ///     allow_variable_frames: true,
-    ///     ..processor.optimal_config()
+    ///     ..ProcessorConfig::optimal(&model)
     /// };
     /// ```
     ///
     /// If you need to configure a non-optimal sample rate or number of frames,
     /// construct the [`ProcessorConfig`] struct directly. For example:
     /// ```rust,no_run
-    /// # use aic_sdk::{Config, Model, Processor};
+    /// # use aic_sdk::{Model, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(&model, &license_key).unwrap();
-    /// let config = Config {
+    /// let config = ProcessorConfig {
     ///     num_channels: 2,
     ///     sample_rate: 44100,
-    ///     num_frames: processor.optimal_num_frames(44100),
+    ///     num_frames: model.optimal_num_frames(44100),
     ///     allow_variable_frames: true,
     /// };
     /// ```
@@ -273,9 +271,8 @@ impl<'a> Model<'a> {
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(&model, &license_key).unwrap();
-    /// # let sample_rate = processor.optimal_sample_rate();
-    /// let optimal_frames = processor.optimal_num_frames(sample_rate);
+    /// # let sample_rate = model.optimal_sample_rate();
+    /// let optimal_frames = model.optimal_num_frames(sample_rate);
     /// println!("Optimal frame count: {optimal_frames}");
     /// ```
     pub fn optimal_num_frames(&self, sample_rate: u32) -> usize {

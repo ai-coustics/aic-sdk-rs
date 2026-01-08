@@ -44,7 +44,7 @@ We recommend that the selected model is downloaded and embedded into your binary
 ## Example Usage
 
 ```rust,no_run
-use aic_sdk::{include_model, Config, Model, Parameter, Processor};
+use aic_sdk::{include_model, ProcessorConfig, Model, Processor, ProcessorParameter};
 
 static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
 
@@ -58,28 +58,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut processor = Processor::new(&model, &license_key)?;
 
     // Set up your desired audio settings
-    let config = Config {
+    let config = ProcessorConfig {
         num_channels: 2,
         allow_variable_frames: true,
-        ..processor.optimal_config()
+        ..ProcessorConfig::optimal(&model)
     };
 
     // Initialize the processor
     processor.initialize(&config)?;
 
-    let mut audio_buffer = vec![0.0f32; config.num_frames * config.num_channels];
+    let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
 
     // The process function is where the actual enhancement is happening
     // This is meant to be called in your real-time audio thread
     processor.process_interleaved(&mut audio_buffer)?;
+    
+    let processor_context = processor.processor_context();
 
     // You can also adjust parameters during processing
-    processor.set_parameter(Parameter::EnhancementLevel, 0.8)?;
+    processor_context.set_parameter(ProcessorParameter::EnhancementLevel, 0.8)?;
 
     // For planar audio processing (separate channel buffers)
-    let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels];
-    let mut audio_refs: Vec<&mut [f32]> = audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
-    processor.process_planar(&mut audio_refs)?;
+    let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
+    processor.process_planar(&mut audio)?;
 
     Ok(())
 }

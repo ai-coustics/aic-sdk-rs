@@ -76,7 +76,7 @@ impl From<VadParameter> for AicVadParameter::Type {
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
 /// let processor = Processor::new(&model, &license_key).unwrap();
-/// let vad = processor.create_vad();
+/// let vad = processor.vad_context();
 /// ```
 pub struct VadContext {
     /// Raw pointer to the C VAD structure
@@ -131,9 +131,9 @@ impl VadContext {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let processor = Processor::new(&model, &license_key).unwrap();
-    /// # let vad = processor.create_vad();
-    /// vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08).unwrap();
-    /// vad.set_parameter(VadParameter::Sensitivity, 5.0).unwrap();
+    /// # let vad_context = processor.vad_context();
+    /// vad_context.set_parameter(VadParameter::SpeechHoldDuration, 0.08).unwrap();
+    /// vad_context.set_parameter(VadParameter::Sensitivity, 5.0).unwrap();
     /// ```
     pub fn set_parameter(&self, parameter: VadParameter, value: f32) -> Result<(), AicError> {
         // SAFETY:
@@ -160,8 +160,8 @@ impl VadContext {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let processor = Processor::new(&model, &license_key).unwrap();
-    /// # let vad = processor.create_vad();
-    /// let sensitivity = vad.parameter(VadParameter::Sensitivity).unwrap();
+    /// # let vad_context = processor.vad_context();
+    /// let sensitivity = vad_context.parameter(VadParameter::Sensitivity).unwrap();
     /// println!("Current sensitivity: {sensitivity}");
     /// ```
     pub fn parameter(&self, parameter: VadParameter) -> Result<f32, AicError> {
