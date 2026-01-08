@@ -506,6 +506,11 @@ impl<'a, 'm> Processor<'a, 'm> {
     ///   audio[1] -> [ch1_f0, ch1_f1, ch1_f2, ch1_f3]
     ///   ```
     ///
+    /// The function accepts any type of collection of `f32` values that implements `as_mut`, e.g.:
+    /// - `[vec![0.0; 128]; 2]`
+    /// - `[[0.0; 128]; 2]`
+    /// - `[&mut ch1, &mut ch2]`
+    ///
     /// # Arguments
     ///
     /// * `audio` - Array of mutable channel buffer slices to be enhanced in-place.
@@ -528,8 +533,8 @@ impl<'a, 'm> Processor<'a, 'm> {
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(&model, &license_key).unwrap();
     /// let config = ProcessorConfig { num_channels: 2, ..ProcessorConfig::optimal(&model) };
-    /// let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
     /// processor.initialize(&config).unwrap();
+    /// let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
     /// processor.process_planar(&mut audio).unwrap();
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
@@ -604,8 +609,8 @@ impl<'a, 'm> Processor<'a, 'm> {
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(&model, &license_key).unwrap();
     /// let config = ProcessorConfig { num_channels: 2, ..ProcessorConfig::optimal(&model) };
-    /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
     /// processor.initialize(&config).unwrap();
+    /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
     /// processor.process_interleaved(&mut audio).unwrap();
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
@@ -666,8 +671,8 @@ impl<'a, 'm> Processor<'a, 'm> {
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(&model, &license_key).unwrap();
     /// let config = ProcessorConfig { num_channels: 2, ..ProcessorConfig::optimal(&model) };
-    /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
     /// processor.initialize(&config).unwrap();
+    /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
     /// processor.process_sequential(&mut audio).unwrap();
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
