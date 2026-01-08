@@ -255,7 +255,7 @@ impl<'a> Model<'a> {
     /// 48 kHz, but only 160 frames at 16 kHz to capture the same duration of audio.
     ///
     /// Call this function with your intended sample rate before calling
-    /// [`Processor::initialize`] to determine the best frame count for minimal latency.
+    /// [`crate::Processor::initialize`] to determine the best frame count for minimal latency.
     ///
     /// # Arguments
     ///
