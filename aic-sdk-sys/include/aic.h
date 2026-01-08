@@ -36,7 +36,7 @@ typedef enum AicErrorCode {
    */
   AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE = 2,
   /**
-   * Model must be initialized before calling this operation. Call `aic_model_initialize` first.
+   * Model must be initialized before calling this operation. Call `aic_processor_initialize` first.
    */
   AIC_ERROR_CODE_MODEL_NOT_INITIALIZED = 3,
   /**
@@ -96,7 +96,7 @@ typedef enum AicErrorCode {
 /**
  * Configurable parameters for audio processing.
  */
-typedef enum AicParameter {
+typedef enum AicProcessorParameter {
   /**
    * Controls whether audio processing is bypassed while preserving algorithmic delay.
    *
@@ -110,7 +110,7 @@ typedef enum AicParameter {
    *
    * **Default:** 0.0
    */
-  AIC_PARAMETER_BYPASS = 0,
+  AIC_PROCESSOR_PARAMETER_BYPASS = 0,
   /**
    * Controls the intensity of speech enhancement processing.
    *
@@ -120,7 +120,7 @@ typedef enum AicParameter {
    *
    * **Default:** 1.0
    */
-  AIC_PARAMETER_ENHANCEMENT_LEVEL = 1,
+  AIC_PROCESSOR_PARAMETER_ENHANCEMENT_LEVEL = 1,
   /**
    * Compensates for perceived volume reduction after noise removal.
    *
@@ -133,8 +133,8 @@ typedef enum AicParameter {
    * **Formula:** Gain (dB) = 20 × log₁₀(value)
    * **Default:** 1.0
    */
-  AIC_PARAMETER_VOICE_GAIN = 2,
-} AicParameter;
+  AIC_PROCESSOR_PARAMETER_VOICE_GAIN = 2,
+} AicProcessorParameter;
 
 /**
  * Configurable parameters for Voice Activity Detection.
@@ -195,11 +195,39 @@ typedef struct AicModel AicModel;
 
 typedef struct AicProcessor AicProcessor;
 
-typedef struct AicVad AicVad;
+typedef struct AicProcessorContext AicProcessorContext;
+
+typedef struct AicVadContext AicVadContext;
 
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
+
+/**
+ * Returns the version of the SDK.
+ *
+ * # Returns
+ * A null-terminated C string containing the version (e.g., "1.2.3")
+ *
+ * # Safety
+ * - The returned pointer points to a static string and remains valid
+ *   for the lifetime of the program. The caller should NOT free this pointer.
+ * - Real-time safe: Can be called from audio processing threads.
+ * - Thread-safe: Can be called from any thread.
+ */
+const char *aic_get_sdk_version(void);
+
+/**
+ * Returns the model version compatible with the SDK.
+ *
+ * # Returns
+ * Model version compatible with this version of the SDK.
+ *
+ * # Safety
+ * - Real-time safe: Can be called from audio processing threads.
+ * - Thread-safe: Can be called from any thread.
+ */
+uint32_t aic_get_compatible_model_version(void);
 
 /**
  * Creates a new model instance.
@@ -287,6 +315,86 @@ void aic_model_destroy(struct AicModel *model);
 const char *aic_model_get_id(const struct AicModel *model);
 
 /**
+ * Retrieves the optimal sample rate of the model.
+ *
+ * Each model is optimized for a specific sample rate, which determines the frequency
+ * range of the enhanced audio output. While you can process audio at any sample rate,
+ * understanding the model's native rate helps predict the enhancement quality.
+ *
+ * **How sample rate affects enhancement:**
+ *
+ * - Models trained at lower sample rates (e.g., 8 kHz) can only enhance frequencies
+ *   up to their Nyquist limit (4 kHz for 8 kHz models)
+ * - When processing higher sample rate input (e.g., 48 kHz) with a lower-rate model,
+ *   only the lower frequency components will be enhanced
+ *
+ * **Enhancement blending:**
+ *
+ * When enhancement strength is set below 1.0, the enhanced signal is blended with
+ * the original, maintaining the full frequency spectrum of your input while adding
+ * the model's noise reduction capabilities to the lower frequencies.
+ *
+ * **Sample rate and optimal frames relationship:**
+ *
+ * When using different sample rates than the model's native rate, the optimal number
+ * of frames (returned by `aic_model_get_optimal_num_frames`) will change. The processor's output
+ * delay remains constant regardless of sample rate as long as you use the optimal frame
+ * count for that rate.
+ *
+ * **Recommendation:**
+ *
+ * For maximum enhancement quality across the full frequency spectrum, match your
+ * input sample rate to the model's native rate when possible.
+ *
+ * # Parameters
+ * - `model`: Model instance. Must not be NULL.
+ * - `sample_rate`: Receives the optimal sample rate in Hz. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Sample rate retrieved successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `model` or `sample_rate` is NULL
+ *
+ * # Safety
+ * - Real-time safe: Can be called from audio processing threads.
+ * - Thread-safe: Can be called from any thread.
+ */
+enum AicErrorCode aic_model_get_optimal_sample_rate(const struct AicModel *model,
+                                                    uint32_t *sample_rate);
+
+/**
+ * Retrieves the optimal number of frames for the model at a given sample rate.
+ *
+ * Using the optimal number of frames minimizes latency by avoiding internal buffering.
+ *
+ * **When you use a different frame count than the optimal value, the processor will
+ * introduce additional buffering latency on top of its base processing delay.**
+ *
+ * The optimal frame count varies based on the sample rate. Each model operates on a
+ * fixed time window length, so the required number of frames changes with sample rate.
+ * For example, a model designed for 10 ms processing windows requires 480 frames at
+ * 48 kHz, but only 160 frames at 16 kHz to capture the same duration of audio.
+ *
+ * Call this function with your intended sample rate before calling `aic_processor_initialize`
+ * to determine the best frame count for minimal latency.
+ *
+ * # Parameters
+ * - `model`: Model instance. Must not be NULL.
+ * - `sample_rate`: The sample rate in Hz for which to calculate the optimal frame count.
+ * - `num_frames`: Receives the optimal frame count. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Frame count retrieved successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `model` or `num_frames` is NULL
+ *
+ * # Safety
+ * - Real-time safe: Can be called from audio processing threads.
+ * - Thread-safe: Can be called from any thread.
+ */
+enum AicErrorCode aic_model_get_optimal_num_frames(const struct AicModel *model,
+                                                   uint32_t sample_rate,
+                                                   size_t *num_frames);
+
+/**
  * Creates a new audio processor instance.
  *
  * Multiple processors can be created to process different audio streams simultaneously
@@ -330,7 +438,7 @@ void aic_processor_destroy(struct AicProcessor *processor);
  *
  * This function must be called before processing any audio.
  * For the lowest delay use the sample rate and frame size returned by
- * `aic_get_optimal_sample_rate` and `aic_get_optimal_num_frames`.
+ * `aic_processor_get_optimal_sample_rate` and `aic_processor_get_optimal_num_frames`.
  *
  * # Parameters
  * - `processor`: Processor instance to configure. Must not be NULL.
@@ -357,27 +465,6 @@ enum AicErrorCode aic_processor_initialize(struct AicProcessor *processor,
                                            uint16_t num_channels,
                                            size_t num_frames,
                                            bool allow_variable_frames);
-
-/**
- * Clears all internal state and buffers.
- *
- * Call this when the audio stream is interrupted or when seeking
- * to prevent artifacts from previous audio content.
- *
- * The processor stays initialized to the configured settings.
- *
- * # Parameters
- * - `processor`: Processor instance to reset. Must not be NULL.
- *
- * # Returns
- * - `AIC_ERROR_CODE_SUCCESS`: State cleared successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` is NULL
- *
- * # Safety
- * - Real-time safe: Can be called from audio processing threads.
- * - Thread-safe: Can be called from any thread.
- */
-enum AicErrorCode aic_processor_reset(const struct AicProcessor *processor);
 
 /**
  * Processes audio with separate buffers for each channel (planar layout).
@@ -488,50 +575,112 @@ enum AicErrorCode aic_processor_process_sequential(struct AicProcessor *processo
                                                    size_t num_frames);
 
 /**
+ * Creates a processor context handle for thread-safe control APIs.
+ *
+ * Use the returned handle to reset the processor, parameter APIs,
+ * and other thread-safe functions that operate on `AicProcessorContext`.
+ *
+ * # Parameters
+ * - `context`: Receives the handle to the processor context. Must not be NULL.
+ * - `processor`: Processor instance. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Context handle created successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `context` is NULL
+ *
+ * # Safety
+ * - Thread-safe: Can be called from any thread.
+ */
+enum AicErrorCode aic_processor_context_create(struct AicProcessorContext **context,
+                                               const struct AicProcessor *processor);
+
+/**
+ * Releases a processor context handle.
+ *
+ * After calling this function, the context handle becomes invalid.
+ * This function is safe to call with NULL.
+ * Destroying the context does not destroy the associated processor.
+ *
+ * # Parameters
+ * - `context`: Context instance to destroy. Can be NULL.
+ *
+ * # Safety
+ * - Thread-safe: Can be called from any thread.
+ */
+void aic_processor_context_destroy(struct AicProcessorContext *context);
+
+/**
+ * Clears all internal state and buffers.
+ *
+ * Call this when the audio stream is interrupted or when seeking
+ * to prevent artifacts from previous audio content.
+ *
+ * This operates on the processor associated with the provided context handle.
+ *
+ * The processor stays initialized to the configured settings.
+ *
+ * # Parameters
+ * - `context`: Processor context instance to reset. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: State cleared successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` is NULL
+ *
+ * # Safety
+ * - Real-time safe: Can be called from audio processing threads.
+ * - Thread-safe: Can be called from any thread.
+ */
+enum AicErrorCode aic_processor_context_reset(const struct AicProcessorContext *context);
+
+/**
  * Modifies an enhancement parameter.
  *
  * All parameters can be changed during audio processing.
  * This function can be called from any thread.
  *
+ * This operates on the processor associated with the provided context handle.
+ *
  * # Parameters
- * - `processor`: Emhancer instance. Must not be NULL.
+ * - `context`: Processor context instance. Must not be NULL.
  * - `parameter`: Parameter to modify.
  * - `value`: New parameter value. See parameter documentation for ranges.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Parameter updated successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` is NULL
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` is NULL
  * - `AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE`: Value outside valid range
  *
  * # Safety
  * - Real-time safe: Can be called from audio processing threads.
  * - Thread-safe: Can be called from any thread.
  */
-enum AicErrorCode aic_processor_set_parameter(const struct AicProcessor *processor,
-                                              enum AicParameter parameter,
-                                              float value);
+enum AicErrorCode aic_processor_context_set_parameter(const struct AicProcessorContext *context,
+                                                      enum AicProcessorParameter parameter,
+                                                      float value);
 
 /**
  * Retrieves the current value of a parameter.
  *
  * This function can be called from any thread.
  *
+ * This queries the processor associated with the provided context handle.
+ *
  * # Parameters
- * - `processor`: Processor instance. Must not be NULL.
+ * - `context`: Processor context instance. Must not be NULL.
  * - `parameter`: Parameter to query.
  * - `value`: Receives the current parameter value. Must not be NULL.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Parameter retrieved successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `value` is NULL
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` or `value` is NULL
  *
  * # Safety
  * - Real-time safe: Can be called from audio processing threads.
  * - Thread-safe: Can be called from any thread.
  */
-enum AicErrorCode aic_processor_get_parameter(const struct AicProcessor *processor,
-                                              enum AicParameter parameter,
-                                              float *value);
+enum AicErrorCode aic_processor_context_get_parameter(const struct AicProcessorContext *context,
+                                                      enum AicProcessorParameter parameter,
+                                                      float *value);
 
 /**
  * Returns the total output delay in samples for the current audio configuration.
@@ -540,6 +689,8 @@ enum AicErrorCode aic_processor_get_parameter(const struct AicProcessor *process
  * which includes both algorithmic processing delay and any buffering overhead.
  * Use this value to synchronize enhanced audio with other streams or to implement
  * delay compensation in your application.
+ *
+ * This queries the processor associated with the provided context handle.
  *
  * **Delay behavior:**
  * - **Before initialization:** Returns the base processing delay using the processor's
@@ -552,127 +703,52 @@ enum AicErrorCode aic_processor_get_parameter(const struct AicProcessor *process
  * `delay_ms = (delay_samples * 1000) / sample_rate`
  *
  * **Note:** Using frame sizes different from the optimal value returned by
- * `aic_get_optimal_num_frames` will increase the delay beyond the processor's base latency.
+ * `aic_processor_get_optimal_num_frames` will increase the delay beyond the processor's base latency.
  *
  * # Parameters
- * - `processor`: Initialized processor instance. Must not be NULL.
+ * - `context`: Processor context instance. Must not be NULL.
  * - `delay`: Receives the delay in samples. Must not be NULL.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Delay retrieved successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `delay` is NULL
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` or `delay` is NULL
  *
  * # Safety
  * - Real-time safe: Can be called from audio processing threads.
  * - Thread-safe: Can be called from any thread.
  */
-enum AicErrorCode aic_get_output_delay(const struct AicProcessor *processor, size_t *delay);
+enum AicErrorCode aic_processor_context_get_output_delay(const struct AicProcessorContext *context,
+                                                         size_t *delay);
 
 /**
- * Retrieves the native sample rate of the selected model.
+ * Creates a VAD context handle for thread-safe control APIs.
  *
- * Each model is optimized for a specific sample rate, which determines the frequency
- * range of the enhanced audio output. While you can process audio at any sample rate,
- * understanding the model's native rate helps predict the enhancement quality.
+ * The voice activity detection works automatically using the enhanced audio output
+ * of a given processor.
  *
- * **How sample rate affects enhancement:**
- *
- * - Models trained at lower sample rates (e.g., 8 kHz) can only enhance frequencies
- *   up to their Nyquist limit (4 kHz for 8 kHz models)
- * - When processing higher sample rate input (e.g., 48 kHz) with a lower-rate model,
- *   only the lower frequency components will be enhanced
- *
- * **Enhancement blending:**
- *
- * When enhancement strength is set below 1.0, the enhanced signal is blended with
- * the original, maintaining the full frequency spectrum of your input while adding
- * the model's noise reduction capabilities to the lower frequencies.
- *
- * **Sample rate and optimal frames relationship:**
- *
- * When using different sample rates than the model's native rate, the optimal number
- * of frames (returned by `aic_get_optimal_num_frames`) will change. The processor's output
- * delay remains constant regardless of sample rate as long as you use the optimal frame
- * count for that rate.
- *
- * **Recommendation:**
- *
- * For maximum enhancement quality across the full frequency spectrum, match your
- * input sample rate to the model's native rate when possible.
- *
- * # Parameters
- * - `processor`: Processor instance. Must not be NULL.
- * - `sample_rate`: Receives the optimal sample rate in Hz. Must not be NULL.
- *
- * # Returns
- * - `AIC_ERROR_CODE_SUCCESS`: Sample rate retrieved successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `sample_rate` is NULL
- *
- * # Safety
- * - Real-time safe: Can be called from audio processing threads.
- * - Thread-safe: Can be called from any thread.
- */
-enum AicErrorCode aic_get_optimal_sample_rate(const struct AicProcessor *processor,
-                                              uint32_t *sample_rate);
-
-/**
- * Retrieves the optimal number of frames for the processor at a given sample rate.
- *
- * Using the optimal number of frames minimizes latency by avoiding internal buffering.
- *
- * **When you use a different frame count than the optimal value, the processor will
- * introduce additional buffering latency on top of its base processing delay.**
- *
- * The optimal frame count varies based on the sample rate. Each processor operates on a
- * fixed time window length, so the required number of frames changes with sample rate.
- * For example, a model designed for 10 ms processing windows requires 480 frames at
- * 48 kHz, but only 160 frames at 16 kHz to capture the same duration of audio.
- *
- * Call this function with your intended sample rate before calling `aic_processor_initialize`
- * to determine the best frame count for minimal latency.
- *
- * # Parameters
- * - `processor`: Processor instance. Must not be NULL.
- * - `sample_rate`: The sample rate in Hz for which to calculate the optimal frame count.
- * - `num_frames`: Receives the optimal frame count. Must not be NULL.
- *
- * # Returns
- * - `AIC_ERROR_CODE_SUCCESS`: Frame count retrieved successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `num_frames` is NULL
- *
- * # Safety
- * - Real-time safe: Can be called from audio processing threads.
- * - Thread-safe: Can be called from any thread.
- */
-enum AicErrorCode aic_get_optimal_num_frames(const struct AicProcessor *processor,
-                                             uint32_t sample_rate,
-                                             size_t *num_frames);
-
-/**
- * Creates a new Voice Activity Detector instance.
- *
- * The VAD works automatically using the enhanced audio output of a given processor.
+ * This uses the processor associated with the provided processor handle.
  *
  * **Important:** If the backing processor is destroyed, the VAD instance will stop
  * producing new data. It is safe to destroy the processor without destroying the VAD.
  *
  * # Parameters
- * - `vad`: Receives the handle to the newly created VAD. Must not be NULL.
+ * - `context`: VAD context instance. Must not be NULL.
  * - `processor`: Processor instance to use as data source for the VAD.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: VAD created successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `vad` or `processor` is NULL
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` or `processor` is NULL
  *
  * # Safety
  * - Real-time safe: Can be called from audio processing threads.
- * - This function is not thread-safe. Ensure no other threads are using the VAD handle.
+ * - Thread-safe: Can be called from any thread.
  * - It is safe for the processor handle to be currently in use by other threads.
  */
-enum AicErrorCode aic_vad_create(struct AicVad **vad, const struct AicProcessor *processor);
+enum AicErrorCode aic_vad_context_create(struct AicVadContext **context,
+                                         const struct AicProcessor *processor);
 
 /**
- * Releases the VAD instance.
+ * Releases a VAD context handle.
  *
  * **Important:** This does **NOT** destroy the backing processor.
  * `aic_processor_destroy` must be called separately.
@@ -681,12 +757,12 @@ enum AicErrorCode aic_vad_create(struct AicVad **vad, const struct AicProcessor 
  * This function is safe to call with NULL.
  *
  * # Parameters
- * - `vad`: VAD instance to destroy. Can be NULL.
+ * - `context`: VAD context instance.
  *
  * # Safety
- * - This function is not thread-safe. Ensure no other threads are using the VAD handle.
+ * - Thread-safe: Can be called from any thread.
  */
-void aic_vad_destroy(struct AicVad *vad);
+void aic_vad_context_destroy(struct AicVadContext *context);
 
 /**
  * Returns the VAD's prediction.
@@ -698,18 +774,19 @@ void aic_vad_destroy(struct AicVad *vad);
  *   the VAD will not update its speech detection prediction.
  *
  * # Parameters
- * - `vad`: VAD instance. Must not be NULL.
+ * - `context`: VAD context instance. Must not be NULL.
  * - `value`: Receives the VAD prediction. Must not be NULL.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Prediction retrieved successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `vad` or `value` is NULL
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` or `value` is NULL
  *
  * # Safety
  * - Real-time safe: Can be called from audio processing threads.
  * - Thread-safe: Can be called from any thread.
  */
-enum AicErrorCode aic_vad_is_speech_detected(const struct AicVad *vad, bool *value);
+enum AicErrorCode aic_vad_context_is_speech_detected(const struct AicVadContext *context,
+                                                     bool *value);
 
 /**
  * Modifies a VAD parameter.
@@ -718,22 +795,22 @@ enum AicErrorCode aic_vad_is_speech_detected(const struct AicVad *vad, bool *val
  * This function can be called from any thread.
  *
  * # Parameters
- * - `vad`: VAD instance. Must not be NULL.
+ * - `context`: VAD context instance. Must not be NULL.
  * - `parameter`: Parameter to modify.
  * - `value`: New parameter value. See parameter documentation for ranges.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Parameter updated successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `vad` is NULL
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` is NULL
  * - `AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE`: Value outside valid range
  *
  * # Safety
  * - Real-time safe: Can be called from audio processing threads.
  * - Thread-safe: Can be called from any thread.
  */
-enum AicErrorCode aic_vad_set_parameter(const struct AicVad *vad,
-                                        enum AicVadParameter parameter,
-                                        float value);
+enum AicErrorCode aic_vad_context_set_parameter(const struct AicVadContext *context,
+                                                enum AicVadParameter parameter,
+                                                float value);
 
 /**
  * Retrieves the current value of a parameter.
@@ -741,49 +818,21 @@ enum AicErrorCode aic_vad_set_parameter(const struct AicVad *vad,
  * This function can be called from any thread.
  *
  * # Parameters
- * - `vad`: VAD instance. Must not be NULL.
+ * - `context`: VAD context instance. Must not be NULL.
  * - `parameter`: Parameter to query.
  * - `value`: Receives the current parameter value. Must not be NULL.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Parameter retrieved successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `vad` or `value` is NULL
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` or `value` is NULL
  *
  * # Safety
  * - Real-time safe: Can be called from audio processing threads.
  * - Thread-safe: Can be called from any thread.
  */
-enum AicErrorCode aic_vad_get_parameter(const struct AicVad *vad,
-                                        enum AicVadParameter parameter,
-                                        float *value);
-
-/**
- * Returns the version of the SDK.
- *
- * # Safety
- * The returned pointer points to a static string and remains valid
- * for the lifetime of the program. The caller should NOT free this pointer.
- *
- * # Returns
- * A null-terminated C string containing the version (e.g., "1.2.3")
- *
- * # Safety
- * - Real-time safe: Can be called from audio processing threads.
- * - Thread-safe: Can be called from any thread.
- */
-const char *aic_get_sdk_version(void);
-
-/**
- * Returns the model version compatible with the SDK.
- *
- * # Returns
- * Model version compatible with this version of the SDK.
- *
- * # Safety
- * - Real-time safe: Can be called from audio processing threads.
- * - Thread-safe: Can be called from any thread.
- */
-uint32_t aic_get_compatible_model_version(void);
+enum AicErrorCode aic_vad_context_get_parameter(const struct AicVadContext *context,
+                                                enum AicVadParameter parameter,
+                                                float *value);
 
 #ifdef __cplusplus
 }  // extern "C"

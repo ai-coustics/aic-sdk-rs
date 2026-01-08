@@ -78,19 +78,19 @@ impl From<VadParameter> for AicVadParameter::Type {
 /// let processor = Processor::new(&model, &license_key).unwrap();
 /// let vad = processor.create_vad();
 /// ```
-pub struct Vad {
+pub struct VadContext {
     /// Raw pointer to the C VAD structure
-    inner: *mut AicVad,
+    inner: *mut AicVadContext,
 }
 
-impl Vad {
+impl VadContext {
     /// Creates a new VAD instance.
-    pub(crate) fn new(vad_ptr: *mut AicVad) -> Self {
+    pub(crate) fn new(vad_ptr: *mut AicVadContext) -> Self {
         Self { inner: vad_ptr }
     }
 
-    fn as_const_ptr(&self) -> *const AicVad {
-        self.inner as *const AicVad
+    fn as_const_ptr(&self) -> *const AicVadContext {
+        self.inner as *const AicVadContext
     }
 
     /// Returns the VAD's prediction.
@@ -105,7 +105,8 @@ impl Vad {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live VAD.
         // - `value` points to stack storage for output.
-        let error_code = unsafe { aic_vad_is_speech_detected(self.as_const_ptr(), &mut value) };
+        let error_code =
+            unsafe { aic_vad_context_is_speech_detected(self.as_const_ptr(), &mut value) };
 
         // This should never fail
         assert!(handle_error(error_code).is_ok());
@@ -138,7 +139,7 @@ impl Vad {
         // SAFETY:
         // - `self.as_const_ptr()` is a live VAD pointer.
         let error_code =
-            unsafe { aic_vad_set_parameter(self.as_const_ptr(), parameter.into(), value) };
+            unsafe { aic_vad_context_set_parameter(self.as_const_ptr(), parameter.into(), value) };
         handle_error(error_code)
     }
 
@@ -168,23 +169,24 @@ impl Vad {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live VAD.
         // - `value` points to stack storage for output.
-        let error_code =
-            unsafe { aic_vad_get_parameter(self.as_const_ptr(), parameter.into(), &mut value) };
+        let error_code = unsafe {
+            aic_vad_context_get_parameter(self.as_const_ptr(), parameter.into(), &mut value)
+        };
         handle_error(error_code)?;
         Ok(value)
     }
 }
 
-impl Drop for Vad {
+impl Drop for VadContext {
     fn drop(&mut self) {
         if !self.inner.is_null() {
             // SAFETY:
             // - `self.inner` was allocated by the SDK and is still owned by this wrapper.
-            unsafe { aic_vad_destroy(self.inner) };
+            unsafe { aic_vad_context_destroy(self.inner) };
         }
     }
 }
 
 // Safety: The underlying C library should be thread-safe for individual VAD instances
-unsafe impl Send for Vad {}
-unsafe impl Sync for Vad {}
+unsafe impl Send for VadContext {}
+unsafe impl Sync for VadContext {}

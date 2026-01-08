@@ -1,4 +1,4 @@
-use crate::error::*;
+use crate::{ProcessorConfig, error::*};
 
 use aic_sdk_sys::*;
 
@@ -139,6 +139,162 @@ impl<'a> Model<'a> {
 
         // SAFETY: Pointer either came from the SDK or we already bailed if it was null.
         unsafe { CStr::from_ptr(id_ptr).to_str().unwrap_or("unknown") }
+    }
+
+    /// Retrieves the native sample rate of the processor's model.
+    ///
+    /// Each model is optimized for a specific sample rate, which determines the frequency
+    /// range of the enhanced audio output. While you can process audio at any sample rate,
+    /// understanding the model's native rate helps predict the enhancement quality.
+    ///
+    /// **How sample rate affects enhancement:**
+    /// - Models trained at lower sample rates (e.g., 8 kHz) can only enhance frequencies
+    ///   up to their Nyquist limit (4 kHz for 8 kHz models)
+    /// - When processing higher sample rate input (e.g., 48 kHz) with a lower-rate model,
+    ///   only the lower frequency components will be enhanced
+    ///
+    /// **Enhancement blending:**
+    /// When enhancement strength is set below 1.0, the enhanced signal is blended with
+    /// the original, maintaining the full frequency spectrum of your input while adding
+    /// the model's noise reduction capabilities to the lower frequencies.
+    ///
+    /// **Sample rate and optimal frames relationship:**
+    /// When using different sample rates than the model's native rate, the optimal number
+    /// of frames (returned by `optimal_num_frames`) will change. The model's output
+    /// delay remains constant regardless of sample rate as long as you use the optimal frame
+    /// count for that rate.
+    ///
+    /// **Recommendation:**
+    /// For maximum enhancement quality across the full frequency spectrum, match your
+    /// input sample rate to the model's native rate when possible.
+    ///
+    /// # Returns
+    ///
+    /// Returns the model's native sample rate.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Processor};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// let optimal_rate = processor.optimal_sample_rate();
+    /// println!("Optimal sample rate: {optimal_rate} Hz");
+    /// ```
+    pub fn optimal_sample_rate(&self) -> u32 {
+        let mut sample_rate: u32 = 0;
+        // SAFETY:
+        // - `self.as_const_ptr()` is a valid pointer to a live processor.
+        // - `sample_rate` points to stack storage for output.
+        let error_code =
+            unsafe { aic_model_get_optimal_sample_rate(self.as_const_ptr(), &mut sample_rate) };
+
+        // This should never fail. If it does, it's a bug in the SDK.
+        // `aic_get_optimal_sample_rate` is documented to always succeed if given a valid processor pointer.
+        assert_success(
+            error_code,
+            "`aic_model_get_optimal_sample_rate` failed. This is a bug, please open an issue on GitHub for further investigation.",
+        );
+
+        // This should never fail
+        sample_rate
+    }
+
+    /// Returns a [`ProcessorConfig`] pre-filled with the model's optimal sample rate and frame size.
+    ///
+    /// Adjust the number of channels and enable variable frames by using struct-update syntax.
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Config, Model, Processor};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// let config = Config {
+    ///     num_channels: 2,
+    ///     allow_variable_frames: true,
+    ///     ..processor.optimal_config()
+    /// };
+    /// ```
+    ///
+    /// If you need to configure a non-optimal sample rate or number of frames,
+    /// construct the [`ProcessorConfig`] struct directly. For example:
+    /// ```rust,no_run
+    /// # use aic_sdk::{Config, Model, Processor};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// let config = Config {
+    ///     num_channels: 2,
+    ///     sample_rate: 44100,
+    ///     num_frames: processor.optimal_num_frames(44100),
+    ///     allow_variable_frames: true,
+    /// };
+    /// ```
+    ///
+    pub fn optimal_processor_config(&self) -> ProcessorConfig {
+        let sample_rate = self.optimal_sample_rate();
+        let num_frames = self.optimal_num_frames(sample_rate);
+        ProcessorConfig {
+            sample_rate,
+            num_channels: 1,
+            num_frames,
+            allow_variable_frames: false,
+        }
+    }
+
+    /// Retrieves the optimal number of frames for the selected model at a given sample rate.
+    ///
+    ///
+    /// Using the optimal number of frames minimizes latency by avoiding internal buffering.
+    ///
+    /// **When you use a different frame count than the optimal value, the model will
+    /// introduce additional buffering latency on top of its base processing delay.**
+    ///
+    /// The optimal frame count varies based on the sample rate. Each model operates on a
+    /// fixed time window duration, so the required number of frames changes with sample rate.
+    /// For example, a model designed for 10 ms processing windows requires 480 frames at
+    /// 48 kHz, but only 160 frames at 16 kHz to capture the same duration of audio.
+    ///
+    /// Call this function with your intended sample rate before calling
+    /// [`Processor::initialize`] to determine the best frame count for minimal latency.
+    ///
+    /// # Arguments
+    ///
+    /// * `sample_rate` - The sample rate in Hz for which to calculate the optimal frame count.
+    ///
+    /// # Returns
+    ///
+    /// Returns the optimal frame count.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Processor};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let sample_rate = processor.optimal_sample_rate();
+    /// let optimal_frames = processor.optimal_num_frames(sample_rate);
+    /// println!("Optimal frame count: {optimal_frames}");
+    /// ```
+    pub fn optimal_num_frames(&self, sample_rate: u32) -> usize {
+        let mut num_frames: usize = 0;
+        // SAFETY:
+        // - `self.as_const_ptr()` is a valid pointer to a live processor.
+        // - `num_frames` points to stack storage for output.
+        let error_code = unsafe {
+            aic_model_get_optimal_num_frames(self.as_const_ptr(), sample_rate, &mut num_frames)
+        };
+
+        // This should never fail. If it does, it's a bug in the SDK.
+        // `aic_get_optimal_num_frames` is documented to always succeed if given valid pointers.
+        assert_success(
+            error_code,
+            "`aic_model_get_optimal_num_frames` failed. This is a bug, please open an issue on GitHub for further investigation.",
+        );
+
+        num_frames
     }
 
     /// Downloads a model file from the ai-coustics artifact CDN.

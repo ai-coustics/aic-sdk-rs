@@ -9,6 +9,7 @@ mod model;
 mod processor;
 mod vad;
 
+pub use audio_blocks::*;
 pub use error::*;
 pub use model::*;
 pub use processor::*;
@@ -30,10 +31,10 @@ pub use vad::*;
 /// # Example
 ///
 /// ```rust
-/// let version = aic_sdk::get_version();
+/// let version = aic_sdk::get_sdk_version();
 /// println!("ai-coustics SDK version: {version}");
 /// ```
-pub fn get_version() -> &'static str {
+pub fn get_sdk_version() -> &'static str {
     // SAFETY: FFI call returns a pointer to a static C string owned by the SDK.
     // The pointer may be null if the version cannot be retrieved.
     let version_ptr = unsafe { aic_get_sdk_version() };

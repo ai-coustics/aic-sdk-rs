@@ -5,7 +5,7 @@ static MODEL: &'static [u8] = include_model!(env!("MODEL_PATH"));
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get license key from environment variable
-    let license = env::var("AIC_SDK_LICENSE").expect("AIC_SDK_LICENSE environment variable");
+    let license = std::env::var("AIC_SDK_LICENSE").expect("AIC_SDK_LICENSE environment variable");
 
     let model = Model::from_buffer(MODEL)?;
 

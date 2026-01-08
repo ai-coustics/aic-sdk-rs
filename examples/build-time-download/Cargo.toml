@@ -5,7 +5,7 @@ publish = false
 version = "0.1.0"
 
 [dependencies]
-aic-sdk = { path = "../..", features = ["download-lib"] }
+aic-sdk = { path = "../.." }
 
 [build-dependencies]
-aic-sdk = { path = "../..", features = ["download-lib", "download-model"] }
+aic-sdk = { path = "../..", features = ["download-model"] }

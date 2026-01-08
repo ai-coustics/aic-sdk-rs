@@ -1,7 +1,9 @@
 #![cfg_attr(not(feature = "download-model"), allow(dead_code, unused_imports))]
 
 #[cfg(feature = "download-model")]
-use aic_sdk::{Config, Model, Parameter, Processor, VadParameter};
+use aic_sdk::{
+    AudioBlockPlanar, Model, Processor, ProcessorConfig, ProcessorParameter, VadParameter,
+};
 use std::env;
 
 #[cfg(not(feature = "download-model"))]
@@ -12,7 +14,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(feature = "download-model")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Display library version
-    println!("ai-coustics SDK version: {}", aic_sdk::get_version());
+    println!("ai-coustics SDK version: {}", aic_sdk::get_sdk_version());
+    println!(
+        "Compatible model version: {}",
+        aic_sdk::get_compatible_model_version()
+    );
 
     // Get license key from environment variable
     let license = env::var("AIC_SDK_LICENSE").expect("AIC_SDK_LICENSE environment variable");
@@ -27,10 +33,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Processor created successfully");
 
     // Set up configuration
-    let config = Config {
+    let config = ProcessorConfig {
         num_channels: 2,
         allow_variable_frames: true,
-        ..processor.optimal_config()
+        ..ProcessorConfig::optimal(&model)
     };
 
     // Initialize the processor
@@ -40,60 +46,55 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         config.sample_rate, config.num_frames, config.num_channels
     );
 
+    // Process audio block of any layout
+    let mut audio_block = AudioBlockPlanar::new(config.num_channels, config.num_frames);
+    processor.process(&mut audio_block)?;
+
+    // Alternatively process direct slices
+    // Interleaved = [l, r, l, r, ..]
+    let mut audio_interleaved = vec![0.0; config.num_channels as usize * config.num_frames];
+    processor.process_interleaved(&mut audio_interleaved)?;
+
+    // Sequential = [l, l, .., r, r, ..]
+    let mut audio_sequential = vec![0.0; config.num_channels as usize * config.num_frames];
+    processor.process_sequential(&mut audio_sequential)?;
+
+    // Planar = [[l, l, ..], [r, r, ..]]
+    let mut audio_planar = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
+    processor.process_planar(&mut audio_planar);
+
+    // Get processor context for thread safe interaction with parameters
+    let processor_context = processor.processor_context();
+
     // Get output delay
-    let delay = processor.output_delay();
+    let delay = processor_context.output_delay();
     println!("Output delay: {} samples", delay);
 
     // Test parameter setting and getting
-    processor.set_parameter(Parameter::EnhancementLevel, 0.7)?;
+    processor_context.set_parameter(ProcessorParameter::EnhancementLevel, 0.7)?;
     println!("Parameter set successfully");
 
-    let enhancement_level = processor.parameter(Parameter::EnhancementLevel)?;
+    let enhancement_level = processor_context.parameter(ProcessorParameter::EnhancementLevel)?;
     println!("Enhancement level: {}", enhancement_level);
 
-    // Create minimal test audio - planar format (separate buffers for each channel)
-    let mut audio_buffer_left = vec![0.0f32; config.num_frames];
-    let mut audio_buffer_right = vec![0.0f32; config.num_frames];
-
-    // Create mutable references for planar processing
-    let mut audio_planar = vec![
-        audio_buffer_left.as_mut_slice(),
-        audio_buffer_right.as_mut_slice(),
-    ];
-
-    // Test planar audio processing
-    match processor.process_planar(&mut audio_planar) {
-        Ok(()) => println!("Planar processing succeeded"),
-        Err(e) => println!("Planar processing failed: {}", e),
-    }
-
-    // Create interleaved test audio (all channels mixed together)
-    let mut audio_buffer_interleaved = vec![0.0f32; config.num_channels * config.num_frames];
-
-    // Test interleaved audio processing
-    match processor.process_interleaved(&mut audio_buffer_interleaved) {
-        Ok(()) => println!("Interleaved processing succeeded"),
-        Err(e) => println!("Interleaved processing failed: {}", e),
-    }
-
     // Test reset functionality
-    match processor.reset() {
+    match processor_context.reset() {
         Ok(()) => println!("Processor reset succeeded"),
         Err(e) => println!("Processor reset failed: {}", e),
     }
 
-    // Voice Activity Detection
-    let vad = processor.create_vad();
-    vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
-    vad.set_parameter(VadParameter::Sensitivity, 7.0)?;
+    //  Get VAD context for thread safe interaction with voice activity detection parameters
+    let vad_context = processor.vad_context();
+    vad_context.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
+    vad_context.set_parameter(VadParameter::Sensitivity, 7.0)?;
 
-    let speech_hold_duration = vad.parameter(VadParameter::SpeechHoldDuration)?;
+    let speech_hold_duration = vad_context.parameter(VadParameter::SpeechHoldDuration)?;
     println!("Speech hold duration: {}", speech_hold_duration);
 
-    let sensitivity = vad.parameter(VadParameter::Sensitivity)?;
+    let sensitivity = vad_context.parameter(VadParameter::Sensitivity)?;
     println!("Sensitivity: {}", sensitivity);
 
-    if vad.is_speech_detected() {
+    if vad_context.is_speech_detected() {
         println!("VAD detected speech");
     } else {
         println!("VAD did not detect speech");
