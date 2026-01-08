@@ -43,7 +43,7 @@ We recommend that the selected model is downloaded and embedded into your binary
 
 ## Example Usage
 
-```rust,no_run
+```rust,ignore
 use aic_sdk::{include_model, ProcessorConfig, Model, Processor, ProcessorParameter};
 
 static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
