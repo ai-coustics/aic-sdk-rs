@@ -471,6 +471,50 @@ impl<'a, 'm> Processor<'a, 'm> {
         Ok(())
     }
 
+    /// Enhances speech blocks in the provided `audio_blocks` in-place.
+    ///
+    /// For more information about `audio_blocks`, see the [documentation](https://docs.rs/audio-blocks/latest/audio_blocks/).
+    ///
+    /// # Arguments
+    ///
+    /// * `audio_block` - AudioBlock that can have any type of data layout.
+    ///                   Each channel buffer must be exactly of size `num_frames`,
+    ///                   or if `allow_variable_frames` was enabled, less than the initialization value.
+    ///
+    /// # Note
+    ///
+    /// For planar blocks, the maximum supported number of channels is 16. Exceeding this will return an error.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an `AicError` if processing fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{AudioBlockInterleaved, AudioBlockSequential, AudioBlockPlanar};
+    /// # use aic_sdk::AudioBlockInterleavedViewMut;
+    /// # use aic_sdk::{Model, Processor, ProcessorConfig};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
+    /// let config = ProcessorConfig { num_channels: 2, ..ProcessorConfig::optimal(&model) };
+    /// processor.initialize(&config).unwrap();
+    ///
+    /// let mut audio_block = AudioBlockSequential::new(config.num_channels, config.num_frames);
+    /// processor.process(&mut audio_block).unwrap();
+    ///
+    /// let mut audio_block = AudioBlockInterleaved::new(config.num_channels, config.num_frames);
+    /// processor.process(&mut audio_block).unwrap();
+    ///
+    /// let mut audio_block = AudioBlockPlanar::new(config.num_channels, config.num_frames);
+    /// processor.process(&mut audio_block).unwrap();
+    ///
+    /// // For an existing buffer call
+    /// let mut data = vec![0.0; config.num_channels as usize * config.num_frames];
+    /// let mut audio_block = AudioBlockInterleavedViewMut::from_slice(&mut data, config.num_channels, config.num_frames);
+    ///  processor.process(&mut audio_block).unwrap();
+    /// ```
     pub fn process(&mut self, audio_block: &mut impl AudioBlockMut<f32>) -> Result<(), AicError> {
         match audio_block.layout() {
             audio_blocks::BlockLayout::Interleaved => self.process_interleaved(
