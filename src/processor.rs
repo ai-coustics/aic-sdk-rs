@@ -27,18 +27,17 @@ pub struct ProcessorConfig {
 impl ProcessorConfig {
     /// Returns a [`ProcessorConfig`] pre-filled with the model's optimal sample rate and frame size.
     ///
-    /// Adjust the number of channels and enable variable frames by using struct-update syntax.
+    /// `num_channels` will be set to `1` and `allow_variable_frames` to `false`.
+    /// Adjust the number of channels and enable variable frames by using the builder pattern.
     ///
     /// ```rust,no_run
     /// # use aic_sdk::{Model, ProcessorConfig, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let processor = Processor::new(&model, &license_key).unwrap();
-    /// let config = ProcessorConfig {
-    ///     num_channels: 2,
-    ///     allow_variable_frames: true,
-    ///     ..ProcessorConfig::optimal(&model)
-    /// };
+    /// let config = ProcessorConfig::optimal(&model)
+    ///     .with_num_channels(2)
+    ///     .with_variable_frames(true);
     /// ```
     ///
     /// If you need to configure a non-optimal sample rate or number of frames,
@@ -63,6 +62,28 @@ impl ProcessorConfig {
             num_frames,
             allow_variable_frames: false,
         }
+    }
+
+    /// Sets the number of audio channels for processing.
+    ///
+    /// # Arguments
+    ///
+    /// * `num_channels` - Number of audio channels (1 for mono, 2 for stereo, etc.)
+    pub fn with_num_channels(mut self, num_channels: u16) -> Self {
+        self.num_channels = num_channels;
+        self
+    }
+
+    /// Enables or disables variable frame size support.
+    ///
+    /// When enabled, allows processing frame counts below `num_frames` at the cost of added latency.
+    ///
+    /// # Arguments
+    ///
+    /// * `allow_variable_frames` - `true` to enable variable frame sizes, `false` for fixed size
+    pub fn with_allow_variable_frames(mut self, allow_variable_frames: bool) -> Self {
+        self.allow_variable_frames = allow_variable_frames;
+        self
     }
 }
 
@@ -796,10 +817,7 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let mut processor = Processor::new(&model, &license_key).unwrap();
 
-        let config = ProcessorConfig {
-            num_channels: 2,
-            ..ProcessorConfig::optimal(&model)
-        };
+        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
         processor.initialize(&config).unwrap();
 
         let num_channels = config.num_channels as usize;
@@ -815,10 +833,7 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let mut processor = Processor::new(&model, &license_key).unwrap();
 
-        let config = ProcessorConfig {
-            num_channels: 2,
-            ..ProcessorConfig::optimal(&model)
-        };
+        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
         processor.initialize(&config).unwrap();
 
         let num_channels = config.num_channels as usize;
@@ -831,10 +846,7 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let mut processor = Processor::new(&model, &license_key).unwrap();
 
-        let config = ProcessorConfig {
-            num_channels: 2,
-            ..ProcessorConfig::optimal(&model)
-        };
+        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
         processor.initialize(&config).unwrap();
 
         let mut left = vec![0.0f32; config.num_frames];
@@ -848,10 +860,7 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let mut processor = Processor::new(&model, &license_key).unwrap();
 
-        let config = ProcessorConfig {
-            num_channels: 2,
-            ..ProcessorConfig::optimal(&model)
-        };
+        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
         processor.initialize(&config).unwrap();
 
         let num_channels = config.num_channels as usize;
@@ -864,11 +873,9 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let mut processor = Processor::new(&model, &license_key).unwrap();
 
-        let config = ProcessorConfig {
-            num_channels: 2,
-            allow_variable_frames: true,
-            ..ProcessorConfig::optimal(&model)
-        };
+        let config = ProcessorConfig::optimal(&model)
+            .with_num_channels(2)
+            .with_allow_variable_frames(true);
         processor.initialize(&config).unwrap();
 
         let num_channels = config.num_channels as usize;
@@ -884,11 +891,9 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let mut processor = Processor::new(&model, &license_key).unwrap();
 
-        let config = ProcessorConfig {
-            num_channels: 2,
-            allow_variable_frames: true,
-            ..ProcessorConfig::optimal(&model)
-        };
+        let config = ProcessorConfig::optimal(&model)
+            .with_num_channels(2)
+            .with_allow_variable_frames(true);
         processor.initialize(&config).unwrap();
 
         let mut left = vec![0.0f32; config.num_frames];
@@ -907,11 +912,9 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let mut processor = Processor::new(&model, &license_key).unwrap();
 
-        let config = ProcessorConfig {
-            num_channels: 2,
-            allow_variable_frames: true,
-            ..ProcessorConfig::optimal(&model)
-        };
+        let config = ProcessorConfig::optimal(&model)
+            .with_num_channels(2)
+            .with_allow_variable_frames(true);
         processor.initialize(&config).unwrap();
 
         let num_channels = config.num_channels as usize;
@@ -927,10 +930,7 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let mut processor = Processor::new(&model, &license_key).unwrap();
 
-        let config = ProcessorConfig {
-            num_channels: 2,
-            ..ProcessorConfig::optimal(&model)
-        };
+        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
         processor.initialize(&config).unwrap();
 
         let num_channels = config.num_channels as usize;
@@ -948,10 +948,7 @@ mod tests {
 
         let mut processor = Processor::new(&model, &license_key).unwrap();
 
-        let config = ProcessorConfig {
-            num_channels: 2,
-            ..ProcessorConfig::optimal(&model)
-        };
+        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
         processor.initialize(&config).unwrap();
 
         let mut left = vec![0.0f32; config.num_frames];
@@ -972,10 +969,7 @@ mod tests {
 
         let mut processor = Processor::new(&model, &license_key).unwrap();
 
-        let config = ProcessorConfig {
-            num_channels: 2,
-            ..ProcessorConfig::optimal(&model)
-        };
+        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
         processor.initialize(&config).unwrap();
 
         let num_channels = config.num_channels as usize;
