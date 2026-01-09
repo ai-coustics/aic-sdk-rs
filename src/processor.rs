@@ -745,12 +745,6 @@ impl<'a, 'm> Drop for Processor<'a, 'm> {
     }
 }
 
-// SAFETY:
-// - The Processor struct safely wraps the AicProcessor object and uses the C library's APIs
-//   according to the documented thread-safety guarantees.
-unsafe impl<'a, 'm> Send for Processor<'a, 'm> {}
-unsafe impl<'a, 'm> Sync for Processor<'a, 'm> {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
