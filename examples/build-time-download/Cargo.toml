@@ -10,3 +10,6 @@ aic-sdk = { path = "../.." }
 
 [build-dependencies]
 aic-sdk = { path = "../..", features = ["download-model"] }
+
+[features]
+download-lib = ["aic-sdk/download-lib"]

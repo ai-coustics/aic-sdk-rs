@@ -23,7 +23,7 @@ Enable the `download-lib` feature to automatically download the library when bui
 
 ```toml
 [dependencies]
-aic-sdk = { version = "0.13.0", features = ["download-lib"] }
+aic-sdk = { version = "2.0.0", features = ["download-lib"] }
 ```
 
 If you want to provide your own library, use the `AIC_LIB_PATH` environment variable to specify the path
@@ -97,7 +97,13 @@ export AIC_SDK_LICENSE="your_license_key_here"
 Then use the following commands to configure, build and run the example:
 
 ```sh
-cargo run --example basic_usage --features "download-lib,download-model"
+cargo run --example basic_usage --features download-lib,download-model
+```
+
+To run the example package that shows how to download and embed models at compiletime run:
+
+```sh
+cargo run --package build-time-download --features download-lib
 ```
 
 ## Support & Resources
