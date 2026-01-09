@@ -61,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Planar = [[l, l, ..], [r, r, ..]]
     let mut audio_planar = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
-    processor.process_planar(&mut audio_planar);
+    processor.process_planar(&mut audio_planar)?;
 
     // Get processor context for thread safe interaction with parameters
     let processor_context = processor.processor_context();
