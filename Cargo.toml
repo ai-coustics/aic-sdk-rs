@@ -1,34 +1,43 @@
 [workspace]
 members = ["aic-sdk-sys", "examples/build-time-download"]
 
+[workspace.package]
+edition = "2024"
+homepage = "https://ai-coustics.com/sdk/"
+license = "Apache-2.0"
+repository = "https://github.com/ai-coustics/aic-sdk-rs"
+version = "2.0.0"
+
 [workspace.dependencies]
 aic-sdk-sys = { version = "2.0.0", path = "aic-sdk-sys" }
+audio-blocks = "0.5.0"
 serde = { version = "1.0" }
 serde_json = { version = "1.0" }
 sha2 = { version = "0.10" }
+thiserror = "2.0"
 ureq = { version = "3.1", default-features = false }
 
 [package]
 categories = ["multimedia::audio"]
 description = "ai-coustics Speech Enhancement SDK"
 documentation = "https://docs.rs/aic-sdk"
-edition = "2024"
+edition.workspace = true
 exclude = [".github"]
-homepage = "https://ai-coustics.com/sdk/"
-keywords = ["cancellation", "enhancement", "noise", "speech", "voice"]
-license = "Apache-2.0"
+homepage.workspace = true
+keywords = ["audio", "enhancement", "noise", "speech", "voice"]
+license.workspace = true
 name = "aic-sdk"
 readme = "README.md"
-repository = "https://github.com/ai-coustics/aic-sdk-rs"
-version = "2.0.0"
+repository.workspace = true
+version.workspace = true
 
 [dependencies]
 aic-sdk-sys = { workspace = true }
-audio-blocks = "0.5.0"
+audio-blocks = { workspace = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
 sha2 = { workspace = true, optional = true }
-thiserror = "2.0"
+thiserror = { workspace = true }
 ureq = { workspace = true, optional = true, features = ["rustls"] }
 
 [dev-dependencies]

@@ -1,8 +1,9 @@
 [package]
-edition = "2024"
+edition.workspace = true
+license.workspace = true
 name = "build-time-download"
 publish = false
-version = "0.1.0"
+version.workspace = true
 
 [dependencies]
 aic-sdk = { path = "../.." }
