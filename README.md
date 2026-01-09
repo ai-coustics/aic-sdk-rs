@@ -15,6 +15,16 @@ To use this SDK, you'll need to generate an **SDK license key** from our [Develo
 
 **Please note:** The SDK license key is different from our cloud API product. If you have an API license key for our cloud services, it won't work with the SDK - you'll need to create a separate SDK license key in the portal.
 
+### Download a Model
+
+Models can be obtained in two ways:
+
+1. **Manual Download**: Visit [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io/) to browse and download models directly. Once downloaded, you can load the model file:
+   - At runtime using `Model::from_file`
+   - At compile-time using the `include_model!` macro
+
+2. **Programmatic Download**: Enable the `download-model` feature to use the `Model::download` function, which fetches models by their ID from [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io/).
+
 ## Integration
 
 ### Library

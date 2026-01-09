@@ -251,23 +251,25 @@ impl<'a> Model<'a> {
 
     /// Downloads a model file from the ai-coustics artifact CDN.
     ///
-    /// This method fetches the model manifest, checks whether the requested model
+    /// This method fetches the model manifest, verifies that the requested model
     /// exists in a version compatible with this library, and downloads the model
-    /// file into the provided directory.
+    /// file to the specified directory.
     ///
-    /// # Note
-    ///
-    /// This is a blocking operation.
+    /// Available models can be browsed at [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io/).
     ///
     /// # Arguments
     ///
-    /// * `model` - The model identifier as listed in the manifest (e.g. `"quail-l-16khz"`).
-    /// * `download_dir` - Directory where the downloaded model file should be stored.
+    /// * `model_id` - The model identifier (e.g., `"quail-l-16khz"`).
+    /// * `download_dir` - Directory where the downloaded model file will be stored.
     ///
     /// # Returns
     ///
-    /// Returns the full path to the downloaded model file, or an `AicError` if the
+    /// Returns the full path to the downloaded model file on success, or an [`AicError`] if the
     /// operation fails.
+    ///
+    /// # Note
+    ///
+    /// This is a blocking operation that performs network I/O.
     #[cfg(feature = "download-model")]
     pub fn download<P: AsRef<Path>>(
         model_id: &str,
