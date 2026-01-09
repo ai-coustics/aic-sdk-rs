@@ -83,9 +83,9 @@ pub struct ProcessorContext {
 }
 
 impl ProcessorContext {
-    /// Creates a new VAD instance.
-    pub(crate) fn new(vad_ptr: *mut AicProcessorContext) -> Self {
-        Self { inner: vad_ptr }
+    /// Creates a new Processor context.
+    pub(crate) fn new(ctx_ptr: *mut AicProcessorContext) -> Self {
+        Self { inner: ctx_ptr }
     }
 
     fn as_const_ptr(&self) -> *const AicProcessorContext {

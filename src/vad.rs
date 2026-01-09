@@ -84,7 +84,7 @@ pub struct VadContext {
 }
 
 impl VadContext {
-    /// Creates a new VAD instance.
+    /// Creates a new VAD context.
     pub(crate) fn new(vad_ptr: *mut AicVadContext) -> Self {
         Self { inner: vad_ptr }
     }

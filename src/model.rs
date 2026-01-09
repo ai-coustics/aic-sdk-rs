@@ -100,8 +100,8 @@ impl<'a> Model<'a> {
     ///
     /// ```rust,ignore
     /// # use aic_sdk::{include_model, Model};
-    /// static MODEL_BYTES: &'static [u8] = include_model!("/path/to/model.aicmodel");
-    /// let model = Model::from_buffer(MODEL_BYTES).unwrap();
+    /// static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
+    /// let model = Model::from_buffer(MODEL).unwrap();
     /// ```
     pub fn from_buffer(buffer: &'a [u8]) -> Result<Self, AicError> {
         let mut model_ptr: *mut AicModel = ptr::null_mut();
@@ -126,10 +126,6 @@ impl<'a> Model<'a> {
     }
 
     /// Returns the model identifier string.
-    ///
-    /// # Note
-    /// The returned string is owned by the underlying model and remains valid
-    /// for the lifetime of this `Model` instance.
     pub fn id(&self) -> &str {
         // SAFETY: `self` owns a valid model pointer created by the SDK.
         let id_ptr = unsafe { aic_model_get_id(self.as_const_ptr()) };
