@@ -1,6 +1,6 @@
 use crate::{error::*, model::Model};
 
-use aic_sdk_sys::*;
+use aic_sdk_sys::{AicProcessorParameter::*, *};
 use audio_blocks::AudioBlockMut;
 
 use std::{ffi::CString, marker::PhantomData, ptr, sync::Once};
@@ -70,13 +70,9 @@ pub enum ProcessorParameter {
 impl From<ProcessorParameter> for u32 {
     fn from(parameter: ProcessorParameter) -> Self {
         match parameter {
-            ProcessorParameter::Bypass => AicProcessorParameter_AIC_PROCESSOR_PARAMETER_BYPASS,
-            ProcessorParameter::EnhancementLevel => {
-                AicProcessorParameter_AIC_PROCESSOR_PARAMETER_ENHANCEMENT_LEVEL
-            }
-            ProcessorParameter::VoiceGain => {
-                AicProcessorParameter_AIC_PROCESSOR_PARAMETER_VOICE_GAIN
-            }
+            ProcessorParameter::Bypass => AIC_PROCESSOR_PARAMETER_BYPASS,
+            ProcessorParameter::EnhancementLevel => AIC_PROCESSOR_PARAMETER_ENHANCEMENT_LEVEL,
+            ProcessorParameter::VoiceGain => AIC_PROCESSOR_PARAMETER_VOICE_GAIN,
         }
     }
 }
