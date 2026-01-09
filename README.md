@@ -66,6 +66,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create a processor using the model and your license
     let mut processor = Processor::new(&model, &license_key)?;
+    
+    // Get the processor context to update parameters from any thread
+    let proc_ctx = processor.processor_context();
 
     // Set up your desired audio settings
     let config = ProcessorConfig::optimal(&model)
@@ -80,11 +83,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The process function is where the actual enhancement is happening
     // This is meant to be called in your real-time audio thread
     processor.process_interleaved(&mut audio_buffer)?;
-    
-    let processor_context = processor.processor_context();
 
-    // You can also adjust parameters during processing
-    processor_context.set_parameter(ProcessorParameter::EnhancementLevel, 0.8)?;
+    // You can adjust parameters during processing
+    proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.8)?;
 
     // For planar audio processing (separate channel buffers)
     let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
