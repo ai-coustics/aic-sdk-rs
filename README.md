@@ -16,7 +16,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-aic-sdk = { version = "2.0.0", features = ["download-lib", "download-model"] }
+aic-sdk = { version = "2.0.0", features = ["download-lib"] }
 ```
 
 ## Quick Start
