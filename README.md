@@ -49,7 +49,7 @@ aic-sdk = { version = "2.0.0", features = ["download-model"] }
 ```
 
 Our models are available for download at [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io).
-We recommend that the selected model is downloaded and embedded into your binary using the `include_model` macro.
+We recommend that the selected model is downloaded and embedded into your binary using the `include_model!` macro.
 
 ## Example Usage
 
