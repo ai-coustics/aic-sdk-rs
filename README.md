@@ -24,7 +24,7 @@ aic-sdk = { version = "2.0.0", features = ["download-lib"] }
 ```rust
 use aic_sdk::{include_model, ProcessorConfig, Model, Processor};
 
-// Include model data at compile time (runtime alternative available)
+// Embed model at compile time (or use Model::from_file to load at runtime)
 static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -67,14 +67,14 @@ println!("Compatible model version: {}", aic_sdk::get_compatible_model_version()
 
 Download models and find available IDs at [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io/).
 
-#### From File
+#### Load from File
 ```rust
 use aic_sdk::Model;
 
 let model = Model::from_file("path/to/model.aicmodel")?;
 ```
 
-#### From Buffer (Embedded)
+#### Embed at Compile Time
 ```rust
 use aic_sdk::{Model, include_model};
 
