@@ -31,11 +31,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Processor created successfully");
 
     // Set up configuration
-    let config = ProcessorConfig {
-        num_channels: 2,
-        allow_variable_frames: true,
-        ..ProcessorConfig::optimal(&model)
-    };
+    let config = ProcessorConfig::optimal(&model)
+        .with_num_channels(2)
+        .with_allow_variable_frames(true);
 
     // Initialize the processor
     processor.initialize(&config)?;
@@ -58,37 +56,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     processor.process_sequential(&mut audio_sequential)?;
 
     // Get processor context for thread safe interaction with parameters
-    let processor_context = processor.processor_context();
+    let proc_ctx = processor.processor_context();
 
     // Get output delay
-    let delay = processor_context.output_delay();
+    let delay = proc_ctx.output_delay();
     println!("Output delay: {} samples", delay);
 
     // Test parameter setting and getting
-    processor_context.set_parameter(ProcessorParameter::EnhancementLevel, 0.7)?;
+    proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.7)?;
     println!("Parameter set successfully");
 
-    let enhancement_level = processor_context.parameter(ProcessorParameter::EnhancementLevel)?;
+    let enhancement_level = proc_ctx.parameter(ProcessorParameter::EnhancementLevel)?;
     println!("Enhancement level: {}", enhancement_level);
 
     // Test reset functionality
-    match processor_context.reset() {
+    match proc_ctx.reset() {
         Ok(()) => println!("Processor reset succeeded"),
         Err(e) => println!("Processor reset failed: {}", e),
     }
 
     //  Get VAD context for thread safe interaction with voice activity detection parameters
-    let vad_context = processor.vad_context();
-    vad_context.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
-    vad_context.set_parameter(VadParameter::Sensitivity, 7.0)?;
+    let vad_ctx = processor.vad_context();
+    vad_ctx.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
+    vad_ctx.set_parameter(VadParameter::Sensitivity, 7.0)?;
 
-    let speech_hold_duration = vad_context.parameter(VadParameter::SpeechHoldDuration)?;
+    let speech_hold_duration = vad_ctx.parameter(VadParameter::SpeechHoldDuration)?;
     println!("Speech hold duration: {}", speech_hold_duration);
 
-    let sensitivity = vad_context.parameter(VadParameter::Sensitivity)?;
+    let sensitivity = vad_ctx.parameter(VadParameter::Sensitivity)?;
     println!("Sensitivity: {}", sensitivity);
 
-    if vad_context.is_speech_detected() {
+    if vad_ctx.is_speech_detected() {
         println!("VAD detected speech");
     } else {
         println!("VAD did not detect speech");
