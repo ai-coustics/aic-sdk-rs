@@ -102,7 +102,7 @@ pub enum ProcessorParameter {
     VoiceGain,
 }
 
-impl From<ProcessorParameter> for u32 {
+impl From<ProcessorParameter> for ProcessorParameter::Type {
     fn from(parameter: ProcessorParameter) -> Self {
         match parameter {
             ProcessorParameter::Bypass => AIC_PROCESSOR_PARAMETER_BYPASS,
