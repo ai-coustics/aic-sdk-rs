@@ -9,7 +9,6 @@ mod model;
 mod processor;
 mod vad;
 
-pub use audio_blocks::*;
 pub use error::*;
 pub use model::*;
 pub use processor::*;

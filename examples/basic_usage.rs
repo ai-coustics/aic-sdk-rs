@@ -1,9 +1,7 @@
 #![cfg_attr(not(feature = "download-model"), allow(dead_code, unused_imports))]
 
 #[cfg(feature = "download-model")]
-use aic_sdk::{
-    AudioBlockPlanar, Model, Processor, ProcessorConfig, ProcessorParameter, VadParameter,
-};
+use aic_sdk::{Model, Processor, ProcessorConfig, ProcessorParameter, VadParameter};
 use std::env;
 
 #[cfg(not(feature = "download-model"))]
@@ -46,22 +44,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         config.sample_rate, config.num_frames, config.num_channels
     );
 
-    // Process audio block of any layout
-    let mut audio_block = AudioBlockPlanar::new(config.num_channels, config.num_frames);
-    processor.process(&mut audio_block)?;
-
-    // Alternatively process direct slices
+    // Process Audio in different data layouts (for mono audio, the layout does not matter)
     // Interleaved = [l, r, l, r, ..]
     let mut audio_interleaved = vec![0.0; config.num_channels as usize * config.num_frames];
     processor.process_interleaved(&mut audio_interleaved)?;
 
-    // Sequential = [l, l, .., r, r, ..]
-    let mut audio_sequential = vec![0.0; config.num_channels as usize * config.num_frames];
-    processor.process_sequential(&mut audio_sequential)?;
-
     // Planar = [[l, l, ..], [r, r, ..]]
     let mut audio_planar = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
     processor.process_planar(&mut audio_planar)?;
+
+    // Sequential = [l, l, .., r, r, ..]
+    let mut audio_sequential = vec![0.0; config.num_channels as usize * config.num_frames];
+    processor.process_sequential(&mut audio_sequential)?;
 
     // Get processor context for thread safe interaction with parameters
     let processor_context = processor.processor_context();

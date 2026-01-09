@@ -1,7 +1,6 @@
 use crate::{error::*, model::Model};
 
 use aic_sdk_sys::{AicProcessorParameter::*, *};
-use audio_blocks::AudioBlockMut;
 
 use std::{ffi::CString, marker::PhantomData, ptr, sync::Once};
 
@@ -335,7 +334,7 @@ impl<'a, 'm> Processor<'a, 'm> {
     ///
     /// * `model` - The loaded model instance
     /// * `license_key` - license key for the ai-coustics SDK
-    /// (generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com/))
+    ///   (generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com/))
     ///
     /// # Returns
     ///
@@ -474,11 +473,11 @@ impl<'a, 'm> Processor<'a, 'm> {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use aic_sdk::{Model, Processor};
+    /// # use aic_sdk::{Model, Processor, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(&model, &license_key).unwrap();
-    /// let config = model.optimal_processor_config();
+    /// let config = ProcessorConfig::optimal(&model);
     /// processor.initialize(&config).unwrap();
     /// ```
     pub fn initialize(&mut self, config: &ProcessorConfig) -> Result<(), AicError> {
@@ -497,69 +496,6 @@ impl<'a, 'm> Processor<'a, 'm> {
         handle_error(error_code)?;
         self.num_channels = Some(config.num_channels);
         Ok(())
-    }
-
-    /// Enhances speech blocks in the provided `audio_blocks` in-place.
-    ///
-    /// For more information about `audio_blocks`, see the [documentation](https://docs.rs/audio-blocks/latest/audio_blocks/).
-    ///
-    /// # Arguments
-    ///
-    /// * `audio_block` - AudioBlock that can have any type of data layout.
-    ///                   Each channel buffer must be exactly of size `num_frames`,
-    ///                   or if `allow_variable_frames` was enabled, less than the initialization value.
-    ///
-    /// # Note
-    ///
-    /// For planar blocks, the maximum supported number of channels is 16. Exceeding this will return an error.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` on success or an `AicError` if processing fails.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use aic_sdk::{Model, Processor, ProcessorConfig};
-    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
-    /// let config = ProcessorConfig { num_channels: 2, ..ProcessorConfig::optimal(&model) };
-    /// processor.initialize(&config).unwrap();
-    ///
-    /// let mut audio_block = aic_sdk::AudioBlockSequential::new(config.num_channels, config.num_frames);
-    /// processor.process(&mut audio_block).unwrap();
-    ///
-    /// let mut audio_block = aic_sdk::AudioBlockInterleaved::new(config.num_channels, config.num_frames);
-    /// processor.process(&mut audio_block).unwrap();
-    ///
-    /// let mut audio_block = aic_sdk::AudioBlockPlanar::new(config.num_channels, config.num_frames);
-    /// processor.process(&mut audio_block).unwrap();
-    ///
-    /// // You can wrap an existing interleaved slice, or call `Processor::process_interleaved` directly.
-    /// let mut data = vec![0.0; config.num_channels as usize * config.num_frames];
-    /// let mut audio_block = aic_sdk::AudioBlockInterleavedViewMut::from_slice(&mut data, config.num_channels, config.num_frames);
-    ///  processor.process(&mut audio_block).unwrap();
-    /// ```
-    pub fn process(&mut self, audio_block: &mut impl AudioBlockMut<f32>) -> Result<(), AicError> {
-        match audio_block.layout() {
-            audio_blocks::BlockLayout::Interleaved => self.process_interleaved(
-                audio_block
-                    .as_interleaved_view_mut()
-                    .expect("Layout checked")
-                    .raw_data_mut(),
-            ),
-            audio_blocks::BlockLayout::Planar => {
-                let mut block_view = audio_block.as_planar_view_mut().expect("Layout checked");
-                self.process_planar(block_view.raw_data_mut())
-            }
-            audio_blocks::BlockLayout::Sequential => self.process_sequential(
-                audio_block
-                    .as_sequential_view_mut()
-                    .expect("Layout checked")
-                    .raw_data_mut(),
-            ),
-        }
     }
 
     /// Processes audio with separate buffers for each channel (planar layout).
@@ -628,7 +564,6 @@ impl<'a, 'm> Processor<'a, 'm> {
         } else {
             audio[0].as_mut().len()
         };
-        let num_channels = num_channels as u16;
 
         let mut audio_ptrs = [std::ptr::null_mut::<f32>(); MAX_CHANNELS as usize];
         for (i, channel) in audio.iter_mut().enumerate() {
@@ -694,7 +629,6 @@ impl<'a, 'm> Processor<'a, 'm> {
         }
 
         let num_frames = audio.len() / num_channels as usize;
-        let num_channels = num_channels as u16;
 
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
@@ -756,7 +690,6 @@ impl<'a, 'm> Processor<'a, 'm> {
         }
 
         let num_frames = audio.len() / num_channels as usize;
-        let num_channels = num_channels as u16;
 
         // SAFETY: `self.inner` is initialized; `audio` length has been validated.
         let error_code = unsafe {
@@ -861,7 +794,7 @@ mod tests {
 
         let config = ProcessorConfig {
             num_channels: 2,
-            ..model.optimal_processor_config()
+            ..ProcessorConfig::optimal(&model)
         };
         processor.initialize(&config).unwrap();
 
@@ -880,7 +813,7 @@ mod tests {
 
         let config = ProcessorConfig {
             num_channels: 2,
-            ..model.optimal_processor_config()
+            ..ProcessorConfig::optimal(&model)
         };
         processor.initialize(&config).unwrap();
 
@@ -896,7 +829,7 @@ mod tests {
 
         let config = ProcessorConfig {
             num_channels: 2,
-            ..model.optimal_processor_config()
+            ..ProcessorConfig::optimal(&model)
         };
         processor.initialize(&config).unwrap();
 
@@ -913,7 +846,7 @@ mod tests {
 
         let config = ProcessorConfig {
             num_channels: 2,
-            ..model.optimal_processor_config()
+            ..ProcessorConfig::optimal(&model)
         };
         processor.initialize(&config).unwrap();
 
@@ -930,7 +863,7 @@ mod tests {
         let config = ProcessorConfig {
             num_channels: 2,
             allow_variable_frames: true,
-            ..model.optimal_processor_config()
+            ..ProcessorConfig::optimal(&model)
         };
         processor.initialize(&config).unwrap();
 
@@ -950,7 +883,7 @@ mod tests {
         let config = ProcessorConfig {
             num_channels: 2,
             allow_variable_frames: true,
-            ..model.optimal_processor_config()
+            ..ProcessorConfig::optimal(&model)
         };
         processor.initialize(&config).unwrap();
 
@@ -973,7 +906,7 @@ mod tests {
         let config = ProcessorConfig {
             num_channels: 2,
             allow_variable_frames: true,
-            ..model.optimal_processor_config()
+            ..ProcessorConfig::optimal(&model)
         };
         processor.initialize(&config).unwrap();
 
@@ -992,7 +925,7 @@ mod tests {
 
         let config = ProcessorConfig {
             num_channels: 2,
-            ..model.optimal_processor_config()
+            ..ProcessorConfig::optimal(&model)
         };
         processor.initialize(&config).unwrap();
 
@@ -1013,7 +946,7 @@ mod tests {
 
         let config = ProcessorConfig {
             num_channels: 2,
-            ..model.optimal_processor_config()
+            ..ProcessorConfig::optimal(&model)
         };
         processor.initialize(&config).unwrap();
 
@@ -1037,7 +970,7 @@ mod tests {
 
         let config = ProcessorConfig {
             num_channels: 2,
-            ..model.optimal_processor_config()
+            ..ProcessorConfig::optimal(&model)
         };
         processor.initialize(&config).unwrap();
 

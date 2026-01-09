@@ -33,7 +33,6 @@ version.workspace = true
 
 [dependencies]
 aic-sdk-sys = { workspace = true }
-audio-blocks = { workspace = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
 sha2 = { workspace = true, optional = true }
