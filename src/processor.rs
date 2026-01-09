@@ -290,6 +290,10 @@ impl Drop for ProcessorContext {
     }
 }
 
+// Safety: The underlying C library should be thread-safe for individual ProcessorContext instances
+unsafe impl Send for ProcessorContext {}
+unsafe impl Sync for ProcessorContext {}
+
 /// High-level wrapper for the ai-coustics audio enhancement model.
 ///
 /// This struct provides a safe, Rust-friendly interface to the underlying C library.

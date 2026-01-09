@@ -187,6 +187,6 @@ impl Drop for VadContext {
     }
 }
 
-// Safety: The underlying C library should be thread-safe for individual VAD instances
+// Safety: The underlying C library should be thread-safe for individual VadContext instances
 unsafe impl Send for VadContext {}
 unsafe impl Sync for VadContext {}
