@@ -2,11 +2,11 @@
 members = ["aic-sdk-sys", "examples/build-time-download"]
 
 [workspace.dependencies]
-aic-sdk-sys = { version = "0.13.0", path = "aic-sdk-sys" }
-serde = { version = "1.0.228" }
-serde_json = { version = "1.0.148" }
+aic-sdk-sys = { version = "2.0.0", path = "aic-sdk-sys" }
+serde = { version = "1.0" }
+serde_json = { version = "1.0" }
 sha2 = { version = "0.10" }
-ureq = { version = "3.1.4", default-features = false }
+ureq = { version = "3.1", default-features = false }
 
 [package]
 categories = ["multimedia::audio"]
@@ -20,7 +20,7 @@ license = "Apache-2.0"
 name = "aic-sdk"
 readme = "README.md"
 repository = "https://github.com/ai-coustics/aic-sdk-rs"
-version = "0.13.0"
+version = "2.0.0"
 
 [dependencies]
 aic-sdk-sys = { workspace = true }
@@ -28,7 +28,7 @@ audio-blocks = "0.5.0"
 serde = { workspace = true, optional = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
 sha2 = { workspace = true, optional = true }
-thiserror = "2.0.17"
+thiserror = "2.0"
 ureq = { workspace = true, optional = true, features = ["rustls"] }
 
 [dev-dependencies]
