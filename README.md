@@ -1,147 +1,225 @@
-# ai-coustics Speech Enhancement SDK for Rust
+# aic-sdk - Rust Bindings for ai-coustics SDK
+
+Rust wrapper for the ai-coustics Speech Enhancement SDK.
+
+For comprehensive documentation, visit [docs.ai-coustics.com](https://docs.ai-coustics.com).
+
+> [!NOTE]
+> This SDK requires a license key. Generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com).
 
 > [!WARNING]
 > You must use a Rust version different from `1.93.0-beta.5`, which was used to build the static libraries. A solution is currently in development.
 
-## What is this SDK?
+## Installation
 
-Our Speech Enhancement SDK delivers state-of-the-art audio processing capabilities, enabling you to enhance speech clarity and intelligibility in real-time.
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+aic-sdk = { version = "2.0.0", features = ["download-lib", "download-model"] }
+```
 
 ## Quick Start
 
-### Generate your SDK License Key
+```rust
+use aic_sdk::{include_model, ProcessorConfig, Model, Processor};
 
-To use this SDK, you'll need to generate an **SDK license key** from our [Development Portal](https://developers.ai-coustics.io).
-
-**Please note:** The SDK license key is different from our cloud API product. If you have an API license key for our cloud services, it won't work with the SDK - you'll need to create a separate SDK license key in the portal.
-
-### Download a Model
-
-Models can be obtained in two ways:
-
-1. **Manual Download**: Visit [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io/) to browse and download models directly. Once downloaded, you can load the model file:
-   - At runtime using `Model::from_file`
-   - At compile-time using the `include_model!` macro
-
-2. **Programmatic Download**: Enable the `download-model` feature to use the `Model::download` function, which fetches models by their ID from [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io/).
-
-## Integration
-
-### Library
-
-Enable the `download-lib` feature to automatically download the library when building the crate.
-
-```toml
-[dependencies]
-aic-sdk = { version = "2.0.0", features = ["download-lib"] }
-```
-
-If you want to provide your own library, use the `AIC_LIB_PATH` environment variable to specify the path
-to the directory where the library is located.
-
-### Models
-
-Enable the `download-model` feature to enable the `Model::download` API.
-
-```toml
-[dependencies]
-aic-sdk = { version = "2.0.0", features = ["download-model"] }
-```
-
-Our models are available for download at [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io).
-We recommend that the selected model is downloaded and embedded into your binary using the `include_model!` macro.
-
-## Example Usage
-
-```rust,ignore
-use aic_sdk::{include_model, ProcessorConfig, Model, Processor, ProcessorParameter};
-
+// Include model data at compile time (runtime alternative available)
 static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Get your license key
     let license_key = std::env::var("AIC_SDK_LICENSE")?;
 
-    // Load the embedded model
+    // Load the embedded model (or download manually at https://artifacts.ai-coustics.io/)
     let model = Model::from_buffer(MODEL)?;
 
-    // Create a processor using the model and your license
+    // Create a processor
     let mut processor = Processor::new(&model, &license_key)?;
-    
-    // Get the processor context to update parameters from any thread
-    let proc_ctx = processor.processor_context();
 
-    // Set up your desired audio settings
-    let config = ProcessorConfig::optimal(&model)
-        .with_num_channels(2)
-        .with_allow_variable_frames(true);
-
-    // Initialize the processor
+    // Get optimal configuration and initialize
+    let config = ProcessorConfig::optimal(&model).with_num_channels(2);
     processor.initialize(&config)?;
 
+    // Process audio (interleaved: channels × frames)
     let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
-
-    // The process function is where the actual enhancement is happening
-    // This is meant to be called in your real-time audio thread
     processor.process_interleaved(&mut audio_buffer)?;
-
-    // You can adjust parameters during processing
-    proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.8)?;
-
-    // For planar audio processing (separate channel buffers)
-    let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
-    processor.process_planar(&mut audio)?;
 
     Ok(())
 }
 ```
 
-## Running the Example
+## Usage
 
-To run the example, make sure you have set your license key as an environment variable:
+### SDK Information
 
-```bash
-export AIC_SDK_LICENSE="your_license_key_here"
+```rust
+use aic_sdk;
+
+// Get SDK version
+println!("SDK version: {}", aic_sdk::get_sdk_version());
+
+// Get compatible model version
+println!("Compatible model version: {}", aic_sdk::get_compatible_model_version());
 ```
 
-Then use the following commands to configure, build and run the example:
+### Loading Models
 
-```sh
+Download models and find available IDs at [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io/).
+
+#### From File
+```rust
+use aic_sdk::Model;
+
+let model = Model::from_file("path/to/model.aicmodel")?;
+```
+
+#### From Buffer (Embedded)
+```rust
+use aic_sdk::{Model, include_model};
+
+static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
+let model = Model::from_buffer(MODEL)?;
+```
+
+#### Download from CDN
+Enable the `download-model` feature:
+```toml
+[dependencies]
+aic-sdk = { version = "2.0.0", features = ["download-lib", "download-model"] }
+```
+
+```rust
+use aic_sdk::Model;
+
+let model_path = Model::download("quail-xxs-48khz", "./models")?;
+let model = Model::from_file(&model_path)?;
+```
+
+### Model Information
+
+```rust
+// Get model ID
+let model_id = model.get_id();
+
+// Get optimal sample rate for the model
+let optimal_rate = model.get_optimal_sample_rate();
+
+// Get optimal frame count for a specific sample rate
+let optimal_frames = model.get_optimal_num_frames(48000);
+```
+
+### Configuring the Processor
+
+```rust
+use aic_sdk::ProcessorConfig;
+
+// Get optimal configuration for the model
+let config = ProcessorConfig::optimal(&model)
+    .with_num_channels(1)
+    .with_allow_variable_frames(false);
+println!("{:?}", config);  // ProcessorConfig { sample_rate: 48000, num_channels: 1, num_frames: 480, allow_variable_frames: false }
+
+// Or create from scratch
+let config = ProcessorConfig {
+    sample_rate: 48000,
+    num_channels: 2,
+    num_frames: 480,
+    allow_variable_frames: false,
+};
+
+// Initialize the processor
+processor.initialize(&config)?;
+```
+
+### Processing Audio
+
+```rust
+// Interleaved processing (channels interleaved in single buffer)
+// Format: [l, r, l, r, ...]
+let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
+processor.process_interleaved(&mut audio_buffer)?;
+
+// Sequential processing (channels in sequence)
+// Format: [l, l, ..., r, r, ...]
+let mut audio_sequential = vec![0.0f32; config.num_channels as usize * config.num_frames];
+processor.process_sequential(&mut audio_sequential)?;
+
+// Planar processing (separate buffer per channel)
+// Format: [[l, l, ...], [r, r, ...]]
+let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
+processor.process_planar(&mut audio)?;
+```
+
+### Processor Context
+
+The processor context provides thread-safe access to processor parameters and state. You can create multiple contexts and move them to any thread for concurrent parameter updates.
+
+```rust
+use aic_sdk::ProcessorParameter;
+
+// Get processor context
+let proc_ctx = processor.processor_context();
+
+// Get output delay in samples
+let delay = proc_ctx.get_output_delay();
+
+// Reset processor state (clears internal buffers)
+proc_ctx.reset()?;
+
+// Set enhancement parameters
+proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.8)?;
+proc_ctx.set_parameter(ProcessorParameter::VoiceGain, 1.5)?;
+proc_ctx.set_parameter(ProcessorParameter::Bypass, 0.0)?;
+
+// Get parameter values
+let level = proc_ctx.parameter(ProcessorParameter::EnhancementLevel)?;
+println!("Enhancement level: {}", level);
+```
+
+### Voice Activity Detection (VAD)
+
+The VAD context provides thread-safe access to VAD parameters and state. You can create multiple contexts and move them to any thread for concurrent parameter updates.
+
+```rust
+use aic_sdk::VadParameter;
+
+// Get VAD context from processor
+let vad_ctx = processor.vad_context();
+
+// Configure VAD parameters
+vad_ctx.set_parameter(VadParameter::Sensitivity, 6.0)?;
+vad_ctx.set_parameter(VadParameter::SpeechHoldDuration, 0.05)?;
+vad_ctx.set_parameter(VadParameter::MinimumSpeechDuration, 0.0)?;
+
+// Get parameter values
+let sensitivity = vad_ctx.parameter(VadParameter::Sensitivity)?;
+println!("VAD sensitivity: {}", sensitivity);
+
+// Check for speech (after processing audio through the processor)
+if vad_ctx.is_speech_detected() {
+    println!("Speech detected!");
+}
+```
+
+## Examples
+
+See the example files for complete working examples:
+- [`examples/basic_usage.rs`](examples/basic_usage.rs) - Basic usage example
+- [`examples/build-time-download`](examples/build-time-download) - Download and embed models at compile-time
+
+Run examples with:
+```bash
+export AIC_SDK_LICENSE="your_license_key_here"
 cargo run --example basic_usage --features download-lib,download-model
 ```
 
-To run the example package that shows how to download and embed models at compiletime run:
+## Documentation
 
-```sh
-cargo run --package build-time-download --features download-lib
-```
-
-## Support & Resources
-
-### Documentation
-- **[Basic Example](examples/basic_usage.rs)** - Sample code and integration patterns
-- **[Build-Time Download Example](examples/build-time-download)** - Download and embed models at compile-time
-
-### Looking for Other Languages?
-The ai-coustics Speech Enhancement SDK is available in multiple programming languages to fit your development needs:
-
-| Platform | Repository | Description |
-|----------|------------|-------------|
-| **C** | [`aic-sdk-c`](https://github.com/ai-coustics/aic-sdk-c) | Core C interface and foundation library |
-| **C++** | [`aic-sdk-cpp`](https://github.com/ai-coustics/aic-sdk-cpp) | Modern C++ interface with RAII and type safety |
-| **Python** | [`aic-sdk-py`](https://github.com/ai-coustics/aic-sdk-py) | Idiomatic Python interface |
-| **JavaScript/TypeScript** | [`aic-sdk-node`](https://github.com/ai-coustics/aic-sdk-node) | Native bindings for Node.js applications |
-| **Web (WASM)** | [`aic-sdk-wasm`](https://github.com/ai-coustics/aic-sdk-wasm) | WebAssembly build for browser applications |
-
-All SDKs provide the same core functionality with language-specific optimizations and idioms.
-
-### Get Help
-Need assistance? We're here to support you:
-- **Issues**: [GitHub Issues](https://github.com/ai-coustics/aic-sdk-rs/issues)
-- **Technical Support**: [info@ai-coustics.com](mailto:info@ai-coustics.com)
+- **Full Documentation**: [docs.ai-coustics.com](https://docs.ai-coustics.com)
+- **Rust API Reference**: [docs.rs/aic-sdk](https://docs.rs/aic-sdk)
+- **Available Models**: [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io)
 
 ## License
-This Rust wrapper is distributed under the `Apache 2.0 license`, while the core C SDK is distributed under the proprietary `AIC-SDK license`.
 
----
-
-Made with ❤️ by the ai-coustics team
+This Rust wrapper is distributed under the Apache 2.0 license. The core C SDK is distributed under the proprietary AIC-SDK license.
