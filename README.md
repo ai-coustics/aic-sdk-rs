@@ -35,7 +35,7 @@ Enable the `download-model` feature to enable the `Model::download` API.
 
 ```toml
 [dependencies]
-aic-sdk = { version = "0.13.0", features = ["download-model"] }
+aic-sdk = { version = "2.0.0", features = ["download-model"] }
 ```
 
 Our models are available for download at [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io).

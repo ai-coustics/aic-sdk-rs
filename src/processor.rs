@@ -26,8 +26,44 @@ pub struct ProcessorConfig {
 }
 
 impl ProcessorConfig {
+    /// Returns a [`ProcessorConfig`] pre-filled with the model's optimal sample rate and frame size.
+    ///
+    /// Adjust the number of channels and enable variable frames by using struct-update syntax.
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, ProcessorConfig, Processor};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// let config = ProcessorConfig {
+    ///     num_channels: 2,
+    ///     allow_variable_frames: true,
+    ///     ..ProcessorConfig::optimal(&model)
+    /// };
+    /// ```
+    ///
+    /// If you need to configure a non-optimal sample rate or number of frames,
+    /// construct the [`ProcessorConfig`] struct directly. For example:
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, ProcessorConfig};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// let config = ProcessorConfig {
+    ///     num_channels: 2,
+    ///     sample_rate: 44100,
+    ///     num_frames: model.optimal_num_frames(44100),
+    ///     allow_variable_frames: true,
+    /// };
+    /// ```
     pub fn optimal(model: &Model) -> Self {
-        model.optimal_processor_config()
+        let sample_rate = model.optimal_sample_rate();
+        let num_frames = model.optimal_num_frames(sample_rate);
+        ProcessorConfig {
+            sample_rate,
+            num_channels: 1,
+            num_frames,
+            allow_variable_frames: false,
+        }
     }
 }
 
@@ -218,7 +254,7 @@ impl ProcessorContext {
     /// Call this when the audio stream is interrupted or when seeking
     /// to prevent artifacts from previous audio content.
     ///
-    /// The model stays initialized to the configured settings.
+    /// The processor stays initialized to the configured settings.
     ///
     /// # Returns
     ///
@@ -298,11 +334,12 @@ impl<'a, 'm> Processor<'a, 'm> {
     /// # Arguments
     ///
     /// * `model` - The loaded model instance
-    /// * `license_key` - Valid license key for the AIC SDK
+    /// * `license_key` - license key for the ai-coustics SDK
+    /// (generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com/))
     ///
     /// # Returns
     ///
-    /// Returns a `Result` containing the new `Model` instance or an `AicError` if creation fails.
+    /// Returns a `Result` containing the new `Processor` instance or an `AicError` if creation fails.
     ///
     /// # Example
     ///
@@ -391,7 +428,7 @@ impl<'a, 'm> Processor<'a, 'm> {
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// let processor = Processor::new(&model, &license_key).unwrap();
-    /// let vad_context = processor.vad_context();
+    /// let vad = processor.vad_context();
     /// ```
     pub fn vad_context(&self) -> crate::VadContext {
         let mut vad_ptr: *mut AicVadContext = ptr::null_mut();
@@ -445,18 +482,13 @@ impl<'a, 'm> Processor<'a, 'm> {
     /// processor.initialize(&config).unwrap();
     /// ```
     pub fn initialize(&mut self, config: &ProcessorConfig) -> Result<(), AicError> {
-        let num_channels_u16: u16 = config
-            .num_channels
-            .try_into()
-            .map_err(|_| AicError::AudioConfigUnsupported)?;
-
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
         let error_code = unsafe {
             aic_processor_initialize(
                 self.inner,
                 config.sample_rate,
-                num_channels_u16,
+                config.num_channels,
                 config.num_frames,
                 config.allow_variable_frames,
             )
@@ -504,7 +536,7 @@ impl<'a, 'm> Processor<'a, 'm> {
     /// let mut audio_block = aic_sdk::AudioBlockPlanar::new(config.num_channels, config.num_frames);
     /// processor.process(&mut audio_block).unwrap();
     ///
-    /// // You can wrap an exisiting interleaved buffer like this, or call [`Processor::process_interleaved`].
+    /// // You can wrap an existing interleaved slice, or call `Processor::process_interleaved` directly.
     /// let mut data = vec![0.0; config.num_channels as usize * config.num_frames];
     /// let mut audio_block = aic_sdk::AudioBlockInterleavedViewMut::from_slice(&mut data, config.num_channels, config.num_frames);
     ///  processor.process(&mut audio_block).unwrap();
