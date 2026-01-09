@@ -143,17 +143,6 @@
           "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
         }
       }
-    },
-    "starling-l-48khz": {
-      "versions": {
-        "v1": {
-          "file": "models/starling-l-48khz/v1/starling_l_48khz_4l7qk88c_v19.aicmodel",
-          "filename": "starling_l_48khz_4l7qk88c_v19.aicmodel",
-          "checksum": "c8029141c1539dc0a6ae796590f84ca929bf75a9470258359363396526d389d4",
-          "uploaded_at": "2025-12-11T16:53:41Z",
-          "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
-        }
-      }
     }
   },
   "updated_at": "2025-12-11T16:53:41Z"
