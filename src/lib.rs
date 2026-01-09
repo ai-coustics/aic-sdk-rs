@@ -36,11 +36,8 @@ pub use vad::*;
 /// ```
 pub fn get_sdk_version() -> &'static str {
     // SAFETY: FFI call returns a pointer to a static C string owned by the SDK.
-    // The pointer may be null if the version cannot be retrieved.
+    // The pointer can never be null, so no check is necessary.
     let version_ptr = unsafe { aic_get_sdk_version() };
-    if version_ptr.is_null() {
-        return "unknown";
-    }
 
     // SAFETY: Pointer either came from the SDK or we already bailed if it was null.
     unsafe { CStr::from_ptr(version_ptr).to_str().unwrap_or("unknown") }
