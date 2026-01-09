@@ -10,7 +10,7 @@ Before creating a release, check that everything can be published to crates.io.
   - Increase version number in [aic-sdk-sys/Cargo.toml](aic-sdk-sys/Cargo.toml)
   - Set `aic-sdk-sys` dependency version number in top-level [Cargo.toml](Cargo.toml) to the newest version
 
-3. Update the version number of `aic-sdk` in the top level [Cargo.toml](Cargo.toml)
+3. Update the version number of the workspace in the top level [Cargo.toml](Cargo.toml)
 
 4. Check that the right version number is reflected in [README.md](README.md)
 

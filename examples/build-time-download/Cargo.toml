@@ -1,0 +1,15 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "build-time-download"
+publish = false
+version.workspace = true
+
+[dependencies]
+aic-sdk = { path = "../.." }
+
+[build-dependencies]
+aic-sdk = { path = "../..", features = ["download-model"] }
+
+[features]
+download-lib = ["aic-sdk/download-lib"]

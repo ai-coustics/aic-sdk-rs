@@ -6,6 +6,9 @@ use std::path::PathBuf;
 mod downloader;
 
 fn main() {
+    // Rerun the build script if the header file changes
+    println!("cargo:rerun-if-changed=include/aic.h");
+
     // Rerun the build script if the AIC_LIB_PATH environment variable changes
     println!("cargo:rerun-if-env-changed=AIC_LIB_PATH");
 
@@ -85,8 +88,7 @@ fn generate_bindings() {
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         // Generate constified enums to avoid name repetition
         .constified_enum_module("AicErrorCode")
-        .constified_enum_module("AicEnhancementParameter")
-        .constified_enum_module("AicModelType")
+        .constified_enum_module("AicProcessorParameter")
         .constified_enum_module("AicVadParameter")
         // Finish the builder and generate the bindings.
         .generate()

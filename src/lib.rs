@@ -1,13 +1,17 @@
 #![doc = include_str!("../README.md")]
-use aic_sdk_sys::aic_get_sdk_version;
+use aic_sdk_sys::{aic_get_compatible_model_version, aic_get_sdk_version};
 use std::ffi::CStr;
 
+#[cfg(feature = "download-model")]
+mod download;
 mod error;
 mod model;
+mod processor;
 mod vad;
 
 pub use error::*;
 pub use model::*;
+pub use processor::*;
 pub use vad::*;
 
 /// Returns the version of the ai-coustics SDK library.
@@ -26,14 +30,20 @@ pub use vad::*;
 /// # Example
 ///
 /// ```rust
-/// let version = aic_sdk::get_version();
+/// let version = aic_sdk::get_sdk_version();
 /// println!("ai-coustics SDK version: {version}");
 /// ```
-pub fn get_version() -> &'static str {
+pub fn get_sdk_version() -> &'static str {
+    // SAFETY: FFI call returns a pointer to a static C string owned by the SDK.
+    // The pointer can never be null, so no check is necessary.
     let version_ptr = unsafe { aic_get_sdk_version() };
-    if version_ptr.is_null() {
-        return "unknown";
-    }
 
+    // SAFETY: Pointer either came from the SDK or we already bailed if it was null.
     unsafe { CStr::from_ptr(version_ptr).to_str().unwrap_or("unknown") }
+}
+
+/// Returns the model version number compatible with this SDK build.
+pub fn get_compatible_model_version() -> u32 {
+    // SAFETY: FFI call takes no arguments and returns a plain integer.
+    unsafe { aic_get_compatible_model_version() }
 }
