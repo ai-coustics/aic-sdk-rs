@@ -27,14 +27,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model = Model::from_file(&model_path)?;
     println!("Model loaded from {}", model_path.display());
 
-    // Create processor with license key
-    let mut processor = Processor::new(&model, &license)?;
-    println!("Processor created successfully");
-
-    // Set up configuration
+    // Get optimal ProcessorConfig from Model
     let config = ProcessorConfig::optimal(&model)
         .with_num_channels(2)
         .with_allow_variable_frames(true);
+
+    // Create processor with license key
+    let mut processor = Processor::new(model, &license)?;
+    println!("Processor created successfully");
 
     // Initialize the processor
     processor.initialize(&config)?;
