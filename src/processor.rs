@@ -746,6 +746,21 @@ impl<'m> Drop for Processor<'m> {
     }
 }
 
+// SAFETY:
+// The Processor can be sent to another thread because:
+// - The underlying C library supports multiple processor instances running on different threads
+// - Each processor instance maintains its own internal state
+// - The processor owns its AicProcessor pointer exclusively
+//
+// However, Processor is NOT Sync because:
+// - The C library's process functions explicitly state "Do not call this function from multiple threads"
+// - A single processor instance must not be accessed concurrently from multiple threads
+//
+// To use a processor across threads (e.g., in async contexts), wrap it in a Mutex:
+//   let processor = Arc::new(Mutex::new(processor));
+//   // Can now safely share across threads - the mutex ensures exclusive access
+unsafe impl<'a> Send for Processor<'a> {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -753,6 +768,17 @@ mod tests {
         fs,
         path::{Path, PathBuf},
     };
+
+    #[test]
+    fn processor_is_send_and_sync() {
+        // Compile-time check that Processor implements Send and Sync.
+        // This ensures the processor can be safely shared across threads.
+        fn assert_send<T: Send>() {}
+        fn assert_sync<T: Sync>() {}
+
+        assert_send::<Processor>();
+        assert_sync::<Processor>();
+    }
 
     fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
         let entries = fs::read_dir(target_dir).ok()?;

@@ -76,12 +76,6 @@ struct ModelInner<'a> {
     marker: PhantomData<&'a [u8]>,
 }
 
-// SAFETY:
-// - ModelInner wraps a raw pointer to an AicModel which is immutable after creation and it
-//   does not provide access to it through its public API.
-unsafe impl<'a> Send for ModelInner<'a> {}
-unsafe impl<'a> Sync for ModelInner<'a> {}
-
 impl Clone for Model<'_> {
     /// Creates a clone of the model.
     ///
@@ -357,6 +351,12 @@ impl<'a> Drop for Model<'a> {
     }
 }
 
+// SAFETY:
+// - ModelInner wraps a raw pointer to an AicModel which is immutable after creation and it
+//   does not provide access to it through its public API.
+unsafe impl<'a> Send for ModelInner<'a> {}
+unsafe impl<'a> Sync for ModelInner<'a> {}
+
 /// Embeds the bytes of model file, ensuring proper alignment.
 ///
 /// This macro uses Rust's standard library's [`include_bytes!`](std::include_bytes) macro
@@ -385,6 +385,8 @@ macro_rules! include_model {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn include_model_aligns_to_64_bytes() {
         // Use the README.md as a dummy file for testing
@@ -395,6 +397,17 @@ mod tests {
             ptr.is_multiple_of(64),
             "include_model should align data to 64 bytes"
         );
+    }
+
+    #[test]
+    fn model_is_send_and_sync() {
+        // Compile-time check that Model implements Send and Sync.
+        // This ensures the model can be safely shared across threads.
+        fn assert_send<T: Send>() {}
+        fn assert_sync<T: Sync>() {}
+
+        assert_send::<Model>();
+        assert_sync::<Model>();
     }
 }
 
