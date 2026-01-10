@@ -2,7 +2,12 @@ use crate::{error::*, model::Model};
 
 use aic_sdk_sys::{AicProcessorParameter::*, *};
 
-use std::{ffi::CString, marker::PhantomData, ptr, sync::Once};
+use std::{
+    ffi::CString,
+    marker::PhantomData,
+    ptr,
+    sync::{Arc, Once},
+};
 
 /// Public for telemetry purposes
 pub static SET_WRAPPER_ID: Once = Once::new();
@@ -341,16 +346,16 @@ unsafe impl Sync for ProcessorContext {}
 /// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
-pub struct Processor<'a, 'm> {
+pub struct Processor<'m> {
     /// Raw pointer to the C processor structure
     inner: *mut AicProcessor,
     /// Configured number of channels
     num_channels: Option<u16>,
-    /// Phantom data to tie the lifetime to the Model
-    _marker: PhantomData<&'a Model<'m>>,
+    /// Store Model pointer to prevent it from being cleaned up
+    _model: Arc<Model<'m>>,
 }
 
-impl<'a, 'm> Processor<'a, 'm> {
+impl<'m> Processor<'m> {
     /// Creates a new audio enhancement model instance.
     ///
     /// Multiple models can be created to process different audio streams simultaneously
@@ -374,7 +379,7 @@ impl<'a, 'm> Processor<'a, 'm> {
     /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// let processor = Processor::new(&model, &license_key).unwrap();
     /// ```
-    pub fn new(model: &'a Model<'m>, license_key: &str) -> Result<Self, AicError> {
+    pub fn new(model: Arc<Model<'m>>, license_key: &str) -> Result<Self, AicError> {
         SET_WRAPPER_ID.call_once(|| unsafe {
             // SAFETY:
             // - This function has no safety requirements, it's unsafe because it's FFI.
@@ -407,7 +412,7 @@ impl<'a, 'm> Processor<'a, 'm> {
         Ok(Self {
             inner: processor_ptr,
             num_channels: None,
-            _marker: PhantomData,
+            _model: model,
         })
     }
 
@@ -735,7 +740,7 @@ impl<'a, 'm> Processor<'a, 'm> {
     }
 }
 
-impl<'a, 'm> Drop for Processor<'a, 'm> {
+impl<'m> Drop for Processor<'m> {
     fn drop(&mut self) {
         if !self.inner.is_null() {
             // SAFETY:
