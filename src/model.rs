@@ -7,6 +7,7 @@ use std::{
     marker::PhantomData,
     path::Path,
     ptr,
+    sync::Arc,
 };
 
 /// High-level wrapper for the ai-coustics audio enhancement model.
@@ -15,13 +16,23 @@ use std::{
 /// It handles memory management automatically and converts C-style error codes
 /// to Rust `Result` types.
 ///
+/// # Cloning and Multi-threading
+///
+/// `Model` can be cloned cheaply (just an atomic reference count increment) and shared
+/// across multiple threads. Each clone refers to the same underlying model data, making
+/// it efficient to create multiple processors from the same model without duplicating
+/// the model data in memory.
+///
+/// The model is `Send` and `Sync`, so you can clone it and send the clones to different
+/// threads to process audio streams in parallel.
+///
 /// # Example
 ///
 /// ```rust,no_run
 /// # use aic_sdk::{Model, ProcessorConfig, Processor};
 /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-/// let mut processor = Processor::new(&model, &license_key).unwrap();
+/// let mut processor = Processor::new(model.clone(), &license_key).unwrap();
 /// let config = ProcessorConfig {
 ///     num_channels: 2,
 ///     ..ProcessorConfig::optimal(&model)
@@ -30,11 +41,58 @@ use std::{
 /// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
+///
+/// # Multi-threaded Example
+///
+/// ```rust,no_run
+/// # use aic_sdk::{Model, ProcessorConfig, Processor};
+/// # use std::thread;
+/// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+/// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+///
+/// // Spawn multiple threads, each with its own processor but sharing the same model
+/// let handles: Vec<_> = (0..4)
+///     .map(|i| {
+///         let model_clone = model.clone(); // Cheap reference count increment
+///         let license_clone = license_key.clone();
+///         thread::spawn(move || {
+///             let mut processor = Processor::new(model_clone, &license_clone).unwrap();
+///             // Process audio in this thread...
+///         })
+///     })
+///     .collect();
+///
+/// for handle in handles {
+///     handle.join().unwrap();
+/// }
+/// ```
 pub struct Model<'a> {
-    /// Raw pointer to the C model structure
-    inner: *mut AicModel,
-    /// Phantom data to tie the lifetime to the backing buffer (if any)
+    inner: Arc<ModelInner<'a>>,
+}
+
+// Helper struct to make usage
+struct ModelInner<'a> {
+    ptr: *mut AicModel,
     marker: PhantomData<&'a [u8]>,
+}
+
+// SAFETY:
+// - ModelInner wraps a raw pointer to an AicModel which is immutable after creation and it
+//   does not provide access to it through its public API.
+unsafe impl<'a> Send for ModelInner<'a> {}
+unsafe impl<'a> Sync for ModelInner<'a> {}
+
+impl Clone for Model<'_> {
+    /// Creates a clone of the model.
+    ///
+    /// This is a cheap operation that only increments an atomic reference count.
+    /// All clones share the same underlying model data, so you can efficiently
+    /// use the same model across multiple threads without duplicating memory.
+    fn clone(&self) -> Self {
+        Model {
+            inner: Arc::clone(&self.inner),
+        }
+    }
 }
 
 impl<'a> Model<'a> {
@@ -76,8 +134,10 @@ impl<'a> Model<'a> {
         );
 
         Ok(Model {
-            inner: model_ptr,
-            marker: PhantomData,
+            inner: Arc::new(ModelInner {
+                ptr: model_ptr,
+                marker: PhantomData,
+            }),
         })
     }
 
@@ -119,9 +179,11 @@ impl<'a> Model<'a> {
             "C library returned success but null pointer"
         );
 
-        Ok(Self {
-            inner: model_ptr,
-            marker: PhantomData,
+        Ok(Model {
+            inner: Arc::new(ModelInner {
+                ptr: model_ptr,
+                marker: PhantomData,
+            }),
         })
     }
 
@@ -281,25 +343,19 @@ impl<'a> Model<'a> {
     }
 
     pub(crate) fn as_const_ptr(&self) -> *const AicModel {
-        self.inner as *const AicModel
+        self.inner.ptr as *const AicModel
     }
 }
 
 impl<'a> Drop for Model<'a> {
     fn drop(&mut self) {
-        if !self.inner.is_null() {
+        if !self.inner.ptr.is_null() {
             // SAFETY:
             // - `inner` was allocated by the SDK and is still owned by this wrapper.
-            unsafe { aic_model_destroy(self.inner) };
+            unsafe { aic_model_destroy(self.inner.ptr) };
         }
     }
 }
-
-// SAFETY:
-// - The Model wraps a raw pointer to an AicModel which is immutable after creation and it
-//   does not provide access to it through its public API.
-unsafe impl<'a> Send for Model<'a> {}
-unsafe impl<'a> Sync for Model<'a> {}
 
 /// Embeds the bytes of model file, ensuring proper alignment.
 ///
@@ -359,4 +415,24 @@ mod _compile_fail_tests {
     //!     let _ = leak_model_from_buffer();
     //! }
     //! ```
+}
+
+#[doc(hidden)]
+mod self_referential_struct_compiles {
+    use crate::{Model, Processor};
+
+    #[allow(unused)]
+    struct MyModel<'a> {
+        model: Model<'a>,
+        processor: Processor<'a>,
+    }
+
+    impl<'a> MyModel<'a> {
+        #[allow(unused)]
+        pub fn new() -> Self {
+            let model = Model::from_file("").unwrap();
+            let processor = Processor::new(model.clone(), "").unwrap();
+            MyModel { model, processor }
+        }
+    }
 }
