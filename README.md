@@ -130,7 +130,7 @@ let config = ProcessorConfig {
     allow_variable_frames: false,
 };
 
-// Initialize the processor
+// Processor needs to be initialized before processing
 processor.initialize(&config)?;
 ```
 
