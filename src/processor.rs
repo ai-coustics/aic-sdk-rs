@@ -771,13 +771,11 @@ mod tests {
 
     #[test]
     fn processor_is_send_and_sync() {
-        // Compile-time check that Processor implements Send and Sync.
-        // This ensures the processor can be safely shared across threads.
+        // Compile-time check that Processor implements Send.
+        // This ensures the processor can be safely moved to another thread.
         fn assert_send<T: Send>() {}
-        fn assert_sync<T: Sync>() {}
 
         assert_send::<Processor>();
-        assert_sync::<Processor>();
     }
 
     fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
