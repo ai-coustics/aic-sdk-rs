@@ -32,11 +32,8 @@ use std::{
 /// # use aic_sdk::{Model, ProcessorConfig, Processor};
 /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-/// let mut processor = Processor::new(model.clone(), &license_key).unwrap();
-/// let config = ProcessorConfig {
-///     num_channels: 2,
-///     ..ProcessorConfig::optimal(&model)
-/// };
+/// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+/// let mut processor = Processor::new(model, &license_key).unwrap();
 /// processor.initialize(&config).unwrap();
 /// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
