@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut processor = Processor::new(model, &license_key)?;
 
     // Processor needs to be initialized before processing
-    processor.initialize(&config)?;
+    processor.initialize(config)?;
 
     // Process audio (interleaved: channels × frames)
     let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
@@ -131,7 +131,7 @@ let config = ProcessorConfig {
 };
 
 // Processor needs to be initialized before processing
-processor.initialize(&config)?;
+processor.initialize(config)?;
 ```
 
 ### Processing Audio
