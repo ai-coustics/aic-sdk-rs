@@ -337,7 +337,7 @@ unsafe impl Sync for ProcessorContext {}
 /// };
 ///
 /// let mut processor = Processor::new(model, &license_key).unwrap();
-/// processor.initialize(&config).unwrap();
+/// processor.initialize(config).unwrap();
 ///
 /// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
@@ -410,6 +410,40 @@ impl<'m> Processor<'m> {
             num_channels: None,
             _model: model,
         })
+    }
+
+    /// Initializes the processor with the given configuration.
+    ///
+    /// This is a convenience method that calls [`Processor::initialize`] internally and returns `self`.
+    /// The processor is immediately ready to process audio after calling this method, so you don't
+    /// need to call [`Processor::initialize`] separately.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Audio processing configuration
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(Self)` with the initialized processor, or an `AicError` if initialization fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Processor, ProcessorConfig};
+    /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+    ///
+    /// let mut processor = Processor::new(model, &license_key)?.with_config(config)?;
+    ///
+    /// // Processor is ready to use - no need to call initialize()
+    /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
+    /// processor.process_interleaved(&mut audio).unwrap();
+    /// # Ok::<(), aic_sdk::AicError>(())
+    /// ```
+    pub fn with_config(mut self, config: ProcessorConfig) -> Result<Self, AicError> {
+        self.initialize(config)?;
+        Ok(self)
     }
 
     /// Creates a [ProcessorContext](crate::processor::ProcessorContext) instance.
@@ -505,9 +539,9 @@ impl<'m> Processor<'m> {
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(model.clone(), &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model);
-    /// processor.initialize(&config).unwrap();
+    /// processor.initialize(config).unwrap();
     /// ```
-    pub fn initialize(&mut self, config: &ProcessorConfig) -> Result<(), AicError> {
+    pub fn initialize(&mut self, config: ProcessorConfig) -> Result<(), AicError> {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
         let error_code = unsafe {
@@ -566,7 +600,7 @@ impl<'m> Processor<'m> {
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(model.clone(), &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-    /// processor.initialize(&config).unwrap();
+    /// processor.initialize(config).unwrap();
     /// let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
     /// processor.process_planar(&mut audio).unwrap();
     /// ```
@@ -641,7 +675,7 @@ impl<'m> Processor<'m> {
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(model.clone(), &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-    /// processor.initialize(&config).unwrap();
+    /// processor.initialize(config).unwrap();
     /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
     /// processor.process_interleaved(&mut audio).unwrap();
     /// ```
@@ -702,7 +736,7 @@ impl<'m> Processor<'m> {
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(model.clone(), &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);;
-    /// processor.initialize(&config).unwrap();
+    /// processor.initialize(config).unwrap();
     /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
     /// processor.process_sequential(&mut audio).unwrap();
     /// ```
@@ -838,7 +872,7 @@ mod tests {
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
         let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(&config).unwrap();
+        processor.initialize(config).unwrap();
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![vec![0.0f32; config.num_frames]; num_channels];
@@ -854,7 +888,7 @@ mod tests {
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
         let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(&config).unwrap();
+        processor.initialize(config).unwrap();
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![0.0f32; num_channels * config.num_frames];
@@ -867,7 +901,7 @@ mod tests {
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
         let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(&config).unwrap();
+        processor.initialize(config).unwrap();
 
         let mut left = vec![0.0f32; config.num_frames];
         let mut right = vec![0.0f32; config.num_frames];
@@ -881,7 +915,7 @@ mod tests {
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
         let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(&config).unwrap();
+        processor.initialize(config).unwrap();
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![0.0f32; num_channels * config.num_frames];
@@ -896,7 +930,7 @@ mod tests {
             .with_allow_variable_frames(true);
 
         let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(&config).unwrap();
+        processor.initialize(config).unwrap();
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![0.0f32; num_channels * config.num_frames];
@@ -914,7 +948,7 @@ mod tests {
             .with_allow_variable_frames(true);
 
         let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(&config).unwrap();
+        processor.initialize(config).unwrap();
 
         let mut left = vec![0.0f32; config.num_frames];
         let mut right = vec![0.0f32; config.num_frames];
@@ -935,7 +969,7 @@ mod tests {
             .with_allow_variable_frames(true);
 
         let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(&config).unwrap();
+        processor.initialize(config).unwrap();
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![0.0f32; num_channels * config.num_frames];
@@ -951,7 +985,7 @@ mod tests {
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
         let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(&config).unwrap();
+        processor.initialize(config).unwrap();
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![0.0f32; num_channels * config.num_frames];
@@ -968,7 +1002,7 @@ mod tests {
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
         let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(&config).unwrap();
+        processor.initialize(config).unwrap();
 
         let mut left = vec![0.0f32; config.num_frames];
         let mut right = vec![0.0f32; config.num_frames];
@@ -988,7 +1022,7 @@ mod tests {
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
         let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(&config).unwrap();
+        processor.initialize(config).unwrap();
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![0.0f32; num_channels * config.num_frames];

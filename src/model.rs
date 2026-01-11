@@ -34,7 +34,7 @@ use std::{
 /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
 /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 /// let mut processor = Processor::new(model, &license_key).unwrap();
-/// processor.initialize(&config).unwrap();
+/// processor.initialize(config).unwrap();
 /// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```

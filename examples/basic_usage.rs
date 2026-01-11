@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Processor created successfully");
 
     // Initialize the processor
-    processor.initialize(&config)?;
+    processor.initialize(config)?;
     println!(
         "Processor initialized: Sample rate: {} Hz, Frames: {}, Channels: {}",
         config.sample_rate, config.num_frames, config.num_channels
