@@ -5,7 +5,7 @@ Rust wrapper for the ai-coustics Speech Enhancement SDK.
 For comprehensive documentation, visit [docs.ai-coustics.com](https://docs.ai-coustics.com).
 
 > [!NOTE]
-> This SDK requires a license key. Generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com).
+> This SDK requires a license key. Generate your key at [developers.ai-coustics.io](https://developers.ai-coustics.io).
 
 > [!WARNING]
 > You must use a Rust version different from `1.93.0-beta.5`, which was used to build the static libraries. A solution is currently in development.
