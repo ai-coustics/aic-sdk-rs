@@ -2,7 +2,7 @@ use crate::{error::*, model::Model};
 
 use aic_sdk_sys::{AicProcessorParameter::*, *};
 
-use std::{ffi::CString, ptr, sync::Once};
+use std::{ffi::CString, marker::PhantomData, ptr, sync::Once};
 
 /// Public for telemetry purposes
 pub static SET_WRAPPER_ID: Once = Once::new();
@@ -342,14 +342,16 @@ unsafe impl Sync for ProcessorContext {}
 /// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
-pub struct Processor {
+pub struct Processor<'a> {
     /// Raw pointer to the C processor structure
     inner: *mut AicProcessor,
     /// Configured number of channels
     num_channels: Option<u16>,
+    /// Marker to tie the lifetime of the processor to the lifetime of the model's weights
+    marker: PhantomData<&'a [u8]>,
 }
 
-impl Processor {
+impl<'a> Processor<'a> {
     /// Creates a new audio enhancement model instance.
     ///
     /// Multiple models can be created to process different audio streams simultaneously
@@ -373,7 +375,7 @@ impl Processor {
     /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// let processor = Processor::new(model, &license_key).unwrap();
     /// ```
-    pub fn new(model: &Model, license_key: &str) -> Result<Self, AicError> {
+    pub fn new(model: &Model<'a>, license_key: &str) -> Result<Self, AicError> {
         SET_WRAPPER_ID.call_once(|| unsafe {
             // SAFETY:
             // - This function has no safety requirements, it's unsafe because it's FFI.
@@ -407,6 +409,7 @@ impl Processor {
         Ok(Self {
             inner: processor_ptr,
             num_channels: None,
+            marker: PhantomData,
         })
     }
 
@@ -768,7 +771,7 @@ impl Processor {
     }
 }
 
-impl Drop for Processor {
+impl<'a> Drop for Processor<'a> {
     fn drop(&mut self) {
         if !self.inner.is_null() {
             // SAFETY:
@@ -778,20 +781,16 @@ impl Drop for Processor {
     }
 }
 
-// SAFETY:
-// The Processor can be sent to another thread because:
-// - The underlying C library supports multiple processor instances running on different threads
-// - Each processor instance maintains its own internal state
-// - The processor owns its AicProcessor pointer exclusively
-//
-// However, Processor is NOT Sync because:
-// - The C library's process functions explicitly state "Do not call this function from multiple threads"
-// - A single processor instance must not be accessed concurrently from multiple threads
-//
-// To use a processor across threads (e.g., in async contexts), wrap it in a Mutex:
-//   let processor = Arc::new(Mutex::new(processor));
-//   // Can now safely share across threads - the mutex ensures exclusive access
-unsafe impl Send for Processor {}
+// SAFETY: Everything in Processor is Send, with the exception of the inner raw pointer.
+// The Processor only uses the raw pointer according to the safety contracts of the
+// unsafe APIs that require the pointer, and the Processor does not expose access to the
+// raw pointer in any of its methods. Therefore, it safe to implement Send for Processor.
+unsafe impl<'a> Send for Processor<'a> {}
+
+// SAFETY: Processor does not expose any interior mutability, and all unsafe APIs that make use of
+// the inner raw pointer are only used in methods that take &mut self, which upholds the thread safety
+// contracts required by the unsafe APIs. Therefore, it is safe to implement Sync for Processor.
+unsafe impl<'a> Sync for Processor<'a> {}
 
 #[cfg(test)]
 mod tests {

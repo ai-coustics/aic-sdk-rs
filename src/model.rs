@@ -63,22 +63,10 @@ use std::{
 /// }
 /// ```
 pub struct Model<'a> {
+    /// Raw pointer to the C model structure
     ptr: *mut AicModel,
+    /// Marker to tie the lifetime of the model to the lifetime of its weights
     marker: PhantomData<&'a [u8]>,
-}
-
-impl<'a> Clone for Model<'a> {
-    /// Creates a clone of the model.
-    ///
-    /// This is a cheap operation as it is just cloning the pointer.
-    /// All clones share the same underlying model data, so you can efficiently
-    /// use the same model across multiple threads without duplicating memory.
-    fn clone(&self) -> Self {
-        Self {
-            ptr: self.ptr.clone(),
-            marker: self.marker.clone(),
-        }
-    }
 }
 
 impl<'a> Model<'a> {
@@ -428,7 +416,7 @@ mod self_referential_struct_compiles {
     #[allow(unused)]
     struct MyModel<'a> {
         model: Model<'a>,
-        processor: Processor,
+        processor: Processor<'a>,
     }
 
     impl<'a> MyModel<'a> {
