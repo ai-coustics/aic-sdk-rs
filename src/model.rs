@@ -32,7 +32,7 @@ use std::{
 /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
 /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-/// let mut processor = Processor::new(model, &license_key).unwrap();
+/// let mut processor = Processor::new(&model, &license_key).unwrap();
 /// processor.initialize(config).unwrap();
 /// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
@@ -43,16 +43,14 @@ use std::{
 /// ```rust,no_run
 /// # use aic_sdk::{Model, ProcessorConfig, Processor};
 /// # use std::thread;
-/// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+/// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 ///
 /// // Spawn multiple threads, each with its own processor but sharing the same model
 /// let handles: Vec<_> = (0..4)
 ///     .map(|i| {
-///         let model_clone = model.clone(); // Cheap reference count increment
-///         let license_clone = license_key.clone();
-///         thread::spawn(move || {
-///             let mut processor = Processor::new(model_clone, &license_clone).unwrap();
+///         thread::spawn(|| {
+///             let mut processor = Processor::new(&model, &license_key).unwrap();
 ///             // Process audio in this thread...
 ///         })
 ///     })

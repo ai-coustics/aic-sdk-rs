@@ -35,7 +35,7 @@ impl ProcessorConfig {
     /// # use aic_sdk::{Model, ProcessorConfig, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(model.clone(), &license_key).unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model)
     ///     .with_num_channels(2)
     ///     .with_allow_variable_frames(true);
@@ -169,7 +169,7 @@ impl ProcessorContext {
     /// # use aic_sdk::{Model, ProcessorParameter, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(model, &license_key).unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
     /// # let proc_ctx = processor.processor_context();
     /// proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.8).unwrap();
     /// ```
@@ -200,7 +200,7 @@ impl ProcessorContext {
     /// # use aic_sdk::{Model, ProcessorParameter, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(model, &license_key).unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
     /// # let processor_context = processor.processor_context();
     /// let enhancement_level = processor_context.parameter(ProcessorParameter::EnhancementLevel).unwrap();
     /// println!("Current enhancement level: {enhancement_level}");
@@ -247,7 +247,7 @@ impl ProcessorContext {
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(model, &license_key).unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
     /// # let processor_context = processor.processor_context();
     /// let delay = processor_context.output_delay();
     /// println!("Output delay: {} samples", delay);
@@ -290,7 +290,7 @@ impl ProcessorContext {
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(model, &license_key).unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
     /// # let processor_context = processor.processor_context();
     /// processor_context.reset().unwrap();
     /// ```
@@ -336,7 +336,7 @@ unsafe impl Sync for ProcessorContext {}
 ///     allow_variable_frames: false,
 /// };
 ///
-/// let mut processor = Processor::new(model, &license_key).unwrap();
+/// let mut processor = Processor::new(&model, &license_key).unwrap();
 /// processor.initialize(config).unwrap();
 ///
 /// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
@@ -373,7 +373,7 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor};
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// let processor = Processor::new(model, &license_key).unwrap();
+    /// let processor = Processor::new(&model, &license_key).unwrap();
     /// ```
     pub fn new(model: &Model<'a>, license_key: &str) -> Result<Self, AicError> {
         SET_WRAPPER_ID.call_once(|| unsafe {
@@ -435,7 +435,7 @@ impl<'a> Processor<'a> {
     /// let model = Model::from_file("/path/to/model.aicmodel")?;
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
     ///
-    /// let mut processor = Processor::new(model, &license_key)?.with_config(config)?;
+    /// let mut processor = Processor::new(&model, &license_key)?.with_config(config)?;
     ///
     /// // Processor is ready to use - no need to call initialize()
     /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
@@ -456,7 +456,7 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor};
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// let processor = Processor::new(model, &license_key).unwrap();
+    /// let processor = Processor::new(&model, &license_key).unwrap();
     /// let processor_context = processor.processor_context();
     /// ```
     pub fn processor_context(&self) -> ProcessorContext {
@@ -488,7 +488,7 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor};
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// let processor = Processor::new(model, &license_key).unwrap();
+    /// let processor = Processor::new(&model, &license_key).unwrap();
     /// let vad = processor.vad_context();
     /// ```
     pub fn vad_context(&self) -> crate::VadContext {
@@ -538,7 +538,7 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut processor = Processor::new(model.clone(), &license_key).unwrap();
+    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model);
     /// processor.initialize(config).unwrap();
     /// ```
@@ -599,7 +599,7 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut processor = Processor::new(model.clone(), &license_key).unwrap();
+    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
     /// processor.initialize(config).unwrap();
     /// let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
@@ -674,7 +674,7 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut processor = Processor::new(model.clone(), &license_key).unwrap();
+    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
     /// processor.initialize(config).unwrap();
     /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
@@ -735,7 +735,7 @@ impl<'a> Processor<'a> {
     /// # use aic_sdk::{Model, Processor, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut processor = Processor::new(model.clone(), &license_key).unwrap();
+    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);;
     /// processor.initialize(config).unwrap();
     /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
