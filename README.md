@@ -37,11 +37,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get optimal configuration based on the selected model
     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
-    // Create a processor
-    let mut processor = Processor::new(model, &license_key)?;
-
-    // Processor needs to be initialized before processing
-    processor.initialize(config)?;
+    // Create a processor and initialize in one step
+    let mut processor = Processor::new(&model, &license_key)?.with_config(config)?;
 
     // Process audio (interleaved: channels × frames)
     let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
@@ -102,19 +99,19 @@ let model = Model::from_file(&model_path)?;
 
 ```rust,ignore
 // Get model ID
-let model_id = model.get_id();
+let model_id = model.id();
 
 // Get optimal sample rate for the model
-let optimal_rate = model.get_optimal_sample_rate();
+let optimal_rate = model.optimal_sample_rate();
 
 // Get optimal frame count for a specific sample rate
-let optimal_frames = model.get_optimal_num_frames(48000);
+let optimal_frames = model.optimal_num_frames(48000);
 ```
 
 ### Configuring the Processor
 
 ```rust,ignore
-use aic_sdk::ProcessorConfig;
+use aic_sdk::{Processor, ProcessorConfig};
 
 // Get optimal configuration for the model
 let config = ProcessorConfig::optimal(&model)
@@ -131,6 +128,12 @@ let config = ProcessorConfig {
 };
 
 // Processor needs to be initialized before processing
+
+// Option 1: Create and initialize in one step
+let processor = Processor::new(&model, &license_key)?.with_config(config)?;
+
+// Option 2: Create first, then initialize separately
+let mut processor = Processor::new(&model, &license_key)?;
 processor.initialize(config)?;
 ```
 
@@ -164,7 +167,7 @@ use aic_sdk::ProcessorParameter;
 let proc_ctx = processor.processor_context();
 
 // Get output delay in samples
-let delay = proc_ctx.get_output_delay();
+let delay = proc_ctx.output_delay();
 
 // Reset processor state (clears internal buffers)
 proc_ctx.reset()?;

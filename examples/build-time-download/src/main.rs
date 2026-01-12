@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let model = Model::from_buffer(MODEL)?;
 
-    let _processor = Processor::new(model, &license)?;
+    let _processor = Processor::new(&model, &license)?;
     println!("Processor created successfully");
 
     Ok(())

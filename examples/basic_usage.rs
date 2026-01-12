@@ -34,9 +34,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create processor with license key
     let mut processor = Processor::new(&model, &license)?.with_config(config)?;
-    println!("Processor created successfully");
     println!(
-        "Processor initialized: Sample rate: {} Hz, Frames: {}, Channels: {}",
+        "Processor created and initialized successfully with: Sample rate: {} Hz, Frames: {}, Channels: {}",
         config.sample_rate, config.num_frames, config.num_channels
     );
 

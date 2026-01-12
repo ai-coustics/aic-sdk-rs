@@ -42,15 +42,16 @@ use std::{
 ///
 /// ```rust,no_run
 /// # use aic_sdk::{Model, ProcessorConfig, Processor};
-/// # use std::thread;
-/// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-/// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+/// # use std::{thread, sync::Arc};
+/// let model = Arc::new(Model::from_file("/path/to/model.aicmodel").unwrap());
 ///
 /// // Spawn multiple threads, each with its own processor but sharing the same model
 /// let handles: Vec<_> = (0..4)
 ///     .map(|i| {
-///         thread::spawn(|| {
-///             let mut processor = Processor::new(&model, &license_key).unwrap();
+///         let model_clone = Arc::clone(&model);
+///         thread::spawn(move || {
+///             let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+///             let mut processor = Processor::new(&model_clone, &license_key).unwrap();
 ///             // Process audio in this thread...
 ///         })
 ///     })
