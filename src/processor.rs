@@ -800,32 +800,34 @@ mod tests {
         path::{Path, PathBuf},
     };
 
-    // #[test]
-    // fn model_can_be_dropped() {
-    //     let (model, license_key) = load_test_model().unwrap();
-    //     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+    #[test]
+    fn model_can_be_dropped() {
+        let (model, license_key) = load_test_model().unwrap();
+        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
-    //     let mut processor = Processor::new(&model, &license_key)
-    //         .unwrap()
-    //         .with_config(config)
-    //         .unwrap();
-    //     drop(model);
+        let mut processor = Processor::new(&model, &license_key)
+            .unwrap()
+            .with_config(config)
+            .unwrap();
+        drop(model);
 
-    //     let num_channels = config.num_channels as usize;
-    //     let mut audio = vec![vec![0.0f32; config.num_frames]; num_channels];
-    //     let mut audio_refs: Vec<&mut [f32]> =
-    //         audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
+        let num_channels = config.num_channels as usize;
+        let mut audio = vec![vec![0.0f32; config.num_frames]; num_channels];
+        let mut audio_refs: Vec<&mut [f32]> =
+            audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
 
-    //     processor.process_planar(&mut audio_refs).unwrap();
-    // }
+        processor.process_planar(&mut audio_refs).unwrap();
+    }
 
     #[test]
     fn processor_is_send_and_sync() {
-        // Compile-time check that Processor implements Send.
+        // Compile-time check that Processor implements Send and Sync.
         // This ensures the processor can be safely moved to another thread.
         fn assert_send<T: Send>() {}
+        fn assert_sync<T: Send>() {}
 
         assert_send::<Processor>();
+        assert_sync::<Processor>();
     }
 
     fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
@@ -1078,7 +1080,7 @@ mod _compile_fail_tests {
     //! ```rust,compile_fail
     //! use aic_sdk::{Model, Processor};
     //!
-    //! fn leak_processor<'a>() -> Processor<'a, 'a> {
+    //! fn leak_processor<'a>() -> Processor<'a> {
     //!     let license_key = "dummy-license";
     //!     let processor = {
     //!         let bytes = vec![0u8; 64];
@@ -1090,6 +1092,31 @@ mod _compile_fail_tests {
     //!
     //! fn main() {
     //!     let _ = leak_processor();
+    //! }
+    //! ```
+    //!
+    //! Compile-fail regression: a `Processor`'s model buffer must not be dropped before the processor.
+    //!
+    //! ```rust,compile_fail
+    //! use aic_sdk::{Model, Processor, ProcessorConfig};
+    //!
+    //! fn main() {
+    //!     let buffer = vec![0u8; 64];
+    //!     let model = Model::from_buffer(&buffer).unwrap();
+    //!     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+    //!
+    //!     let mut processor = Processor::new(&model, "license")
+    //!         .unwrap()
+    //!         .with_config(config)
+    //!         .unwrap();
+    //!
+    //!     drop(model); // Model can be dropped without issues
+    //!
+    //!     drop(buffer); // This should fail to compile
+    //!
+    //!     let num_channels = config.num_channels as usize;
+    //!     let mut audio = vec![vec![0.0f32; config.num_frames]; num_channels];
+    //!     processor.process_planar(&mut audio).unwrap();
     //! }
     //! ```
 }
