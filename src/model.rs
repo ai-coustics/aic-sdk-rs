@@ -15,25 +15,56 @@ use std::{
 /// It handles memory management automatically and converts C-style error codes
 /// to Rust `Result` types.
 ///
+/// # Cloning and Multi-threading
+///
+/// `Model` can be cloned cheaply (just an atomic reference count increment) and shared
+/// across multiple threads. Each clone refers to the same underlying model data, making
+/// it efficient to create multiple processors from the same model without duplicating
+/// the model data in memory.
+///
+/// The model is `Send` and `Sync`, so you can clone it and send the clones to different
+/// threads to process audio streams in parallel.
+///
 /// # Example
 ///
 /// ```rust,no_run
 /// # use aic_sdk::{Model, ProcessorConfig, Processor};
 /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+/// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 /// let mut processor = Processor::new(&model, &license_key).unwrap();
-/// let config = ProcessorConfig {
-///     num_channels: 2,
-///     ..ProcessorConfig::optimal(&model)
-/// };
 /// processor.initialize(&config).unwrap();
 /// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
+///
+/// # Multi-threaded Example
+///
+/// ```rust,no_run
+/// # use aic_sdk::{Model, ProcessorConfig, Processor};
+/// # use std::{thread, sync::Arc};
+/// let model = Arc::new(Model::from_file("/path/to/model.aicmodel").unwrap());
+///
+/// // Spawn multiple threads, each with its own processor but sharing the same model
+/// let handles: Vec<_> = (0..4)
+///     .map(|i| {
+///         let model_clone = Arc::clone(&model);
+///         thread::spawn(move || {
+///             let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+///             let mut processor = Processor::new(&model_clone, &license_key).unwrap();
+///             // Process audio in this thread...
+///         })
+///     })
+///     .collect();
+///
+/// for handle in handles {
+///     handle.join().unwrap();
+/// }
+/// ```
 pub struct Model<'a> {
     /// Raw pointer to the C model structure
-    inner: *mut AicModel,
-    /// Phantom data to tie the lifetime to the backing buffer (if any)
+    ptr: *mut AicModel,
+    /// Marker to tie the lifetime of the model to the lifetime of its weights
     marker: PhantomData<&'a [u8]>,
 }
 
@@ -76,7 +107,7 @@ impl<'a> Model<'a> {
         );
 
         Ok(Model {
-            inner: model_ptr,
+            ptr: model_ptr,
             marker: PhantomData,
         })
     }
@@ -119,8 +150,8 @@ impl<'a> Model<'a> {
             "C library returned success but null pointer"
         );
 
-        Ok(Self {
-            inner: model_ptr,
+        Ok(Model {
+            ptr: model_ptr,
             marker: PhantomData,
         })
     }
@@ -281,24 +312,27 @@ impl<'a> Model<'a> {
     }
 
     pub(crate) fn as_const_ptr(&self) -> *const AicModel {
-        self.inner as *const AicModel
+        self.ptr as *const AicModel
     }
 }
 
 impl<'a> Drop for Model<'a> {
     fn drop(&mut self) {
-        if !self.inner.is_null() {
+        if !self.ptr.is_null() {
             // SAFETY:
             // - `inner` was allocated by the SDK and is still owned by this wrapper.
-            unsafe { aic_model_destroy(self.inner) };
+            unsafe { aic_model_destroy(self.ptr) };
         }
     }
 }
 
 // SAFETY:
-// - The Model wraps a raw pointer to an AicModel which is immutable after creation and it
+// - Model wraps a raw pointer to an AicModel which is immutable after creation and it
 //   does not provide access to it through its public API.
 unsafe impl<'a> Send for Model<'a> {}
+// SAFETY:
+// - Model wraps a raw pointer to an AicModel which is immutable after creation and it
+//   does not provide access to it through its public API.
 unsafe impl<'a> Sync for Model<'a> {}
 
 /// Embeds the bytes of model file, ensuring proper alignment.
@@ -329,6 +363,8 @@ macro_rules! include_model {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn include_model_aligns_to_64_bytes() {
         // Use the README.md as a dummy file for testing
@@ -339,6 +375,17 @@ mod tests {
             ptr.is_multiple_of(64),
             "include_model should align data to 64 bytes"
         );
+    }
+
+    #[test]
+    fn model_is_send_and_sync() {
+        // Compile-time check that Model implements Send and Sync.
+        // This ensures the model can be safely shared across threads.
+        fn assert_send<T: Send>() {}
+        fn assert_sync<T: Sync>() {}
+
+        assert_send::<Model>();
+        assert_sync::<Model>();
     }
 }
 

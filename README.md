@@ -5,7 +5,7 @@ Rust wrapper for the ai-coustics Speech Enhancement SDK.
 For comprehensive documentation, visit [docs.ai-coustics.com](https://docs.ai-coustics.com).
 
 > [!NOTE]
-> This SDK requires a license key. Generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com).
+> This SDK requires a license key. Generate your key at [developers.ai-coustics.io](https://developers.ai-coustics.io).
 
 > [!WARNING]
 > You must use a Rust version different from `1.93.0-beta.5`, which was used to build the static libraries. A solution is currently in development.
@@ -21,7 +21,7 @@ aic-sdk = { version = "2.0.0", features = ["download-lib"] }
 
 ## Quick Start
 
-```rust
+```rust,ignore
 use aic_sdk::{include_model, ProcessorConfig, Model, Processor};
 
 // Embed model at compile time (or use Model::from_file to load at runtime)
@@ -33,13 +33,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load the embedded model (or download manually at https://artifacts.ai-coustics.io/)
     let model = Model::from_buffer(MODEL)?;
-
-    // Create a processor
-    let mut processor = Processor::new(&model, &license_key)?;
-
-    // Get optimal configuration and initialize
+    
+    // Get optimal configuration based on the selected model
     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-    processor.initialize(&config)?;
+
+    // Create a processor and initialize in one step
+    let mut processor = Processor::new(&model, &license_key)?.with_config(config)?;
 
     // Process audio (interleaved: channels × frames)
     let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
@@ -68,14 +67,14 @@ println!("Compatible model version: {}", aic_sdk::get_compatible_model_version()
 Download models and find available IDs at [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io/).
 
 #### Load from File
-```rust
+```rust,ignore
 use aic_sdk::Model;
 
 let model = Model::from_file("path/to/model.aicmodel")?;
 ```
 
 #### Embed at Compile Time
-```rust
+```rust,ignore
 use aic_sdk::{Model, include_model};
 
 static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
@@ -89,7 +88,7 @@ Enable the `download-model` feature:
 aic-sdk = { version = "2.0.0", features = ["download-lib", "download-model"] }
 ```
 
-```rust
+```rust,ignore
 use aic_sdk::Model;
 
 let model_path = Model::download("quail-xxs-48khz", "./models")?;
@@ -98,21 +97,21 @@ let model = Model::from_file(&model_path)?;
 
 ### Model Information
 
-```rust
+```rust,ignore
 // Get model ID
-let model_id = model.get_id();
+let model_id = model.id();
 
 // Get optimal sample rate for the model
-let optimal_rate = model.get_optimal_sample_rate();
+let optimal_rate = model.optimal_sample_rate();
 
 // Get optimal frame count for a specific sample rate
-let optimal_frames = model.get_optimal_num_frames(48000);
+let optimal_frames = model.optimal_num_frames(48000);
 ```
 
 ### Configuring the Processor
 
-```rust
-use aic_sdk::ProcessorConfig;
+```rust,ignore
+use aic_sdk::{Processor, ProcessorConfig};
 
 // Get optimal configuration for the model
 let config = ProcessorConfig::optimal(&model)
@@ -128,13 +127,19 @@ let config = ProcessorConfig {
     allow_variable_frames: false,
 };
 
-// Initialize the processor
-processor.initialize(&config)?;
+// Processor needs to be initialized before processing
+
+// Option 1: Create and initialize in one step
+let processor = Processor::new(&model, &license_key)?.with_config(config)?;
+
+// Option 2: Create first, then initialize separately
+let mut processor = Processor::new(&model, &license_key)?;
+processor.initialize(config)?;
 ```
 
 ### Processing Audio
 
-```rust
+```rust,ignore
 // Interleaved processing (channels interleaved in single buffer)
 // Format: [l, r, l, r, ...]
 let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
@@ -155,14 +160,14 @@ processor.process_planar(&mut audio)?;
 
 The processor context provides thread-safe access to processor parameters and state. You can create multiple contexts and move them to any thread for concurrent parameter updates.
 
-```rust
+```rust,ignore
 use aic_sdk::ProcessorParameter;
 
 // Get processor context
 let proc_ctx = processor.processor_context();
 
 // Get output delay in samples
-let delay = proc_ctx.get_output_delay();
+let delay = proc_ctx.output_delay();
 
 // Reset processor state (clears internal buffers)
 proc_ctx.reset()?;
@@ -181,7 +186,7 @@ println!("Enhancement level: {}", level);
 
 The VAD context provides thread-safe access to VAD parameters and state. You can create multiple contexts and move them to any thread for concurrent parameter updates.
 
-```rust
+```rust,ignore
 use aic_sdk::VadParameter;
 
 // Get VAD context from processor
