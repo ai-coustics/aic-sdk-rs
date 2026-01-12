@@ -387,7 +387,6 @@ impl<'a> Processor<'a> {
 
         // SAFETY:
         // - `processor_ptr` and `model` pointers are valid for the duration of the call.
-        // - `model` is kept alive internally as it stores the memory in an `Arc`
         // - `c_license_key` is a NUL-terminated CString.
         let error_code = unsafe {
             aic_processor_create(
