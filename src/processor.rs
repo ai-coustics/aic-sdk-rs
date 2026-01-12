@@ -12,7 +12,7 @@ pub use aic_sdk_sys::aic_set_sdk_wrapper_id;
 ///
 /// Use [`Model::optimal_processor_config`] as a starting point, then adjust fields
 /// to match your stream layout.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ProcessorConfig {
     /// Sample rate in Hz (8000 - 192000).
     pub sample_rate: u32,
@@ -330,14 +330,13 @@ unsafe impl Sync for ProcessorContext {}
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
 /// let config = ProcessorConfig {
-///     sample_rate: model.optimal_sample_rate(),
 ///     num_channels: 2,
 ///     num_frames: 1024,
-///     allow_variable_frames: false,
+///     ..ProcessorConfig::optimal(&model)
 /// };
 ///
 /// let mut processor = Processor::new(&model, &license_key).unwrap();
-/// processor.initialize(config).unwrap();
+/// processor.initialize(&config).unwrap();
 ///
 /// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
@@ -435,14 +434,14 @@ impl<'a> Processor<'a> {
     /// let model = Model::from_file("/path/to/model.aicmodel")?;
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
     ///
-    /// let mut processor = Processor::new(&model, &license_key)?.with_config(config)?;
+    /// let mut processor = Processor::new(&model, &license_key)?.with_config(&config)?;
     ///
     /// // Processor is ready to use - no need to call initialize()
     /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
     /// processor.process_interleaved(&mut audio).unwrap();
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
-    pub fn with_config(mut self, config: ProcessorConfig) -> Result<Self, AicError> {
+    pub fn with_config(mut self, config: &ProcessorConfig) -> Result<Self, AicError> {
         self.initialize(config)?;
         Ok(self)
     }
@@ -540,9 +539,9 @@ impl<'a> Processor<'a> {
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(&model, &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model);
-    /// processor.initialize(config).unwrap();
+    /// processor.initialize(&config).unwrap();
     /// ```
-    pub fn initialize(&mut self, config: ProcessorConfig) -> Result<(), AicError> {
+    pub fn initialize(&mut self, config: &ProcessorConfig) -> Result<(), AicError> {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
         let error_code = unsafe {
@@ -601,7 +600,7 @@ impl<'a> Processor<'a> {
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(&model, &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-    /// processor.initialize(config).unwrap();
+    /// processor.initialize(&config).unwrap();
     /// let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
     /// processor.process_planar(&mut audio).unwrap();
     /// ```
@@ -676,7 +675,7 @@ impl<'a> Processor<'a> {
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(&model, &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-    /// processor.initialize(config).unwrap();
+    /// processor.initialize(&config).unwrap();
     /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
     /// processor.process_interleaved(&mut audio).unwrap();
     /// ```
@@ -737,7 +736,7 @@ impl<'a> Processor<'a> {
     /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// # let mut processor = Processor::new(&model, &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);;
-    /// processor.initialize(config).unwrap();
+    /// processor.initialize(&config).unwrap();
     /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
     /// processor.process_sequential(&mut audio).unwrap();
     /// ```
@@ -861,7 +860,7 @@ mod tests {
 
         let mut processor = Processor::new(&model, &license_key)
             .unwrap()
-            .with_config(config)
+            .with_config(&config)
             .unwrap();
 
         let num_channels = config.num_channels as usize;
@@ -879,7 +878,7 @@ mod tests {
 
         let mut processor = Processor::new(&model, &license_key)
             .unwrap()
-            .with_config(config)
+            .with_config(&config)
             .unwrap();
 
         let num_channels = config.num_channels as usize;
@@ -894,7 +893,7 @@ mod tests {
 
         let mut processor = Processor::new(&model, &license_key)
             .unwrap()
-            .with_config(config)
+            .with_config(&config)
             .unwrap();
 
         let mut left = vec![0.0f32; config.num_frames];
@@ -910,7 +909,7 @@ mod tests {
 
         let mut processor = Processor::new(&model, &license_key)
             .unwrap()
-            .with_config(config)
+            .with_config(&config)
             .unwrap();
 
         let num_channels = config.num_channels as usize;
@@ -927,7 +926,7 @@ mod tests {
 
         let mut processor = Processor::new(&model, &license_key)
             .unwrap()
-            .with_config(config)
+            .with_config(&config)
             .unwrap();
 
         let num_channels = config.num_channels as usize;
@@ -947,7 +946,7 @@ mod tests {
 
         let mut processor = Processor::new(&model, &license_key)
             .unwrap()
-            .with_config(config)
+            .with_config(&config)
             .unwrap();
 
         let mut left = vec![0.0f32; config.num_frames];
@@ -970,7 +969,7 @@ mod tests {
 
         let mut processor = Processor::new(&model, &license_key)
             .unwrap()
-            .with_config(config)
+            .with_config(&config)
             .unwrap();
 
         let num_channels = config.num_channels as usize;
@@ -988,7 +987,7 @@ mod tests {
 
         let mut processor = Processor::new(&model, &license_key)
             .unwrap()
-            .with_config(config)
+            .with_config(&config)
             .unwrap();
 
         let num_channels = config.num_channels as usize;
@@ -1007,7 +1006,7 @@ mod tests {
 
         let mut processor = Processor::new(&model, &license_key)
             .unwrap()
-            .with_config(config)
+            .with_config(&config)
             .unwrap();
 
         let mut left = vec![0.0f32; config.num_frames];
@@ -1029,7 +1028,7 @@ mod tests {
 
         let mut processor = Processor::new(&model, &license_key)
             .unwrap()
-            .with_config(config)
+            .with_config(&config)
             .unwrap();
 
         let num_channels = config.num_channels as usize;
@@ -1042,13 +1041,13 @@ mod tests {
     }
 
     #[test]
-    fn model_can_be_dropped() {
+    fn model_can_be_dropped_after_creating_processor() {
         let (model, license_key) = load_test_model().unwrap();
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
         let mut processor = Processor::new(&model, &license_key)
             .unwrap()
-            .with_config(config)
+            .with_config(&config)
             .unwrap();
         drop(model); // Inside of the SDK an Arc-Pointer to `Model` is stored in Processor, so it won't be de-allocated
 
@@ -1070,6 +1069,26 @@ mod tests {
         assert_send::<Processor>();
         assert_sync::<Processor>();
     }
+
+    struct MyModel<'a> {
+        model: Model<'a>,
+        processor: Processor<'a>,
+    }
+
+    impl<'a> MyModel<'a> {
+        pub fn new() -> Self {
+            let (model, license_key) = load_test_model().unwrap();
+            let processor = Processor::new(&model, &license_key)
+                .unwrap()
+                .with_config(&ProcessorConfig::optimal(&model))
+                .unwrap();
+            MyModel { model, processor }
+        }
+    }
+
+    fn self_referential_struct_is_working() {
+        let _model = MyModel::new();
+    }
 }
 
 #[doc(hidden)]
@@ -1086,7 +1105,7 @@ mod _compile_fail_tests {
     //!
     //!     let mut processor = Processor::new(&model, "license")
     //!         .unwrap()
-    //!         .with_config(config)
+    //!         .with_config(&config)
     //!         .unwrap();
     //!
     //!     drop(model); // Model can be dropped without issues
