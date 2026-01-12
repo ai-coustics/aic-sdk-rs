@@ -1050,7 +1050,7 @@ mod tests {
             .unwrap()
             .with_config(config)
             .unwrap();
-        drop(model);
+        drop(model); // Inside of the SDK an Arc-Pointer to `Model` is stored in Processor, so it won't be de-allocated
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![vec![0.0f32; config.num_frames]; num_channels];
