@@ -342,16 +342,14 @@ unsafe impl Sync for ProcessorContext {}
 /// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
-pub struct Processor<'m> {
+pub struct Processor {
     /// Raw pointer to the C processor structure
     inner: *mut AicProcessor,
     /// Configured number of channels
     num_channels: Option<u16>,
-    /// Store Model pointer to prevent it from being cleaned up
-    _model: Model<'m>,
 }
 
-impl<'m> Processor<'m> {
+impl Processor {
     /// Creates a new audio enhancement model instance.
     ///
     /// Multiple models can be created to process different audio streams simultaneously
@@ -375,7 +373,7 @@ impl<'m> Processor<'m> {
     /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// let processor = Processor::new(model, &license_key).unwrap();
     /// ```
-    pub fn new(model: Model<'m>, license_key: &str) -> Result<Self, AicError> {
+    pub fn new(model: &Model, license_key: &str) -> Result<Self, AicError> {
         SET_WRAPPER_ID.call_once(|| unsafe {
             // SAFETY:
             // - This function has no safety requirements, it's unsafe because it's FFI.
@@ -388,6 +386,7 @@ impl<'m> Processor<'m> {
 
         // SAFETY:
         // - `processor_ptr` and `model` pointers are valid for the duration of the call.
+        // - `model` is kept alive internally as it stores the memory in an `Arc`
         // - `c_license_key` is a NUL-terminated CString.
         let error_code = unsafe {
             aic_processor_create(
@@ -408,7 +407,6 @@ impl<'m> Processor<'m> {
         Ok(Self {
             inner: processor_ptr,
             num_channels: None,
-            _model: model,
         })
     }
 
@@ -770,7 +768,7 @@ impl<'m> Processor<'m> {
     }
 }
 
-impl<'m> Drop for Processor<'m> {
+impl Drop for Processor {
     fn drop(&mut self) {
         if !self.inner.is_null() {
             // SAFETY:
@@ -793,7 +791,7 @@ impl<'m> Drop for Processor<'m> {
 // To use a processor across threads (e.g., in async contexts), wrap it in a Mutex:
 //   let processor = Arc::new(Mutex::new(processor));
 //   // Can now safely share across threads - the mutex ensures exclusive access
-unsafe impl<'a> Send for Processor<'a> {}
+unsafe impl Send for Processor {}
 
 #[cfg(test)]
 mod tests {
@@ -802,6 +800,25 @@ mod tests {
         fs,
         path::{Path, PathBuf},
     };
+
+    // #[test]
+    // fn model_can_be_dropped() {
+    //     let (model, license_key) = load_test_model().unwrap();
+    //     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+
+    //     let mut processor = Processor::new(&model, &license_key)
+    //         .unwrap()
+    //         .with_config(config)
+    //         .unwrap();
+    //     drop(model);
+
+    //     let num_channels = config.num_channels as usize;
+    //     let mut audio = vec![vec![0.0f32; config.num_frames]; num_channels];
+    //     let mut audio_refs: Vec<&mut [f32]> =
+    //         audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
+
+    //     processor.process_planar(&mut audio_refs).unwrap();
+    // }
 
     #[test]
     fn processor_is_send_and_sync() {
@@ -871,8 +888,10 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
-        let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(config).unwrap();
+        let mut processor = Processor::new(&model, &license_key)
+            .unwrap()
+            .with_config(config)
+            .unwrap();
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![vec![0.0f32; config.num_frames]; num_channels];
@@ -887,8 +906,10 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
-        let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(config).unwrap();
+        let mut processor = Processor::new(&model, &license_key)
+            .unwrap()
+            .with_config(config)
+            .unwrap();
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![0.0f32; num_channels * config.num_frames];
@@ -900,8 +921,10 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
-        let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(config).unwrap();
+        let mut processor = Processor::new(&model, &license_key)
+            .unwrap()
+            .with_config(config)
+            .unwrap();
 
         let mut left = vec![0.0f32; config.num_frames];
         let mut right = vec![0.0f32; config.num_frames];
@@ -914,8 +937,10 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
-        let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(config).unwrap();
+        let mut processor = Processor::new(&model, &license_key)
+            .unwrap()
+            .with_config(config)
+            .unwrap();
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![0.0f32; num_channels * config.num_frames];
@@ -929,8 +954,10 @@ mod tests {
             .with_num_channels(2)
             .with_allow_variable_frames(true);
 
-        let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(config).unwrap();
+        let mut processor = Processor::new(&model, &license_key)
+            .unwrap()
+            .with_config(config)
+            .unwrap();
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![0.0f32; num_channels * config.num_frames];
@@ -947,8 +974,10 @@ mod tests {
             .with_num_channels(2)
             .with_allow_variable_frames(true);
 
-        let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(config).unwrap();
+        let mut processor = Processor::new(&model, &license_key)
+            .unwrap()
+            .with_config(config)
+            .unwrap();
 
         let mut left = vec![0.0f32; config.num_frames];
         let mut right = vec![0.0f32; config.num_frames];
@@ -968,8 +997,10 @@ mod tests {
             .with_num_channels(2)
             .with_allow_variable_frames(true);
 
-        let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(config).unwrap();
+        let mut processor = Processor::new(&model, &license_key)
+            .unwrap()
+            .with_config(config)
+            .unwrap();
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![0.0f32; num_channels * config.num_frames];
@@ -984,8 +1015,10 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
-        let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(config).unwrap();
+        let mut processor = Processor::new(&model, &license_key)
+            .unwrap()
+            .with_config(config)
+            .unwrap();
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![0.0f32; num_channels * config.num_frames];
@@ -1001,8 +1034,10 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
-        let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(config).unwrap();
+        let mut processor = Processor::new(&model, &license_key)
+            .unwrap()
+            .with_config(config)
+            .unwrap();
 
         let mut left = vec![0.0f32; config.num_frames];
         let mut right = vec![0.0f32; config.num_frames];
@@ -1021,8 +1056,10 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
-        let mut processor = Processor::new(model, &license_key).unwrap();
-        processor.initialize(config).unwrap();
+        let mut processor = Processor::new(&model, &license_key)
+            .unwrap()
+            .with_config(config)
+            .unwrap();
 
         let num_channels = config.num_channels as usize;
         let mut audio = vec![0.0f32; num_channels * config.num_frames];

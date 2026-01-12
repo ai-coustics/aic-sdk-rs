@@ -33,11 +33,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_allow_variable_frames(true);
 
     // Create processor with license key
-    let mut processor = Processor::new(model, &license)?;
+    let mut processor = Processor::new(&model, &license)?.with_config(config)?;
     println!("Processor created successfully");
-
-    // Initialize the processor
-    processor.initialize(config)?;
     println!(
         "Processor initialized: Sample rate: {} Hz, Frames: {}, Channels: {}",
         config.sample_rate, config.num_frames, config.num_channels

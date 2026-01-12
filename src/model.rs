@@ -7,7 +7,6 @@ use std::{
     marker::PhantomData,
     path::Path,
     ptr,
-    sync::Arc,
 };
 
 /// High-level wrapper for the ai-coustics audio enhancement model.
@@ -64,24 +63,20 @@ use std::{
 /// }
 /// ```
 pub struct Model<'a> {
-    inner: Arc<ModelInner<'a>>,
-}
-
-// Helper struct to make usage
-struct ModelInner<'a> {
     ptr: *mut AicModel,
     marker: PhantomData<&'a [u8]>,
 }
 
-impl Clone for Model<'_> {
+impl<'a> Clone for Model<'a> {
     /// Creates a clone of the model.
     ///
-    /// This is a cheap operation that only increments an atomic reference count.
+    /// This is a cheap operation as it is just cloning the pointer.
     /// All clones share the same underlying model data, so you can efficiently
     /// use the same model across multiple threads without duplicating memory.
     fn clone(&self) -> Self {
-        Model {
-            inner: Arc::clone(&self.inner),
+        Self {
+            ptr: self.ptr.clone(),
+            marker: self.marker.clone(),
         }
     }
 }
@@ -125,10 +120,8 @@ impl<'a> Model<'a> {
         );
 
         Ok(Model {
-            inner: Arc::new(ModelInner {
-                ptr: model_ptr,
-                marker: PhantomData,
-            }),
+            ptr: model_ptr,
+            marker: PhantomData,
         })
     }
 
@@ -171,10 +164,8 @@ impl<'a> Model<'a> {
         );
 
         Ok(Model {
-            inner: Arc::new(ModelInner {
-                ptr: model_ptr,
-                marker: PhantomData,
-            }),
+            ptr: model_ptr,
+            marker: PhantomData,
         })
     }
 
@@ -334,25 +325,28 @@ impl<'a> Model<'a> {
     }
 
     pub(crate) fn as_const_ptr(&self) -> *const AicModel {
-        self.inner.ptr as *const AicModel
+        self.ptr as *const AicModel
     }
 }
 
 impl<'a> Drop for Model<'a> {
     fn drop(&mut self) {
-        if !self.inner.ptr.is_null() {
+        if !self.ptr.is_null() {
             // SAFETY:
             // - `inner` was allocated by the SDK and is still owned by this wrapper.
-            unsafe { aic_model_destroy(self.inner.ptr) };
+            unsafe { aic_model_destroy(self.ptr) };
         }
     }
 }
 
 // SAFETY:
-// - ModelInner wraps a raw pointer to an AicModel which is immutable after creation and it
+// - Model wraps a raw pointer to an AicModel which is immutable after creation and it
 //   does not provide access to it through its public API.
-unsafe impl<'a> Send for ModelInner<'a> {}
-unsafe impl<'a> Sync for ModelInner<'a> {}
+unsafe impl<'a> Send for Model<'a> {}
+// SAFETY:
+// - Model wraps a raw pointer to an AicModel which is immutable after creation and it
+//   does not provide access to it through its public API.
+unsafe impl<'a> Sync for Model<'a> {}
 
 /// Embeds the bytes of model file, ensuring proper alignment.
 ///
@@ -434,14 +428,14 @@ mod self_referential_struct_compiles {
     #[allow(unused)]
     struct MyModel<'a> {
         model: Model<'a>,
-        processor: Processor<'a>,
+        processor: Processor,
     }
 
     impl<'a> MyModel<'a> {
         #[allow(unused)]
         pub fn new() -> Self {
             let model = Model::from_file("").unwrap();
-            let processor = Processor::new(model.clone(), "").unwrap();
+            let processor = Processor::new(&model, "").unwrap();
             MyModel { model, processor }
         }
     }
