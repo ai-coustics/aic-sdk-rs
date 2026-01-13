@@ -36,7 +36,7 @@ pub fn get_sdk_version() -> &'static str {
     let version_ptr = unsafe { aic_get_sdk_version() };
 
     // SAFETY:
-    // - SDK returns a NUL-terminated static string.
+    // - SDK returns a null-terminated static string.
     unsafe { CStr::from_ptr(version_ptr).to_str().unwrap_or("unknown") }
 }
 

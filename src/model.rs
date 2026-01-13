@@ -89,7 +89,7 @@ impl<'a> Model<'a> {
 
         // SAFETY:
         // - `model_ptr` points to stack memory we own.
-        // - `c_path` is a valid, NUL-terminated string.
+        // - `c_path` is a valid, null-terminated string.
         let error_code = unsafe { aic_model_create_from_file(&mut model_ptr, c_path.as_ptr()) };
 
         handle_error(error_code)?;
@@ -159,7 +159,7 @@ impl<'a> Model<'a> {
             return "unknown";
         }
 
-        // SAFETY: Pointer is valid for the lifetime of `self` and is NUL-terminated.
+        // SAFETY: Pointer is valid for the lifetime of `self` and is null-terminated.
         unsafe { CStr::from_ptr(id_ptr).to_str().unwrap_or("unknown") }
     }
 

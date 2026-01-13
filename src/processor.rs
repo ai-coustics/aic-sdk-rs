@@ -386,7 +386,7 @@ impl<'a> Processor<'a> {
         // SAFETY:
         // - `processor_ptr` points to stack storage for output.
         // - `model` is a valid SDK model pointer for the duration of the call.
-        // - `c_license_key` is a NUL-terminated CString.
+        // - `c_license_key` is a null-terminated CString.
         let error_code = unsafe {
             aic_processor_create(
                 &mut processor_ptr,
