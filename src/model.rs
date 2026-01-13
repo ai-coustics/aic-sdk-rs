@@ -15,15 +15,10 @@ use std::{
 /// It handles memory management automatically and converts C-style error codes
 /// to Rust `Result` types.
 ///
-/// # Cloning and Multi-threading
+/// # Sharing and Multi-threading
 ///
-/// `Model` can be cloned cheaply (just an atomic reference count increment) and shared
-/// across multiple threads. Each clone refers to the same underlying model data, making
-/// it efficient to create multiple processors from the same model without duplicating
-/// the model data in memory.
-///
-/// The model is `Send` and `Sync`, so you can clone it and send the clones to different
-/// threads to process audio streams in parallel.
+/// `Model` is `Send` and `Sync`, so you can share it across threads. It does not implement
+/// `Clone`, so wrap it in an `Arc` if you need shared ownership.
 ///
 /// # Example
 ///
@@ -76,8 +71,7 @@ impl<'a> Model<'a> {
     ///
     /// # Arguments
     ///
-    /// * `model_type` - Selects the enhancement algorithm variant
-    /// * `license_key` - Valid license key for the AIC SDK
+    /// * `path` - Filesystem path to a model file.
     ///
     /// # Returns
     ///

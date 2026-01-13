@@ -19,13 +19,9 @@ pub use vad::*;
 /// # Note
 /// This is not necessarily the same as this crate's version.
 ///
-/// # Safety
-/// The returned pointer points to a static string and remains valid
-/// for the lifetime of the program. The caller should NOT free this pointer.
-///
 /// # Returns
 ///
-/// Returns the library version as a string, or `None` if the version cannot be retrieved.
+/// Returns the SDK version string, or `"unknown"` if it cannot be decoded.
 ///
 /// # Example
 ///

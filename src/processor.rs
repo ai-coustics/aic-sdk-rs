@@ -10,7 +10,7 @@ pub use aic_sdk_sys::aic_set_sdk_wrapper_id;
 
 /// Audio processing configuration passed to [`Processor::initialize`].
 ///
-/// Use [`Model::optimal_processor_config`] as a starting point, then adjust fields
+/// Use [`ProcessorConfig::optimal`] as a starting point, then adjust fields
 /// to match your stream layout.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ProcessorConfig {
@@ -219,7 +219,7 @@ impl ProcessorContext {
 
     /// Returns the total output delay in samples for the current audio configuration.
     ///
-    /// This function provides the complete end-to-end latency introduced by the model,
+    /// This function provides the complete end-to-end latency introduced by the processor,
     /// which includes both algorithmic processing delay and any buffering overhead.
     /// Use this value to synchronize enhanced audio with other streams or to implement
     /// delay compensation in your application.
@@ -316,7 +316,7 @@ impl Drop for ProcessorContext {
 unsafe impl Send for ProcessorContext {}
 unsafe impl Sync for ProcessorContext {}
 
-/// High-level wrapper for the ai-coustics audio enhancement model.
+/// High-level wrapper for the ai-coustics audio enhancement processor.
 ///
 /// This struct provides a safe, Rust-friendly interface to the underlying C library.
 /// It handles memory management automatically and converts C-style error codes
@@ -351,9 +351,9 @@ pub struct Processor<'a> {
 }
 
 impl<'a> Processor<'a> {
-    /// Creates a new audio enhancement model instance.
+    /// Creates a new audio enhancement processor instance.
     ///
-    /// Multiple models can be created to process different audio streams simultaneously
+    /// Multiple processors can be created to process different audio streams simultaneously
     /// or to switch between different enhancement algorithms during runtime.
     ///
     /// # Arguments
@@ -510,7 +510,7 @@ impl<'a> Processor<'a> {
         crate::vad::VadContext::new(vad_ptr)
     }
 
-    /// Configures the model for specific audio settings.
+    /// Configures the processor for specific audio settings.
     ///
     /// This function must be called before processing any audio.
     /// For the lowest delay use the sample rate and frame size returned by

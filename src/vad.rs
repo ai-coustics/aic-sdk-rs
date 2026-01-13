@@ -62,10 +62,10 @@ impl From<VadParameter> for AicVadParameter::Type {
 
 /// Voice Activity Detector backed by an ai-coustics speech enhancement model.
 ///
-/// The VAD works automatically using the enhanced audio output of the model
+/// The VAD works automatically using the enhanced audio output of the processor
 /// that created the VAD.
 ///
-/// **Important:** If the backing model is destroyed, the VAD instance will stop
+/// **Important:** If the backing processor is destroyed, the VAD instance will stop
 /// producing new data.
 ///
 /// # Example
@@ -97,8 +97,8 @@ impl VadContext {
     ///
     /// **Important:**
     /// - The latency of the VAD prediction is equal to
-    ///   the backing model's processing latency.
-    /// - If the backing model stops being processed,
+    ///   the backing processor's processing latency.
+    /// - If the backing processor stops being processed,
     ///   the VAD will not update its speech detection prediction.
     pub fn is_speech_detected(&self) -> bool {
         let mut value: bool = false;
