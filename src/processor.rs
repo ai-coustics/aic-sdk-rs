@@ -4,9 +4,7 @@ use aic_sdk_sys::{AicProcessorParameter::*, *};
 
 use std::{ffi::CString, marker::PhantomData, ptr, sync::Once};
 
-/// Public for telemetry purposes
-pub static SET_WRAPPER_ID: Once = Once::new();
-pub use aic_sdk_sys::aic_set_sdk_wrapper_id;
+static SET_WRAPPER_ID: Once = Once::new();
 
 /// Audio processing configuration passed to [`Processor::initialize`].
 ///

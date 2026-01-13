@@ -1,5 +1,5 @@
 #![doc = include_str!("../README.md")]
-use aic_sdk_sys::{aic_get_compatible_model_version, aic_get_sdk_version};
+use aic_sdk_sys::{aic_get_compatible_model_version, aic_get_sdk_version, aic_set_sdk_wrapper_id};
 use std::ffi::CStr;
 
 #[cfg(feature = "download-model")]
@@ -45,4 +45,14 @@ pub fn get_compatible_model_version() -> u32 {
     // SAFETY:
     // - FFI call takes no arguments and returns a plain integer.
     unsafe { aic_get_compatible_model_version() }
+}
+
+/// This function is only used to identify SDKs by ai-coustics and should not be called by users of this crate.
+/// 
+/// SAFETY:
+/// - Don't call this function unless you know what you're doing.
+pub unsafe fn set_sdk_id(id: u32) {
+    // SAFETY:
+    // - This FFI call has no safety requirements.
+    unsafe { aic_set_sdk_wrapper_id(id) }
 }
