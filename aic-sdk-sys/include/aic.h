@@ -234,8 +234,11 @@ uint32_t aic_get_compatible_model_version(void);
  *
  * A single model instance can be used to create multiple processors.
  *
- * NOTE: The model must not be destroyed until all processors created from it
- * have been destroyed. Leaving orphaned processor instances is undefined behavior.
+ * # Note
+ * Processor instances retain a shared reference to the model data.
+ * It is safe to destroy the model handle after creating the desired processors.
+ * The memory used by the model will be automatically freed after all processors
+ * using that model have been destroyed.
  *
  * # Parameters
  * - `model`: Receives the handle to the newly created model. Must not be NULL.
@@ -260,6 +263,12 @@ enum AicErrorCode aic_model_create_from_file(struct AicModel **model,
  * Creates a new model instance from a memory buffer.
  *
  * The buffer must remain valid and unchanged for the lifetime of the model.
+ *
+ * # Note
+ * Processor instances retain a shared reference to the model data.
+ * It is safe to destroy the model handle after creating the desired processors.
+ * The memory used by the model will be automatically freed after all processors
+ * using that model have been destroyed.
  *
  * # Parameters
  * - `model`: Receives the handle to the newly created model. Must not be NULL.
@@ -286,11 +295,21 @@ enum AicErrorCode aic_model_create_from_buffer(struct AicModel **model,
  * After calling this function, the model handle becomes invalid.
  * This function is safe to call with NULL.
  *
+ * # Note
+ * Processor instances retain a shared reference to the model data.
+ * It is safe to destroy the model handle after creating the desired processors.
+ *
+ * The memory used by the model will be automatically freed after all processors
+ * using that model have been destroyed. If all processors using this model handle
+ * have already been destroyed, calling this function frees the memory used by the model.
+ *
  * # Parameters
  * - `model`: Model instance to destroy. Can be NULL.
  *
  * # Safety
  * - This function is not thread-safe. Ensure no other threads are using the model handle.
+ * - The `model` pointer must have been created by
+ *   `aic_model_create_from_file` or `aic_model_create_from_buffer` when non-NULL.
  */
 void aic_model_destroy(struct AicModel *model);
 
@@ -430,6 +449,7 @@ enum AicErrorCode aic_processor_create(struct AicProcessor **processor,
  *
  * # Safety
  * - This function is not thread-safe. Ensure no other threads are using the processor during initialization.
+ * - The `processor` pointer must have been created by `aic_processor_create` when non-NULL.
  */
 void aic_processor_destroy(struct AicProcessor *processor);
 
@@ -606,6 +626,7 @@ enum AicErrorCode aic_processor_context_create(struct AicProcessorContext **cont
  *
  * # Safety
  * - Thread-safe: Can be called from any thread.
+ * - The `context` pointer must have been created by `aic_processor_context_create` when non-NULL.
  */
 void aic_processor_context_destroy(struct AicProcessorContext *context);
 
@@ -761,6 +782,7 @@ enum AicErrorCode aic_vad_context_create(struct AicVadContext **context,
  *
  * # Safety
  * - Thread-safe: Can be called from any thread.
+ * - The `context` pointer must have been created by `aic_vad_context_create` when non-NULL.
  */
 void aic_vad_context_destroy(struct AicVadContext *context);
 
