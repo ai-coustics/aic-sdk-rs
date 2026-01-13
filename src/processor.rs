@@ -4,13 +4,11 @@ use aic_sdk_sys::{AicProcessorParameter::*, *};
 
 use std::{ffi::CString, marker::PhantomData, ptr, sync::Once};
 
-/// Public for telemetry purposes
-pub static SET_WRAPPER_ID: Once = Once::new();
-pub use aic_sdk_sys::aic_set_sdk_wrapper_id;
+static SET_WRAPPER_ID: Once = Once::new();
 
 /// Audio processing configuration passed to [`Processor::initialize`].
 ///
-/// Use [`Model::optimal_processor_config`] as a starting point, then adjust fields
+/// Use [`ProcessorConfig::optimal`] as a starting point, then adjust fields
 /// to match your stream layout.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ProcessorConfig {
@@ -175,7 +173,7 @@ impl ProcessorContext {
     /// ```
     pub fn set_parameter(&self, parameter: ProcessorParameter, value: f32) -> Result<(), AicError> {
         // SAFETY:
-        // - `self.as_const_ptr()` is a valid pointer to a live processor.
+        // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         let error_code = unsafe {
             aic_processor_context_set_parameter(self.as_const_ptr(), parameter.into(), value)
         };
@@ -208,7 +206,7 @@ impl ProcessorContext {
     pub fn parameter(&self, parameter: ProcessorParameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
         // SAFETY:
-        // - `self.as_const_ptr()` is a valid pointer to a live processor.
+        // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         // - `value` points to stack storage for output.
         let error_code = unsafe {
             aic_processor_context_get_parameter(self.as_const_ptr(), parameter.into(), &mut value)
@@ -219,7 +217,7 @@ impl ProcessorContext {
 
     /// Returns the total output delay in samples for the current audio configuration.
     ///
-    /// This function provides the complete end-to-end latency introduced by the model,
+    /// This function provides the complete end-to-end latency introduced by the processor,
     /// which includes both algorithmic processing delay and any buffering overhead.
     /// Use this value to synchronize enhanced audio with other streams or to implement
     /// delay compensation in your application.
@@ -255,7 +253,7 @@ impl ProcessorContext {
     pub fn output_delay(&self) -> usize {
         let mut delay: usize = 0;
         // SAFETY:
-        // - `self.as_const_ptr()` is a valid pointer to a live processor.
+        // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         // - `delay` points to stack storage for output.
         let error_code =
             unsafe { aic_processor_context_get_output_delay(self.as_const_ptr(), &mut delay) };
@@ -296,7 +294,7 @@ impl ProcessorContext {
     /// ```
     pub fn reset(&self) -> Result<(), AicError> {
         // SAFETY:
-        // - `self.as_const_ptr()` is a valid pointer to a live processor.
+        // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         let error_code = unsafe { aic_processor_context_reset(self.as_const_ptr()) };
         handle_error(error_code)
     }
@@ -316,7 +314,7 @@ impl Drop for ProcessorContext {
 unsafe impl Send for ProcessorContext {}
 unsafe impl Sync for ProcessorContext {}
 
-/// High-level wrapper for the ai-coustics audio enhancement model.
+/// High-level wrapper for the ai-coustics audio enhancement processor.
 ///
 /// This struct provides a safe, Rust-friendly interface to the underlying C library.
 /// It handles memory management automatically and converts C-style error codes
@@ -351,9 +349,9 @@ pub struct Processor<'a> {
 }
 
 impl<'a> Processor<'a> {
-    /// Creates a new audio enhancement model instance.
+    /// Creates a new audio enhancement processor instance.
     ///
-    /// Multiple models can be created to process different audio streams simultaneously
+    /// Multiple processors can be created to process different audio streams simultaneously
     /// or to switch between different enhancement algorithms during runtime.
     ///
     /// # Arguments
@@ -377,7 +375,7 @@ impl<'a> Processor<'a> {
     pub fn new(model: &Model<'a>, license_key: &str) -> Result<Self, AicError> {
         SET_WRAPPER_ID.call_once(|| unsafe {
             // SAFETY:
-            // - This function has no safety requirements, it's unsafe because it's FFI.
+            // - This FFI call has no safety requirements.
             aic_set_sdk_wrapper_id(2);
         });
 
@@ -386,7 +384,8 @@ impl<'a> Processor<'a> {
             CString::new(license_key).map_err(|_| AicError::LicenseFormatInvalid)?;
 
         // SAFETY:
-        // - `processor_ptr` and `model` pointers are valid for the duration of the call.
+        // - `processor_ptr` points to stack storage for output.
+        // - `model` is a valid SDK model pointer for the duration of the call.
         // - `c_license_key` is a NUL-terminated CString.
         let error_code = unsafe {
             aic_processor_create(
@@ -509,7 +508,7 @@ impl<'a> Processor<'a> {
         crate::vad::VadContext::new(vad_ptr)
     }
 
-    /// Configures the model for specific audio settings.
+    /// Configures the processor for specific audio settings.
     ///
     /// This function must be called before processing any audio.
     /// For the lowest delay use the sample rate and frame size returned by
@@ -636,7 +635,7 @@ impl<'a> Processor<'a> {
 
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
-        // - `audio_ptrs` holds valid, writable channel pointers containing `num_frames` samples each.
+        // - `audio_ptrs` holds `num_channels` valid, writable pointers with `num_frames` samples each.
         let error_code = unsafe {
             aic_processor_process_planar(self.inner, audio_ptrs.as_ptr(), num_channels, num_frames)
         };
@@ -692,7 +691,7 @@ impl<'a> Processor<'a> {
 
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
-        // - `audio` points to a contiguous f32 slice of correct length.
+        // - `audio` points to a contiguous f32 slice of length `num_channels * num_frames`.
         let error_code = unsafe {
             aic_processor_process_interleaved(
                 self.inner,
@@ -751,7 +750,9 @@ impl<'a> Processor<'a> {
 
         let num_frames = audio.len() / num_channels as usize;
 
-        // SAFETY: `self.inner` is initialized; `audio` length has been validated.
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live, initialized processor.
+        // - `audio` points to a contiguous f32 slice of length `num_channels * num_frames`.
         let error_code = unsafe {
             aic_processor_process_sequential(
                 self.inner,
@@ -1069,23 +1070,27 @@ mod tests {
         assert_sync::<Processor>();
     }
 
-    struct MyModel<'a> {
-        model: Model<'a>,
-        processor: Processor<'a>,
+    struct MyModel {
+        _model: Model<'static>,
+        _processor: Processor<'static>,
     }
 
-    impl<'a> MyModel<'a> {
+    impl MyModel {
         pub fn new() -> Self {
             let (model, license_key) = load_test_model().unwrap();
             let processor = Processor::new(&model, &license_key)
                 .unwrap()
                 .with_config(&ProcessorConfig::optimal(&model))
                 .unwrap();
-            MyModel { model, processor }
+            MyModel {
+                _model: model,
+                _processor: processor,
+            }
         }
     }
 
-    fn self_referential_struct_is_working() {
+    #[test]
+    fn can_create_self_referential_structs_with_statics() {
         let _model = MyModel::new();
     }
 }

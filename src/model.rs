@@ -15,15 +15,10 @@ use std::{
 /// It handles memory management automatically and converts C-style error codes
 /// to Rust `Result` types.
 ///
-/// # Cloning and Multi-threading
+/// # Sharing and Multi-threading
 ///
-/// `Model` can be cloned cheaply (just an atomic reference count increment) and shared
-/// across multiple threads. Each clone refers to the same underlying model data, making
-/// it efficient to create multiple processors from the same model without duplicating
-/// the model data in memory.
-///
-/// The model is `Send` and `Sync`, so you can clone it and send the clones to different
-/// threads to process audio streams in parallel.
+/// `Model` is `Send` and `Sync`, so you can share it across threads. It does not implement
+/// `Clone`, so wrap it in an `Arc` if you need shared ownership.
 ///
 /// # Example
 ///
@@ -76,8 +71,7 @@ impl<'a> Model<'a> {
     ///
     /// # Arguments
     ///
-    /// * `model_type` - Selects the enhancement algorithm variant
-    /// * `license_key` - Valid license key for the AIC SDK
+    /// * `path` - Filesystem path to a model file.
     ///
     /// # Returns
     ///
@@ -94,7 +88,7 @@ impl<'a> Model<'a> {
         let c_path = CString::new(path.as_ref().to_string_lossy().as_bytes()).unwrap();
 
         // SAFETY:
-        // - `model_ptr` points to stack memory we own
+        // - `model_ptr` points to stack memory we own.
         // - `c_path` is a valid, NUL-terminated string.
         let error_code = unsafe { aic_model_create_from_file(&mut model_ptr, c_path.as_ptr()) };
 
@@ -138,7 +132,8 @@ impl<'a> Model<'a> {
         let mut model_ptr: *mut AicModel = ptr::null_mut();
 
         // SAFETY:
-        // - `buffer` is a valid slice; its pointer/len are passed verbatim to C which only reads.
+        // - `buffer` is a valid slice and immutable for `'a`.
+        // - The SDK only reads from `buffer` for the lifetime of the model.
         let error_code =
             unsafe { aic_model_create_from_buffer(&mut model_ptr, buffer.as_ptr(), buffer.len()) };
 
@@ -164,7 +159,7 @@ impl<'a> Model<'a> {
             return "unknown";
         }
 
-        // SAFETY: Pointer either came from the SDK or we already bailed if it was null.
+        // SAFETY: Pointer is valid for the lifetime of `self` and is NUL-terminated.
         unsafe { CStr::from_ptr(id_ptr).to_str().unwrap_or("unknown") }
     }
 
@@ -211,7 +206,7 @@ impl<'a> Model<'a> {
     pub fn optimal_sample_rate(&self) -> u32 {
         let mut sample_rate: u32 = 0;
         // SAFETY:
-        // - `self.as_const_ptr()` is a valid pointer to a live processor.
+        // - `self.as_const_ptr()` is a valid pointer to a live model.
         // - `sample_rate` points to stack storage for output.
         let error_code =
             unsafe { aic_model_get_optimal_sample_rate(self.as_const_ptr(), &mut sample_rate) };
@@ -264,7 +259,7 @@ impl<'a> Model<'a> {
     pub fn optimal_num_frames(&self, sample_rate: u32) -> usize {
         let mut num_frames: usize = 0;
         // SAFETY:
-        // - `self.as_const_ptr()` is a valid pointer to a live processor.
+        // - `self.as_const_ptr()` is a valid pointer to a live model.
         // - `num_frames` points to stack storage for output.
         let error_code = unsafe {
             aic_model_get_optimal_num_frames(self.as_const_ptr(), sample_rate, &mut num_frames)
@@ -320,7 +315,7 @@ impl<'a> Drop for Model<'a> {
     fn drop(&mut self) {
         if !self.ptr.is_null() {
             // SAFETY:
-            // - `inner` was allocated by the SDK and is still owned by this wrapper.
+            // - `self.ptr` was allocated by the SDK and is still owned by this wrapper.
             unsafe { aic_model_destroy(self.ptr) };
         }
     }
@@ -329,10 +324,12 @@ impl<'a> Drop for Model<'a> {
 // SAFETY:
 // - Model wraps a raw pointer to an AicModel which is immutable after creation and it
 //   does not provide access to it through its public API.
+// - Methods only pass the pointer to SDK calls documented as thread-safe for const access.
 unsafe impl<'a> Send for Model<'a> {}
 // SAFETY:
 // - Model wraps a raw pointer to an AicModel which is immutable after creation and it
 //   does not provide access to it through its public API.
+// - Methods only pass the pointer to SDK calls documented as thread-safe for const access.
 unsafe impl<'a> Sync for Model<'a> {}
 
 /// Embeds the bytes of model file, ensuring proper alignment.

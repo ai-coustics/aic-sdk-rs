@@ -62,10 +62,10 @@ impl From<VadParameter> for AicVadParameter::Type {
 
 /// Voice Activity Detector backed by an ai-coustics speech enhancement model.
 ///
-/// The VAD works automatically using the enhanced audio output of the model
+/// The VAD works automatically using the enhanced audio output of the processor
 /// that created the VAD.
 ///
-/// **Important:** If the backing model is destroyed, the VAD instance will stop
+/// **Important:** If the backing processor is destroyed, the VAD instance will stop
 /// producing new data.
 ///
 /// # Example
@@ -97,13 +97,13 @@ impl VadContext {
     ///
     /// **Important:**
     /// - The latency of the VAD prediction is equal to
-    ///   the backing model's processing latency.
-    /// - If the backing model stops being processed,
+    ///   the backing processor's processing latency.
+    /// - If the backing processor stops being processed,
     ///   the VAD will not update its speech detection prediction.
     pub fn is_speech_detected(&self) -> bool {
         let mut value: bool = false;
         // SAFETY:
-        // - `self.as_const_ptr()` is a valid pointer to a live VAD.
+        // - `self.as_const_ptr()` is a valid pointer to a live VAD context.
         // - `value` points to stack storage for output.
         let error_code =
             unsafe { aic_vad_context_is_speech_detected(self.as_const_ptr(), &mut value) };
@@ -137,7 +137,7 @@ impl VadContext {
     /// ```
     pub fn set_parameter(&self, parameter: VadParameter, value: f32) -> Result<(), AicError> {
         // SAFETY:
-        // - `self.as_const_ptr()` is a live VAD pointer.
+        // - `self.as_const_ptr()` is a live VAD context pointer.
         let error_code =
             unsafe { aic_vad_context_set_parameter(self.as_const_ptr(), parameter.into(), value) };
         handle_error(error_code)
@@ -167,7 +167,7 @@ impl VadContext {
     pub fn parameter(&self, parameter: VadParameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
         // SAFETY:
-        // - `self.as_const_ptr()` is a valid pointer to a live VAD.
+        // - `self.as_const_ptr()` is a valid pointer to a live VAD context.
         // - `value` points to stack storage for output.
         let error_code = unsafe {
             aic_vad_context_get_parameter(self.as_const_ptr(), parameter.into(), &mut value)
