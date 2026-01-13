@@ -12,11 +12,10 @@ For comprehensive documentation, visit [docs.ai-coustics.com](https://docs.ai-co
 
 ## Installation
 
-Add to your `Cargo.toml`:
+Add to your project:
 
-```toml
-[dependencies]
-aic-sdk = { version = "2.0.0", features = ["download-lib"] }
+```bash
+cargo add aic-sdk --features download-lib
 ```
 
 ## Quick Start
@@ -28,7 +27,7 @@ use aic_sdk::{include_model, ProcessorConfig, Model, Processor};
 static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Get your license key
+    // Get your license key (set with: export AIC_SDK_LICENSE="your-key")
     let license_key = std::env::var("AIC_SDK_LICENSE")?;
 
     // Load the embedded model (or download manually at https://artifacts.ai-coustics.io/)
@@ -83,9 +82,9 @@ let model = Model::from_buffer(MODEL)?;
 
 #### Download from CDN
 Enable the `download-model` feature:
-```toml
-[dependencies]
-aic-sdk = { version = "2.0.0", features = ["download-lib", "download-model"] }
+
+```bash
+cargo add aic-sdk --features download-lib,download-model
 ```
 
 ```rust,ignore

@@ -12,7 +12,7 @@ Before creating a release, check that everything can be published to crates.io.
 
 3. Update the version number of the workspace in the top level [Cargo.toml](Cargo.toml)
 
-4. Check that the right version number is reflected in [README.md](README.md)
+4. Check that the right unsupported Rust version number is reflected in the [README.md](README.md) warning
 
 5. Update [changelog](CHANGELOG.md)
 
