@@ -1072,23 +1072,24 @@ mod tests {
         assert_sync::<Processor>();
     }
 
-    struct MyModel<'a> {
-        model: Model<'a>,
-        processor: Processor<'a>,
+    struct MyModel {
+        _model: Model<'static>,
+        _processor: Processor<'static>,
     }
 
-    impl<'a> MyModel<'a> {
+    impl MyModel {
         pub fn new() -> Self {
             let (model, license_key) = load_test_model().unwrap();
             let processor = Processor::new(&model, &license_key)
                 .unwrap()
                 .with_config(&ProcessorConfig::optimal(&model))
                 .unwrap();
-            MyModel { model, processor }
+            MyModel { _model: model, _processor: processor }
         }
     }
 
-    fn self_referential_struct_is_working() {
+    #[test]
+    fn can_create_self_referential_structs_with_statics() {
         let _model = MyModel::new();
     }
 }
