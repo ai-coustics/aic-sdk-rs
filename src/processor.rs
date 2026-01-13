@@ -175,7 +175,7 @@ impl ProcessorContext {
     /// ```
     pub fn set_parameter(&self, parameter: ProcessorParameter, value: f32) -> Result<(), AicError> {
         // SAFETY:
-        // - `self.as_const_ptr()` is a valid pointer to a live processor.
+        // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         let error_code = unsafe {
             aic_processor_context_set_parameter(self.as_const_ptr(), parameter.into(), value)
         };
@@ -208,7 +208,7 @@ impl ProcessorContext {
     pub fn parameter(&self, parameter: ProcessorParameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
         // SAFETY:
-        // - `self.as_const_ptr()` is a valid pointer to a live processor.
+        // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         // - `value` points to stack storage for output.
         let error_code = unsafe {
             aic_processor_context_get_parameter(self.as_const_ptr(), parameter.into(), &mut value)
@@ -255,7 +255,7 @@ impl ProcessorContext {
     pub fn output_delay(&self) -> usize {
         let mut delay: usize = 0;
         // SAFETY:
-        // - `self.as_const_ptr()` is a valid pointer to a live processor.
+        // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         // - `delay` points to stack storage for output.
         let error_code =
             unsafe { aic_processor_context_get_output_delay(self.as_const_ptr(), &mut delay) };
@@ -296,7 +296,7 @@ impl ProcessorContext {
     /// ```
     pub fn reset(&self) -> Result<(), AicError> {
         // SAFETY:
-        // - `self.as_const_ptr()` is a valid pointer to a live processor.
+        // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         let error_code = unsafe { aic_processor_context_reset(self.as_const_ptr()) };
         handle_error(error_code)
     }
@@ -377,7 +377,7 @@ impl<'a> Processor<'a> {
     pub fn new(model: &Model<'a>, license_key: &str) -> Result<Self, AicError> {
         SET_WRAPPER_ID.call_once(|| unsafe {
             // SAFETY:
-            // - This function has no safety requirements, it's unsafe because it's FFI.
+            // - This FFI call has no safety requirements.
             aic_set_sdk_wrapper_id(2);
         });
 
@@ -386,7 +386,8 @@ impl<'a> Processor<'a> {
             CString::new(license_key).map_err(|_| AicError::LicenseFormatInvalid)?;
 
         // SAFETY:
-        // - `processor_ptr` and `model` pointers are valid for the duration of the call.
+        // - `processor_ptr` points to stack storage for output.
+        // - `model` is a valid SDK model pointer for the duration of the call.
         // - `c_license_key` is a NUL-terminated CString.
         let error_code = unsafe {
             aic_processor_create(
@@ -636,7 +637,7 @@ impl<'a> Processor<'a> {
 
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
-        // - `audio_ptrs` holds valid, writable channel pointers containing `num_frames` samples each.
+        // - `audio_ptrs` holds `num_channels` valid, writable pointers with `num_frames` samples each.
         let error_code = unsafe {
             aic_processor_process_planar(self.inner, audio_ptrs.as_ptr(), num_channels, num_frames)
         };
@@ -692,7 +693,7 @@ impl<'a> Processor<'a> {
 
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
-        // - `audio` points to a contiguous f32 slice of correct length.
+        // - `audio` points to a contiguous f32 slice of length `num_channels * num_frames`.
         let error_code = unsafe {
             aic_processor_process_interleaved(
                 self.inner,
@@ -751,7 +752,9 @@ impl<'a> Processor<'a> {
 
         let num_frames = audio.len() / num_channels as usize;
 
-        // SAFETY: `self.inner` is initialized; `audio` length has been validated.
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live, initialized processor.
+        // - `audio` points to a contiguous f32 slice of length `num_channels * num_frames`.
         let error_code = unsafe {
             aic_processor_process_sequential(
                 self.inner,
