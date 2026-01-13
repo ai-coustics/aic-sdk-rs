@@ -57,6 +57,7 @@ fn add_platform_specific_libs() {
         println!("cargo:rustc-link-lib=kernel32");
         println!("cargo:rustc-link-lib=ws2_32");
         println!("cargo:rustc-link-lib=oleaut32");
+        println!("cargo:rustc-link-lib=crypt32");
     } else if cfg!(target_os = "linux") {
         // Linux system libraries
         println!("cargo:rustc-link-lib=pthread");
