@@ -1082,7 +1082,10 @@ mod tests {
                 .unwrap()
                 .with_config(&ProcessorConfig::optimal(&model))
                 .unwrap();
-            MyModel { _model: model, _processor: processor }
+            MyModel {
+                _model: model,
+                _processor: processor,
+            }
         }
     }
 

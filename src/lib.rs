@@ -48,7 +48,7 @@ pub fn get_compatible_model_version() -> u32 {
 }
 
 /// This function is only used to identify SDKs by ai-coustics and should not be called by users of this crate.
-/// 
+///
 /// SAFETY:
 /// - Don't call this function unless you know what you're doing.
 pub unsafe fn set_sdk_id(id: u32) {
