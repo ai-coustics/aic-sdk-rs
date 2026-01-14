@@ -797,7 +797,13 @@ mod tests {
     use std::{
         fs,
         path::{Path, PathBuf},
+        sync::{Mutex, OnceLock},
     };
+
+    fn download_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
         let entries = fs::read_dir(target_dir).ok()?;
@@ -822,6 +828,11 @@ mod tests {
     fn get_sparrow_xxs_48khz() -> Result<PathBuf, AicError> {
         let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
 
+        if let Some(existing) = find_existing_model(&target_dir) {
+            return Ok(existing);
+        }
+
+        let _guard = download_lock().lock().unwrap();
         if let Some(existing) = find_existing_model(&target_dir) {
             return Ok(existing);
         }
