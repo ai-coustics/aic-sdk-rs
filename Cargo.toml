@@ -9,7 +9,7 @@ repository = "https://github.com/ai-coustics/aic-sdk-rs"
 version = "0.13.0"
 
 [workspace.dependencies]
-aic-sdk-sys = { version = "2.0.0", path = "aic-sdk-sys" }
+aic-sdk-sys = { version = "0.13.0", path = "aic-sdk-sys" }
 serde = { version = "1.0" }
 serde_json = { version = "1.0" }
 sha2 = { version = "0.10" }
