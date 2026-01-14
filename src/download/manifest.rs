@@ -91,7 +91,7 @@ mod tests {
         );
         assert_eq!(
             model.checksum,
-            "fc536364e0b6e851a37ad9790721ee2368ba06e761a78485fabbd6629d6c4cf8"
+            "26003656195671346f73bf35ca3329e316cac585fee9b4e6802287d1be715ef9"
         );
     }
 }
