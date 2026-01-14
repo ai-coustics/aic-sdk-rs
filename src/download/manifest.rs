@@ -82,12 +82,12 @@ mod tests {
     fn metadata_for_model_returns_requested_version() {
         let manifest = load_manifest();
 
-        let model = manifest.metadata_for_model("quail-xxs-48khz", 1).unwrap();
+        let model = manifest.metadata_for_model("sparrow-xxs-48khz", 1).unwrap();
 
-        assert_eq!(model.file_name, "quail_xxs_48khz_wsur2zkw_v7.aicmodel");
+        assert_eq!(model.file_name, "sparrow_xxs_48khz_wsur2zkw_v7.aicmodel");
         assert_eq!(
             model.url_path,
-            "models/quail-xxs-48khz/v1/quail_xxs_48khz_wsur2zkw_v7.aicmodel"
+            "models/sparrow-xxs-48khz/v1/sparrow_xxs_48khz_wsur2zkw_v7.aicmodel"
         );
         assert_eq!(
             model.checksum,

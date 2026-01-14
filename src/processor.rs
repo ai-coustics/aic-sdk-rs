@@ -806,7 +806,7 @@ mod tests {
             if path
                 .file_name()
                 .and_then(|n| n.to_str())
-                .map(|name| name.contains("quail_xxs_48khz") && name.ends_with(".aicmodel"))
+                .map(|name| name.contains("sparrow_xxs_48khz") && name.ends_with(".aicmodel"))
                 .unwrap_or(false)
             {
                 if path.is_file() {
@@ -817,9 +817,9 @@ mod tests {
         None
     }
 
-    /// Downloads the default test model `quail-xxs-48khz` into the crate's `target/` directory.
+    /// Downloads the default test model `sparrow-xxs-48khz` into the crate's `target/` directory.
     /// Returns the path to the downloaded model file.
-    fn get_quail_xxs_48khz() -> Result<PathBuf, AicError> {
+    fn get_sparrow_xxs_48khz() -> Result<PathBuf, AicError> {
         let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
 
         if let Some(existing) = find_existing_model(&target_dir) {
@@ -828,13 +828,13 @@ mod tests {
 
         #[cfg(feature = "download-model")]
         {
-            return Model::download("quail-xxs-48khz", target_dir);
+            return Model::download("sparrow-xxs-48khz", target_dir);
         }
 
         #[cfg(not(feature = "download-model"))]
         {
             panic!(
-                "Model `quail-xxs-48khz` not found in {} and `download-model` feature is disabled",
+                "Model `sparrow-xxs-48khz` not found in {} and `download-model` feature is disabled",
                 target_dir.display()
             );
         }
@@ -844,7 +844,7 @@ mod tests {
         let license_key = std::env::var("AIC_SDK_LICENSE")
             .expect("AIC_SDK_LICENSE environment variable must be set for tests");
 
-        let model_path = get_quail_xxs_48khz()?;
+        let model_path = get_sparrow_xxs_48khz()?;
         let model = Model::from_file(&model_path)?;
 
         Ok((model, license_key))

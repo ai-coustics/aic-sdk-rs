@@ -90,7 +90,7 @@ cargo add aic-sdk --features download-lib,download-model
 ```rust,ignore
 use aic_sdk::Model;
 
-let model_path = Model::download("quail-xxs-48khz", "./models")?;
+let model_path = Model::download("sparrow-xxs-48khz", "./models")?;
 let model = Model::from_file(&model_path)?;
 ```
 
