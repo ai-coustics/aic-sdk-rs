@@ -444,7 +444,7 @@ impl<'a> Processor<'a> {
         Ok(self)
     }
 
-    /// Creates a [ProcessorContext](crate::processor::ProcessorContext) instance.
+    /// Creates a [ProcessorContext] instance.
     /// This can be used to control all parameters and other settings of the processor.
     ///
     /// # Example
