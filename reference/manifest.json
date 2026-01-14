@@ -1,149 +1,149 @@
 {
-  "schema_version": "1.0",
-  "models": {
-    "quail-l-16khz": {
-      "versions": {
-        "v1": {
-          "file": "models/quail-l-16khz/v1/quail_l_16khz_dtv5nvgu_v20.aicmodel",
-          "filename": "quail_l_16khz_dtv5nvgu_v20.aicmodel",
-          "checksum": "1d8a50035c316c62e0bd6fa07568f96b42f2207a35b550d2b666ce739944396c",
-          "uploaded_at": "2025-12-11T16:53:41Z",
-          "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
+    "schema_version": "1.0",
+    "models": {
+        "quail-l-16khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/quail-l-16khz/v1/quail_l_16khz_dtv5nvgu_v20.aicmodel",
+                    "filename": "quail_l_16khz_dtv5nvgu_v20.aicmodel",
+                    "checksum": "b3db85b6091949cf84d9d6cde1f150cbd74746252a0ae61241d739536b5ea362",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "quail-l-8khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/quail-l-8khz/v1/quail_l_8khz_mp51agn0_v13.aicmodel",
+                    "filename": "quail_l_8khz_mp51agn0_v13.aicmodel",
+                    "checksum": "9b5e3d094c32f417d7477b4acaa4ef26510dabbb20d6009a1795940dfee28a74",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "quail-s-16khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/quail-s-16khz/v1/quail_s_16khz_ilmexgyt_v8.aicmodel",
+                    "filename": "quail_s_16khz_ilmexgyt_v8.aicmodel",
+                    "checksum": "d613cdd917a47296accb47c45bcc268994f032e1df636c504201099d61c51bf7",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "quail-s-8khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/quail-s-8khz/v1/quail_s_8khz_9q57ojki_v20.aicmodel",
+                    "filename": "quail_s_8khz_9q57ojki_v20.aicmodel",
+                    "checksum": "093103c9f17261d29d45de91e3506f412eb66c47ed5777eecdd8378a557d6746",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "quail-vf-l-16khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/quail-vf-l-16khz/v1/quail_vf_l_16khz_jc5pk1aa_v17.aicmodel",
+                    "filename": "quail_vf_l_16khz_jc5pk1aa_v17.aicmodel",
+                    "checksum": "1509e36bd30ca296204515eb777dd3663c46a6d4531136599d9e8494e6e4fc27",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-l-16khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-l-16khz/v1/sparrow_l_16khz_dtv5nvgu_v20.aicmodel",
+                    "filename": "sparrow_l_16khz_dtv5nvgu_v20.aicmodel",
+                    "checksum": "d6109ac2e9dca00ae487e04e3e6349ca1db2e6ac287e9f84db64f5568416a502",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-l-48khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-l-48khz/v1/sparrow_l_48khz_7n1r44ri_v23.aicmodel",
+                    "filename": "sparrow_l_48khz_7n1r44ri_v23.aicmodel",
+                    "checksum": "ff7d128621fd517e91efcca6dd45b19284689a215758e5187cfedec5a630bf16",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-l-8khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-l-8khz/v1/sparrow_l_8khz_mp51agn0_v13.aicmodel",
+                    "filename": "sparrow_l_8khz_mp51agn0_v13.aicmodel",
+                    "checksum": "9d1d36b4f95ccf8f0e4422eb04a970a9ce7962385adc4094c33de77968c20374",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-s-16khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-s-16khz/v1/sparrow_s_16khz_ilmexgyt_v8.aicmodel",
+                    "filename": "sparrow_s_16khz_ilmexgyt_v8.aicmodel",
+                    "checksum": "f9fe2697801c507994e5067913abf1a5339b32dd90459c42bd34418da4a931b5",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-s-48khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-s-48khz/v1/sparrow_s_48khz_kg8kp9qm_v52.aicmodel",
+                    "filename": "sparrow_s_48khz_kg8kp9qm_v52.aicmodel",
+                    "checksum": "777ed9015c3ba8d95e5d7281fb4bbdc3cee50b4b260de8f2af27464b05627c2c",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-s-8khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-s-8khz/v1/sparrow_s_8khz_9q57ojki_v20.aicmodel",
+                    "filename": "sparrow_s_8khz_9q57ojki_v20.aicmodel",
+                    "checksum": "5fb589cea729693eed15cc9f675307976713de8d9a6d74793d8af25896ca4834",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-xs-48khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-xs-48khz/v1/sparrow_xs_48khz_g4qwc6lv_v21.aicmodel",
+                    "filename": "sparrow_xs_48khz_g4qwc6lv_v21.aicmodel",
+                    "checksum": "3f71f68ef0661bea78df8deff68450e1a6436f1ba7e2173aee0384a4e77a9e5e",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-xxs-48khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-xxs-48khz/v1/sparrow_xxs_48khz_wsur2zkw_v7.aicmodel",
+                    "filename": "sparrow_xxs_48khz_wsur2zkw_v7.aicmodel",
+                    "checksum": "26003656195671346f73bf35ca3329e316cac585fee9b4e6802287d1be715ef9",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
         }
-      }
     },
-    "quail-l-48khz": {
-      "versions": {
-        "v1": {
-          "file": "models/quail-l-48khz/v1/quail_l_48khz_7n1r44ri_v23.aicmodel",
-          "filename": "quail_l_48khz_7n1r44ri_v23.aicmodel",
-          "checksum": "e7ca2d619b41b758e73c4437b1c27762b1a01ab90b2cbcf372543d4038299897",
-          "uploaded_at": "2025-12-11T16:53:41Z",
-          "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
-        }
-      }
-    },
-    "quail-l-8khz": {
-      "versions": {
-        "v1": {
-          "file": "models/quail-l-8khz/v1/quail_l_8khz_mp51agn0_v13.aicmodel",
-          "filename": "quail_l_8khz_mp51agn0_v13.aicmodel",
-          "checksum": "6c524091094b2f3d0162b638dcf3eaaa4d1b5ec731f3e188a65c8ba6cab184d2",
-          "uploaded_at": "2025-12-11T16:53:41Z",
-          "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
-        }
-      }
-    },
-    "quail-s-16khz": {
-      "versions": {
-        "v1": {
-          "file": "models/quail-s-16khz/v1/quail_s_16khz_ilmexgyt_v8.aicmodel",
-          "filename": "quail_s_16khz_ilmexgyt_v8.aicmodel",
-          "checksum": "079295a69d2f5c471903e0b822f924dec86d12bbe43e44f5c54d431b794f89be",
-          "uploaded_at": "2025-12-11T16:53:41Z",
-          "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
-        }
-      }
-    },
-    "quail-s-48khz": {
-      "versions": {
-        "v1": {
-          "file": "models/quail-s-48khz/v1/quail_s_48khz_kg8kp9qm_v52.aicmodel",
-          "filename": "quail_s_48khz_kg8kp9qm_v52.aicmodel",
-          "checksum": "a3135e1f1e25368c596ed66c416c3557ea7f7cd334a4a3cf95e06dda04ea9f74",
-          "uploaded_at": "2025-12-11T16:53:41Z",
-          "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
-        }
-      }
-    },
-    "quail-s-8khz": {
-      "versions": {
-        "v1": {
-          "file": "models/quail-s-8khz/v1/quail_s_8khz_9q57ojki_v20.aicmodel",
-          "filename": "quail_s_8khz_9q57ojki_v20.aicmodel",
-          "checksum": "97e8c98b0b9f8780482b507c59533987ec16cae112f257c7d3d1eba60244302f",
-          "uploaded_at": "2025-12-11T16:53:41Z",
-          "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
-        }
-      }
-    },
-    "quail-stt-l-16khz": {
-      "versions": {
-        "v1": {
-          "file": "models/quail-stt-l-16khz/v1/quail_stt_l_16khz_dtv5nvgu_v20.aicmodel",
-          "filename": "quail_stt_l_16khz_dtv5nvgu_v20.aicmodel",
-          "checksum": "66821cf458a6282eee85bf7868573aee1a92e7e90c01d27405c3a8251b33b6f7",
-          "uploaded_at": "2025-12-11T16:53:41Z",
-          "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
-        }
-      }
-    },
-    "quail-stt-l-8khz": {
-      "versions": {
-        "v1": {
-          "file": "models/quail-stt-l-8khz/v1/quail_stt_l_8khz_mp51agn0_v13.aicmodel",
-          "filename": "quail_stt_l_8khz_mp51agn0_v13.aicmodel",
-          "checksum": "2260483d730ecd9428956b983980730992696da24b9a1266882af3ea00e3514b",
-          "uploaded_at": "2025-12-11T16:53:41Z",
-          "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
-        }
-      }
-    },
-    "quail-stt-s-16khz": {
-      "versions": {
-        "v1": {
-          "file": "models/quail-stt-s-16khz/v1/quail_stt_s_16khz_ilmexgyt_v8.aicmodel",
-          "filename": "quail_stt_s_16khz_ilmexgyt_v8.aicmodel",
-          "checksum": "a6298cbc50f7f64e77c8e3fc8f9993e504923f765169d1ef311effa2b8187655",
-          "uploaded_at": "2025-12-11T16:53:41Z",
-          "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
-        }
-      }
-    },
-    "quail-stt-s-8khz": {
-      "versions": {
-        "v1": {
-          "file": "models/quail-stt-s-8khz/v1/quail_stt_s_8khz_9q57ojki_v20.aicmodel",
-          "filename": "quail_stt_s_8khz_9q57ojki_v20.aicmodel",
-          "checksum": "d1bc3dc787eeb2ffa6404541e133bdbd0a03ce4978f0fd104a584d4067c27156",
-          "uploaded_at": "2025-12-11T16:53:41Z",
-          "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
-        }
-      }
-    },
-    "quail-vf-stt-l-16khz": {
-      "versions": {
-        "v1": {
-          "file": "models/quail-vf-stt-l-16khz/v1/quail_vf_stt_l_16khz_jc5pk1aa_v17.aicmodel",
-          "filename": "quail_vf_stt_l_16khz_jc5pk1aa_v17.aicmodel",
-          "checksum": "e8eef372c08741b93eff4e916b4f23737cf1b416222a508c2b34d39676368092",
-          "uploaded_at": "2025-12-11T16:53:41Z",
-          "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
-        }
-      }
-    },
-    "quail-xs-48khz": {
-      "versions": {
-        "v1": {
-          "file": "models/quail-xs-48khz/v1/quail_xs_48khz_g4qwc6lv_v21.aicmodel",
-          "filename": "quail_xs_48khz_g4qwc6lv_v21.aicmodel",
-          "checksum": "10f1ac8499446e159d6ec8d18572a9057add62efea5e733099ff5241ac418e90",
-          "uploaded_at": "2025-12-11T16:53:41Z",
-          "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
-        }
-      }
-    },
-    "quail-xxs-48khz": {
-      "versions": {
-        "v1": {
-          "file": "models/quail-xxs-48khz/v1/quail_xxs_48khz_wsur2zkw_v7.aicmodel",
-          "filename": "quail_xxs_48khz_wsur2zkw_v7.aicmodel",
-          "checksum": "fc536364e0b6e851a37ad9790721ee2368ba06e761a78485fabbd6629d6c4cf8",
-          "uploaded_at": "2025-12-11T16:53:41Z",
-          "git_sha": "bfab7190f362acbc6010db15ee1faa66e354fda7"
-        }
-      }
-    }
-  },
-  "updated_at": "2025-12-11T16:53:41Z"
+    "updated_at": "2026-01-14T11:48:45Z"
 }

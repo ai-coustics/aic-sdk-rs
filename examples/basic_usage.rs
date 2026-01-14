@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Download the default model once and reuse the file
     // Select a model id at https://artifacts.ai-coustics.io/
-    let model_path = Model::download("quail-xxs-48khz", "target")?;
+    let model_path = Model::download("sparrow-xxs-48khz", "target")?;
     let model = Model::from_file(&model_path)?;
     println!("Model loaded from {}", model_path.display());
 

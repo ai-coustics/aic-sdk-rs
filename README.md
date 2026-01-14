@@ -8,7 +8,7 @@ For comprehensive documentation, visit [docs.ai-coustics.com](https://docs.ai-co
 > This SDK requires a license key. Generate your key at [developers.ai-coustics.io](https://developers.ai-coustics.io).
 
 > [!WARNING]
-> You must use a Rust version different from `1.93.0-beta.5`, which was used to build the static libraries. A solution is currently in development.
+> You must use a Rust version different from `1.93.0-beta.6`, which was used to build the static libraries. A solution is currently in development.
 
 ## Installation
 
@@ -27,7 +27,7 @@ use aic_sdk::{include_model, ProcessorConfig, Model, Processor};
 static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Get your license key (set with: export AIC_SDK_LICENSE="your-key")
+    // Get your license key from the environment variable
     let license_key = std::env::var("AIC_SDK_LICENSE")?;
 
     // Load the embedded model (or download manually at https://artifacts.ai-coustics.io/)
@@ -90,7 +90,7 @@ cargo add aic-sdk --features download-lib,download-model
 ```rust,ignore
 use aic_sdk::Model;
 
-let model_path = Model::download("quail-xxs-48khz", "./models")?;
+let model_path = Model::download("sparrow-xxs-48khz", "./models")?;
 let model = Model::from_file(&model_path)?;
 ```
 

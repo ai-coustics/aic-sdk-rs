@@ -42,7 +42,7 @@ dependencies = [
 
 [[package]]
 name = "aic-sdk-sys"
-version = "2.0.0"
+version = "0.13.0"
 dependencies = [
  "bindgen",
  "flate2",
@@ -476,9 +476,9 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "lzma-rust2"
-version = "0.15.6"
+version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17f7337d278fec032975dc884152491580dd23750ee957047856735fe0e61ede"
+checksum = "1670343e58806300d87950e3401e820b519b9384281bbabfb15e3636689ffd69"
 dependencies = [
  "crc",
  "sha2",
