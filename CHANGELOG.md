@@ -8,7 +8,7 @@ Most notably, the C library no longer includes any models, which significantly r
 
 **New license keys required**: License keys previously generated in the [development portal](https://developers.ai-coustics.io) will no longer work. New license keys must be generated.
 
-**Model naming changes**: Quail-STT models are now called "Quail" - These models are optimized for human-to-machine enhancement (e.g., speech-to-text/STT applications). Quail models are now called "Sparrow" - These models are optimized for human-to-human enhancement (e.g., voice calls, conferencing). This naming change clarifies the distinction between STT-focused models and human-to-human communication model
+**Model naming changes**: Quail-STT models are now called "Quail" - These models are optimized for human-to-machine enhancement (e.g., Speech-to-Text (STT) applications). Quail models are now called "Sparrow" - These models are optimized for human-to-human enhancement (e.g., voice calls, conferencing). This naming change clarifies the distinction between STT-focused models and human-to-human communication model
 
 **Major architectural change**: The API has been restructured to separate model data from processing instances. What was previously called `Model` (which handled both model data and processing) has been split into:
 - `Model`: Now represents only the ML model data loaded from files or memory
