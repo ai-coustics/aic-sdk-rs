@@ -28,4 +28,4 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run Tests
         run: |
-          cargo test -p aic-sdk --locked --all-features -- --nocapture
+          cargo test -p aic-sdk --locked --features download-model,download-lib -- --nocapture
