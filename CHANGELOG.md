@@ -6,7 +6,7 @@ This release integrates ai-coustics C library version 0.13.0, which comes with a
 
 Most notably, the C library no longer includes any models, which significantly reduces the library's binary size. The models are now available separately for download at https://artifacts.ai-coustics.io.
 
-**New license keys required**: License keys previously generated in the [development portal](https://developers.ai-coustics.io) will no longer work. New license keys must be generated.
+**New license keys required**: License keys previously generated in the [developer portal](https://developers.ai-coustics.io) will no longer work. New license keys must be generated.
 
 **Model naming changes**: Quail-STT models are now called "Quail" - These models are optimized for human-to-machine enhancement (e.g., Speech-to-Text (STT) applications). Quail models are now called "Sparrow" - These models are optimized for human-to-human enhancement (e.g., voice calls, conferencing). This naming change clarifies the distinction between STT-focused models and human-to-human communication model
 
