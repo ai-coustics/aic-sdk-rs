@@ -52,4 +52,4 @@ jobs:
         run: cargo publish -p aic-sdk-sys --features download-lib
 
       - name: Publish Main Crate
-        run: cargo publish -p aic-sdk --features download-lib
+        run: cargo publish -p aic-sdk --features download-lib,download-model
