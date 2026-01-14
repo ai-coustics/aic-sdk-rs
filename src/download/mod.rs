@@ -56,7 +56,13 @@ pub fn download<P: AsRef<Path>>(
     let url = format!("{MODEL_BASE_URL}{}", model.url_path);
     let bytes = download_bytes(&url)?;
 
-    let temp_path = destination.with_extension("download");
+    // Use a unique temporary filename to avoid race conditions when multiple threads
+    // try to download the same model simultaneously
+    let temp_path = download_dir.join(format!(
+        "{}.{:?}.download",
+        model.file_name,
+        std::thread::current().id()
+    ));
     fs::write(&temp_path, &bytes).map_err(|err| Error::Io(err.to_string()))?;
 
     if !checksum_matches(&temp_path, &model.checksum)? {
@@ -64,9 +70,16 @@ pub fn download<P: AsRef<Path>>(
         return Err(Error::ChecksumMismatch);
     }
 
-    fs::rename(&temp_path, &destination).map_err(|err| Error::Io(err.to_string()))?;
-
-    Ok(destination)
+    // Atomic rename - if another thread already created the destination, that's fine
+    match fs::rename(&temp_path, &destination) {
+        Ok(()) => Ok(destination),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            // Another thread beat us to it, clean up our temp file
+            let _ = fs::remove_file(&temp_path);
+            Ok(destination)
+        }
+        Err(e) => Err(Error::Io(e.to_string())),
+    }
 }
 
 fn download_bytes(url: &str) -> Result<Vec<u8>, Error> {
