@@ -1,175 +1,13 @@
 use crate::error::*;
 
-use aic_sdk_sys::{AicEnhancementParameter::*, AicModelType::*, *};
+use aic_sdk_sys::*;
 
-use std::{ffi::CString, ptr, sync::Once};
-
-static SET_WRAPPER_ID: Once = Once::new();
-
-/// Available model types for audio enhancement.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ModelType {
-    /// **Specifications:**
-    /// - Window length: 10 ms
-    /// - Native sample rate: 48 kHz
-    /// - Native num frames: 480
-    /// - Processing latency: 30 ms
-    QuailL48,
-    /// **Specifications:**
-    /// - Window length: 10 ms
-    /// - Native sample rate: 16 kHz
-    /// - Native num frames: 160
-    /// - Processing latency: 30 ms
-    QuailL16,
-    /// **Specifications:**
-    /// - Window length: 10 ms
-    /// - Native sample rate: 8 kHz
-    /// - Native num frames: 80
-    /// - Processing latency: 30 ms
-    QuailL8,
-    /// **Specifications:**
-    /// - Window length: 10 ms
-    /// - Native sample rate: 48 kHz
-    /// - Native num frames: 480
-    /// - Processing latency: 30 ms
-    QuailS48,
-    /// **Specifications:**
-    /// - Window length: 10 ms
-    /// - Native sample rate: 16 kHz
-    /// - Native num frames: 160
-    /// - Processing latency: 30 ms
-    QuailS16,
-    /// **Specifications:**
-    /// - Window length: 10 ms
-    /// - Native sample rate: 8 kHz
-    /// - Native num frames: 80
-    /// - Processing latency: 30 ms
-    QuailS8,
-    /// **Specifications:**
-    /// - Window length: 10 ms
-    /// - Native sample rate: 48 kHz
-    /// - Native num frames: 480
-    /// - Processing latency: 10 ms
-    QuailXs,
-    /// **Specifications:**
-    /// - Window length: 10 ms
-    /// - Native sample rate: 48 kHz
-    /// - Native num frames: 480
-    /// - Processing latency: 10 ms
-    QuailXxs,
-    /// Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
-    /// designed specifically to improve STT accuracy across unpredictable, diverse and challenging environments.
-    ///
-    /// **Specifications:**
-    /// - Window length: 10 ms
-    /// - Native sample rate: 16 kHz
-    /// - Native num frames: 160
-    /// - Processing latency: 30 ms
-    QuailSttL16,
-    /// Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
-    /// designed specifically to improve STT accuracy across unpredictable, diverse and challenging environments.
-    ///
-    /// **Specifications:**
-    /// - Window length: 10 ms
-    /// - Native sample rate: 8 kHz
-    /// - Native num frames: 80
-    /// - Processing latency: 30 ms
-    QuailSttL8,
-    /// Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
-    /// designed specifically to improve STT accuracy across unpredictable, diverse and challenging environments.
-    ///
-    /// **Specifications:**
-    /// - Window length: 10 ms
-    /// - Native sample rate: 16 kHz
-    /// - Native num frames: 160
-    /// - Processing latency: 30 ms
-    QuailSttS16,
-    /// Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
-    /// designed specifically to improve STT accuracy across unpredictable, diverse and challenging environments.
-    ///
-    /// **Specifications:**
-    /// - Window length: 10 ms
-    /// - Native sample rate: 8 kHz
-    /// - Native num frames: 80
-    /// - Processing latency: 30 ms
-    QuailSttS8,
-    /// Special model optimized for human-to-machine interaction (e.g., voice agents, speech-to-text)
-    /// purpose-built to isolate and elevate the foreground speaker while suppressing both
-    /// interfering speech and background noise.
-    ///
-    /// **Specifications:**
-    /// - Window length: 10 ms
-    /// - Native sample rate: 16 kHz
-    /// - Native num frames: 160
-    /// - Processing latency: 30 ms
-    QuailVfSttL16,
-}
-
-impl From<ModelType> for AicModelType::Type {
-    fn from(model_type: ModelType) -> Self {
-        match model_type {
-            ModelType::QuailL48 => AIC_MODEL_TYPE_QUAIL_L48,
-            ModelType::QuailL16 => AIC_MODEL_TYPE_QUAIL_L16,
-            ModelType::QuailL8 => AIC_MODEL_TYPE_QUAIL_L8,
-            ModelType::QuailS48 => AIC_MODEL_TYPE_QUAIL_S48,
-            ModelType::QuailS16 => AIC_MODEL_TYPE_QUAIL_S16,
-            ModelType::QuailS8 => AIC_MODEL_TYPE_QUAIL_S8,
-            ModelType::QuailXs => AIC_MODEL_TYPE_QUAIL_XS,
-            ModelType::QuailXxs => AIC_MODEL_TYPE_QUAIL_XXS,
-            ModelType::QuailSttL16 => AIC_MODEL_TYPE_QUAIL_STT_L16,
-            ModelType::QuailSttL8 => AIC_MODEL_TYPE_QUAIL_STT_L8,
-            ModelType::QuailSttS16 => AIC_MODEL_TYPE_QUAIL_STT_S16,
-            ModelType::QuailSttS8 => AIC_MODEL_TYPE_QUAIL_STT_S8,
-            ModelType::QuailVfSttL16 => AIC_MODEL_TYPE_QUAIL_VF_STT_L16,
-        }
-    }
-}
-
-/// Configurable parameters for audio enhancement
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum EnhancementParameter {
-    /// Controls whether audio processing is bypassed while preserving algorithmic delay.
-    ///
-    /// When enabled, the input audio passes through unmodified, but the output is still
-    /// delayed by the same amount as during normal processing. This ensures seamless
-    /// transitions when toggling enhancement on/off without audible clicks or timing shifts.
-    ///
-    /// **Range:** 0.0 to 1.0
-    /// - **0.0:** Enhancement active (normal processing)
-    /// - **1.0:** Bypass enabled (latency-compensated passthrough)
-    ///
-    /// **Default:** 0.0
-    Bypass,
-    /// Controls the intensity of speech enhancement processing.
-    ///
-    /// **Range:** 0.0 to 1.0
-    /// - **0.0:** Bypass mode - original signal passes through unchanged
-    /// - **1.0:** Full enhancement - maximum noise reduction but also more audible artifacts
-    ///
-    /// **Default:** 1.0
-    EnhancementLevel,
-    /// Compensates for perceived volume reduction after noise removal.
-    ///
-    /// **Range:** 0.1 to 4.0 (linear amplitude multiplier)
-    /// - **0.1:** Significant volume reduction (-20 dB)
-    /// - **1.0:** No gain change (0 dB, default)
-    /// - **2.0:** Double amplitude (+6 dB)
-    /// - **4.0:** Maximum boost (+12 dB)
-    ///
-    /// **Formula:** Gain (dB) = 20 × log₁₀(value)
-    /// **Default:** 1.0
-    VoiceGain,
-}
-
-impl From<EnhancementParameter> for AicEnhancementParameter::Type {
-    fn from(parameter: EnhancementParameter) -> Self {
-        match parameter {
-            EnhancementParameter::Bypass => AIC_ENHANCEMENT_PARAMETER_BYPASS,
-            EnhancementParameter::EnhancementLevel => AIC_ENHANCEMENT_PARAMETER_ENHANCEMENT_LEVEL,
-            EnhancementParameter::VoiceGain => AIC_ENHANCEMENT_PARAMETER_VOICE_GAIN,
-        }
-    }
-}
+use std::{
+    ffi::{CStr, CString},
+    marker::PhantomData,
+    path::Path,
+    ptr,
+};
 
 /// High-level wrapper for the ai-coustics audio enhancement model.
 ///
@@ -177,28 +15,55 @@ impl From<EnhancementParameter> for AicEnhancementParameter::Type {
 /// It handles memory management automatically and converts C-style error codes
 /// to Rust `Result` types.
 ///
+/// # Sharing and Multi-threading
+///
+/// `Model` is `Send` and `Sync`, so you can share it across threads. It does not implement
+/// `Clone`, so wrap it in an `Arc` if you need shared ownership.
+///
 /// # Example
 ///
-/// ```rust
-/// use aic_sdk::{Model, ModelType};
-///
-/// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-/// let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-///
-/// model.initialize(48000, 1, 1024, false).unwrap();
-///
-/// // Process audio data
-/// let mut audio_buffer = vec![0.0f32; 1024];
-/// model.process_interleaved(&mut audio_buffer).unwrap();
+/// ```rust,no_run
+/// # use aic_sdk::{Model, ProcessorConfig, Processor};
+/// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+/// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+/// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+/// let mut processor = Processor::new(&model, &license_key).unwrap();
+/// processor.initialize(&config).unwrap();
+/// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
+/// processor.process_interleaved(&mut audio_buffer).unwrap();
 /// ```
-pub struct Model {
+///
+/// # Multi-threaded Example
+///
+/// ```rust,no_run
+/// # use aic_sdk::{Model, ProcessorConfig, Processor};
+/// # use std::{thread, sync::Arc};
+/// let model = Arc::new(Model::from_file("/path/to/model.aicmodel").unwrap());
+///
+/// // Spawn multiple threads, each with its own processor but sharing the same model
+/// let handles: Vec<_> = (0..4)
+///     .map(|i| {
+///         let model_clone = Arc::clone(&model);
+///         thread::spawn(move || {
+///             let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+///             let mut processor = Processor::new(&model_clone, &license_key).unwrap();
+///             // Process audio in this thread...
+///         })
+///     })
+///     .collect();
+///
+/// for handle in handles {
+///     handle.join().unwrap();
+/// }
+/// ```
+pub struct Model<'a> {
     /// Raw pointer to the C model structure
-    inner: *mut AicModel,
-    /// Configured number of channels
-    num_channels: Option<u16>,
+    ptr: *mut AicModel,
+    /// Marker to tie the lifetime of the model to the lifetime of its weights
+    marker: PhantomData<&'a [u8]>,
 }
 
-impl Model {
+impl<'a> Model<'a> {
     /// Creates a new audio enhancement model instance.
     ///
     /// Multiple models can be created to process different audio streams simultaneously
@@ -206,8 +71,7 @@ impl Model {
     ///
     /// # Arguments
     ///
-    /// * `model_type` - Selects the enhancement algorithm variant
-    /// * `license_key` - Valid license key for the AIC SDK
+    /// * `path` - Filesystem path to a model file.
     ///
     /// # Returns
     ///
@@ -215,22 +79,18 @@ impl Model {
     ///
     /// # Example
     ///
-    /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
-    /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// let model = Model::new(ModelType::QuailS48, &license_key).unwrap();
+    /// ```rust,no_run
+    /// # use aic_sdk::Model;
+    /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
     /// ```
-    pub fn new(model_type: ModelType, license_key: &str) -> Result<Self, AicError> {
-        SET_WRAPPER_ID.call_once(|| unsafe {
-            aic_set_sdk_wrapper_id(2);
-        });
-
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Model<'static>, AicError> {
         let mut model_ptr: *mut AicModel = ptr::null_mut();
-        let c_license_key =
-            CString::new(license_key).map_err(|_| AicError::LicenseFormatInvalid)?;
+        let c_path = CString::new(path.as_ref().to_string_lossy().as_bytes()).unwrap();
 
-        let error_code =
-            unsafe { aic_model_create(&mut model_ptr, model_type.into(), c_license_key.as_ptr()) };
+        // SAFETY:
+        // - `model_ptr` points to stack memory we own.
+        // - `c_path` is a valid, null-terminated string.
+        let error_code = unsafe { aic_model_create_from_file(&mut model_ptr, c_path.as_ptr()) };
 
         handle_error(error_code)?;
 
@@ -240,388 +100,70 @@ impl Model {
             "C library returned success but null pointer"
         );
 
-        Ok(Self {
-            inner: model_ptr,
-            num_channels: None,
+        Ok(Model {
+            ptr: model_ptr,
+            marker: PhantomData,
         })
     }
 
-    /// Creates a [Voice Activity Detector](crate::vad::Vad) instance.
+    /// Creates a new model instance from an in-memory buffer.
+    ///
+    /// The buffer must be 64-byte aligned.
+    ///
+    /// Consider using [`include_model!`](macro@crate::include_model) to embed a model file at compile time with
+    /// the correct alignment.
+    ///
+    /// # Arguments
+    ///
+    /// * `buffer` - Raw bytes of the model file.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Result` containing the new `Model` instance or an `AicError` if creation fails.
     ///
     /// # Example
     ///
-    /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
-    /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// let vad = model.create_vad();
+    /// ```rust,ignore
+    /// # use aic_sdk::{include_model, Model};
+    /// static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
+    /// let model = Model::from_buffer(MODEL).unwrap();
     /// ```
-    pub fn create_vad(&mut self) -> crate::Vad {
-        let mut vad_ptr: *mut AicVad = ptr::null_mut();
+    pub fn from_buffer(buffer: &'a [u8]) -> Result<Self, AicError> {
+        let mut model_ptr: *mut AicModel = ptr::null_mut();
 
-        let error_code = unsafe { aic_vad_create(&mut vad_ptr, self.inner) };
+        // SAFETY:
+        // - `buffer` is a valid slice and immutable for `'a`.
+        // - The SDK only reads from `buffer` for the lifetime of the model.
+        let error_code =
+            unsafe { aic_model_create_from_buffer(&mut model_ptr, buffer.as_ptr(), buffer.len()) };
 
-        // This should never fail
-        assert!(handle_error(error_code).is_ok());
+        handle_error(error_code)?;
 
         // This should never happen if the C library is well-behaved, but let's be defensive
         assert!(
-            !vad_ptr.is_null(),
+            !model_ptr.is_null(),
             "C library returned success but null pointer"
         );
 
-        crate::vad::Vad::new(vad_ptr)
+        Ok(Model {
+            ptr: model_ptr,
+            marker: PhantomData,
+        })
     }
 
-    /// Configures the model for a specific audio format.
-    ///
-    /// This function must be called before processing any audio.
-    /// For the lowest delay use the sample rate and frame size returned by
-    /// `optimal_sample_rate` and `optimal_num_frames`.
-    ///
-    /// # Arguments
-    ///
-    /// * `sample_rate` - Audio sample rate in Hz (8000 - 192000)
-    /// * `num_channels` - Number of audio channels (1 for mono, 2 for stereo, etc.)
-    /// * `num_frames` - Number of samples per channel in each process call
-    /// * `allow_variable_frames` - Allows varying frame counts per process call (up to `num_frames`), but increases delay.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` on success or an `AicError` if initialization fails.
-    ///
-    /// # Warning
-    /// Do not call from audio processing threads as this allocates memory.
-    ///
-    /// # Note
-    /// All channels are mixed to mono for processing. To process channels
-    /// independently, create separate model instances.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
-    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// model.initialize(48000, 1, 1024, true).unwrap();
-    /// ```
-    pub fn initialize(
-        &mut self,
-        sample_rate: u32,
-        num_channels: u16,
-        num_frames: usize,
-        allow_variable_frames: bool,
-    ) -> Result<(), AicError> {
-        let error_code = unsafe {
-            aic_model_initialize(
-                self.inner,
-                sample_rate,
-                num_channels,
-                num_frames,
-                allow_variable_frames,
-            )
-        };
-
-        handle_error(error_code)?;
-        self.num_channels = Some(num_channels);
-        Ok(())
-    }
-
-    /// Clears all internal state and buffers.
-    ///
-    /// Call this when the audio stream is interrupted or when seeking
-    /// to prevent artifacts from previous audio content.
-    ///
-    /// The model stays initialized to the configured settings.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` on success or an `AicError` if the reset fails.
-    ///
-    /// # Thread Safety
-    /// Real-time safe. Can be called from audio processing threads.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
-    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// model.reset().unwrap();
-    /// ```
-    pub fn reset(&mut self) -> Result<(), AicError> {
-        let error_code = unsafe { aic_model_reset(self.inner) };
-        handle_error(error_code)
-    }
-
-    /// Processes audio with separate buffers for each channel (planar layout).
-    ///
-    /// Enhances speech in the provided audio buffers in-place.
-    ///
-    /// **Memory Layout:**
-    /// - Separate buffer for each channel
-    /// - Each buffer contains `num_frames` floats
-    /// - Maximum of 16 channels supported
-    /// - Example for 2 channels, 4 frames:
-    ///   ```text
-    ///   audio[0] -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3]
-    ///   audio[1] -> [ch1_f0, ch1_f1, ch1_f2, ch1_f3]
-    ///   ```
-    ///
-    /// # Arguments
-    ///
-    /// * `audio` - Array of mutable channel buffer slices to be enhanced in-place.
-    ///             Each channel buffer must be exactly of size `num_frames`,
-    ///             or if `allow_variable_frames` was enabled, less than the initialization value.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` on success or an `AicError` if processing fails.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
-    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
-    /// let mut audio_refs: Vec<&mut [f32]> = audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
-    /// model.initialize(48000, 2, 480, false).unwrap();
-    /// model.process_planar(&mut audio_refs).unwrap();
-    /// ```
-    #[allow(clippy::doc_overindented_list_items)]
-    pub fn process_planar(&mut self, audio: &mut [&mut [f32]]) -> Result<(), AicError> {
-        const MAX_CHANNELS: usize = 16;
-
-        let Some(num_channels) = self.num_channels else {
-            return Err(AicError::ModelNotInitialized);
-        };
-
-        if audio.len() != num_channels as usize {
-            return Err(AicError::AudioConfigMismatch);
+    /// Returns the model identifier string.
+    pub fn id(&self) -> &str {
+        // SAFETY: `self` owns a valid model pointer created by the SDK.
+        let id_ptr = unsafe { aic_model_get_id(self.as_const_ptr()) };
+        if id_ptr.is_null() {
+            return "unknown";
         }
 
-        let num_frames = if audio.is_empty() { 0 } else { audio[0].len() };
-
-        let mut audio_ptrs = [std::ptr::null_mut::<f32>(); MAX_CHANNELS];
-        for (i, channel) in audio.iter_mut().enumerate() {
-            // Check that all channels have the same number of frames
-            if channel.len() != num_frames {
-                return Err(AicError::AudioConfigMismatch);
-            }
-            audio_ptrs[i] = channel.as_mut_ptr();
-        }
-
-        let error_code = unsafe {
-            aic_model_process_planar(self.inner, audio_ptrs.as_ptr(), num_channels, num_frames)
-        };
-
-        handle_error(error_code)
+        // SAFETY: Pointer is valid for the lifetime of `self` and is null-terminated.
+        unsafe { CStr::from_ptr(id_ptr).to_str().unwrap_or("unknown") }
     }
 
-    /// Processes audio with interleaved channel data.
-    ///
-    /// Enhances speech in the provided audio buffer in-place.
-    ///
-    /// **Memory Layout:**
-    /// - Single contiguous buffer with samples alternating between channels
-    /// - Buffer size: `num_channels` * `num_frames` floats
-    /// - Example for 2 channels, 4 frames:
-    ///   ```text
-    ///   audio -> [ch0_f0, ch1_f0, ch0_f1, ch1_f1, ch0_f2, ch1_f2, ch0_f3, ch1_f3]
-    ///   ```
-    ///
-    /// # Arguments
-    ///
-    /// * `audio` - Interleaved audio buffer to be enhanced in-place.
-    ///             Must be exactly of size `num_channels` * `num_frames`,
-    ///             or if `allow_variable_frames` was enabled, less than the initialization value per channel.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` on success or an `AicError` if processing fails.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
-    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
-    /// model.initialize(48000, 2, 480, false).unwrap();
-    /// model.process_interleaved(&mut audio).unwrap();
-    /// ```
-    #[allow(clippy::doc_overindented_list_items)]
-    pub fn process_interleaved(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
-        let Some(num_channels) = self.num_channels else {
-            return Err(AicError::ModelNotInitialized);
-        };
-
-        if !audio.len().is_multiple_of(num_channels as usize) {
-            return Err(AicError::AudioConfigMismatch);
-        }
-
-        let num_frames = audio.len() / num_channels as usize;
-
-        let error_code = unsafe {
-            aic_model_process_interleaved(self.inner, audio.as_mut_ptr(), num_channels, num_frames)
-        };
-
-        handle_error(error_code)
-    }
-
-    /// Processes audio with sequential channel data.
-    ///
-    /// Enhances speech in the provided audio buffer in-place.
-    ///
-    /// **Memory Layout:**
-    /// - Single contiguous buffer with all samples for each channel stored sequentially
-    /// - Buffer size: `num_channels` * `num_frames` floats
-    /// - Example for 2 channels, 4 frames:
-    ///   ```text
-    ///   audio -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3, ch1_f0, ch1_f1, ch1_f2, ch1_f3]
-    ///   ```
-    ///
-    /// # Arguments
-    ///
-    /// * `audio` - Sequential audio buffer to be enhanced in-place.
-    ///             Must be exactly of size `num_channels` * `num_frames`,
-    ///             or if `allow_variable_frames` was enabled, less than the initialization value per channel.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` on success or an `AicError` if processing fails.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
-    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames each stored sequentially
-    /// model.initialize(48000, 2, 480, false).unwrap();
-    /// model.process_sequential(&mut audio).unwrap();
-    /// ```
-    #[allow(clippy::doc_overindented_list_items)]
-    pub fn process_sequential(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
-        let Some(num_channels) = self.num_channels else {
-            return Err(AicError::ModelNotInitialized);
-        };
-
-        if !audio.len().is_multiple_of(num_channels as usize) {
-            return Err(AicError::AudioConfigMismatch);
-        }
-
-        let num_frames = audio.len() / num_channels as usize;
-
-        let error_code = unsafe {
-            aic_model_process_sequential(self.inner, audio.as_mut_ptr(), num_channels, num_frames)
-        };
-
-        handle_error(error_code)
-    }
-
-    /// Modifies a model parameter.
-    ///
-    /// All parameters can be changed during audio processing.
-    /// This function can be called from any thread.
-    ///
-    /// # Arguments
-    ///
-    /// * `parameter` - Parameter to modify
-    /// * `value` - New parameter value. See parameter documentation for ranges
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` on success or an `AicError` if the parameter cannot be set.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use aic_sdk::{Model, ModelType, EnhancementParameter};
-    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// model.set_parameter(EnhancementParameter::EnhancementLevel, 0.8).unwrap();
-    /// ```
-    pub fn set_parameter(
-        &mut self,
-        parameter: EnhancementParameter,
-        value: f32,
-    ) -> Result<(), AicError> {
-        let error_code = unsafe { aic_model_set_parameter(self.inner, parameter.into(), value) };
-        handle_error(error_code)
-    }
-
-    /// Retrieves the current value of a parameter.
-    ///
-    /// This function can be called from any thread.
-    ///
-    /// # Arguments
-    ///
-    /// * `parameter` - Parameter to query
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(value)` containing the current parameter value, or an `AicError` if the query fails.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use aic_sdk::{Model, ModelType, EnhancementParameter};
-    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// let enhancement_level = model.parameter(EnhancementParameter::EnhancementLevel).unwrap();
-    /// println!("Current enhancement level: {enhancement_level}");
-    /// ```
-    pub fn parameter(&self, parameter: EnhancementParameter) -> Result<f32, AicError> {
-        let mut value: f32 = 0.0;
-        let error_code =
-            unsafe { aic_model_get_parameter(self.inner, parameter.into(), &mut value) };
-        handle_error(error_code)?;
-        Ok(value)
-    }
-
-    /// Returns the total output delay in samples for the current audio configuration.
-    ///
-    /// This function provides the complete end-to-end latency introduced by the model,
-    /// which includes both algorithmic processing delay and any buffering overhead.
-    /// Use this value to synchronize enhanced audio with other streams or to implement
-    /// delay compensation in your application.
-    ///
-    /// **Delay behavior:**
-    /// - **Before initialization:** Returns the base processing delay using the model's
-    ///   optimal frame size at its native sample rate
-    /// - **After initialization:** Returns the actual delay for your specific configuration,
-    ///   including any additional buffering introduced by non-optimal frame sizes
-    ///
-    /// **Important:** The delay value is always expressed in samples at the sample rate
-    /// you configured during `initialize`. To convert to time units:
-    /// `delay_ms = (delay_samples * 1000) / sample_rate`
-    ///
-    /// **Note:** Using frame sizes different from the optimal value returned by
-    /// `optimal_num_frames` will increase the delay beyond the model's base latency.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(delay_samples)` or an `AicError` if the query fails.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
-    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// let delay = model.output_delay().unwrap();
-    /// println!("Output delay: {} samples", delay);
-    /// ```
-    pub fn output_delay(&self) -> Result<usize, AicError> {
-        let mut delay: usize = 0;
-        let error_code = unsafe { aic_get_output_delay(self.inner, &mut delay) };
-        handle_error(error_code)?;
-        Ok(delay)
-    }
-
-    /// Retrieves the native sample rate of the selected model.
+    /// Retrieves the native sample rate of the processor's model.
     ///
     /// Each model is optimized for a specific sample rate, which determines the frequency
     /// range of the enhanced audio output. While you can process audio at any sample rate,
@@ -650,22 +192,34 @@ impl Model {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(sample_rate)` or an `AicError` if the query fails.
+    /// Returns the model's native sample rate.
     ///
     /// # Example
     ///
-    /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// let optimal_rate = model.optimal_sample_rate().unwrap();
-    /// println!("Optimal sample rate: {optimal_rate} Hz");
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// let optimal_sample_rate = model.optimal_sample_rate();
+    /// println!("Optimal sample rate: {optimal_sample_rate} Hz");
     /// ```
-    pub fn optimal_sample_rate(&self) -> Result<u32, AicError> {
+    pub fn optimal_sample_rate(&self) -> u32 {
         let mut sample_rate: u32 = 0;
-        let error_code = unsafe { aic_get_optimal_sample_rate(self.inner, &mut sample_rate) };
-        handle_error(error_code)?;
-        Ok(sample_rate)
+        // SAFETY:
+        // - `self.as_const_ptr()` is a valid pointer to a live model.
+        // - `sample_rate` points to stack storage for output.
+        let error_code =
+            unsafe { aic_model_get_optimal_sample_rate(self.as_const_ptr(), &mut sample_rate) };
+
+        // This should never fail. If it does, it's a bug in the SDK.
+        // `aic_get_optimal_sample_rate` is documented to always succeed if given a valid processor pointer.
+        assert_success(
+            error_code,
+            "`aic_model_get_optimal_sample_rate` failed. This is a bug, please open an issue on GitHub for further investigation.",
+        );
+
+        // This should never fail
+        sample_rate
     }
 
     /// Retrieves the optimal number of frames for the selected model at a given sample rate.
@@ -681,8 +235,8 @@ impl Model {
     /// For example, a model designed for 10 ms processing windows requires 480 frames at
     /// 48 kHz, but only 160 frames at 16 kHz to capture the same duration of audio.
     ///
-    /// Call this function with your intended sample rate before calling `aic_model_initialize`
-    /// to determine the best frame count for minimal latency.
+    /// Call this function with your intended sample rate before calling
+    /// [`Processor::initialize`](crate::Processor::initialize) to determine the best frame count for minimal latency.
     ///
     /// # Arguments
     ///
@@ -690,143 +244,163 @@ impl Model {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(num_frames)` or an `AicError` if the query fails.
+    /// Returns the optimal frame count.
     ///
     /// # Example
     ///
-    /// ```rust
-    /// # use aic_sdk::{Model, ModelType};
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// # let sample_rate = model.optimal_sample_rate().unwrap();
-    /// let optimal_frames = model.optimal_num_frames(sample_rate).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let sample_rate = model.optimal_sample_rate();
+    /// let optimal_frames = model.optimal_num_frames(sample_rate);
     /// println!("Optimal frame count: {optimal_frames}");
     /// ```
-    pub fn optimal_num_frames(&self, sample_rate: u32) -> Result<usize, AicError> {
+    pub fn optimal_num_frames(&self, sample_rate: u32) -> usize {
         let mut num_frames: usize = 0;
-        let error_code =
-            unsafe { aic_get_optimal_num_frames(self.inner, sample_rate, &mut num_frames) };
-        handle_error(error_code)?;
-        Ok(num_frames)
+        // SAFETY:
+        // - `self.as_const_ptr()` is a valid pointer to a live model.
+        // - `num_frames` points to stack storage for output.
+        let error_code = unsafe {
+            aic_model_get_optimal_num_frames(self.as_const_ptr(), sample_rate, &mut num_frames)
+        };
+
+        // This should never fail. If it does, it's a bug in the SDK.
+        // `aic_get_optimal_num_frames` is documented to always succeed if given valid pointers.
+        assert_success(
+            error_code,
+            "`aic_model_get_optimal_num_frames` failed. This is a bug, please open an issue on GitHub for further investigation.",
+        );
+
+        num_frames
+    }
+
+    /// Downloads a model file from the ai-coustics artifact CDN.
+    ///
+    /// This method fetches the model manifest, verifies that the requested model
+    /// exists in a version compatible with this library, and downloads the model
+    /// file to the specified directory.
+    ///
+    /// Available models can be browsed at [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io/).
+    ///
+    /// # Arguments
+    ///
+    /// * `model_id` - The model identifier (e.g., `"quail-l-16khz"`).
+    /// * `download_dir` - Directory where the downloaded model file will be stored.
+    ///
+    /// # Returns
+    ///
+    /// Returns the full path to the downloaded model file on success, or an [`AicError`] if the
+    /// operation fails.
+    ///
+    /// # Note
+    ///
+    /// This is a blocking operation that performs network I/O.
+    #[cfg(feature = "download-model")]
+    pub fn download<P: AsRef<Path>>(
+        model_id: &str,
+        download_dir: P,
+    ) -> Result<std::path::PathBuf, AicError> {
+        let compatible_version = crate::get_compatible_model_version();
+        crate::download::download(model_id, compatible_version, download_dir)
+            .map_err(|err| AicError::ModelDownload(err.to_string()))
+    }
+
+    pub(crate) fn as_const_ptr(&self) -> *const AicModel {
+        self.ptr as *const AicModel
     }
 }
 
-impl Drop for Model {
+impl<'a> Drop for Model<'a> {
     fn drop(&mut self) {
-        if !self.inner.is_null() {
-            unsafe {
-                aic_model_destroy(self.inner);
-            }
+        if !self.ptr.is_null() {
+            // SAFETY:
+            // - `self.ptr` was allocated by the SDK and is still owned by this wrapper.
+            unsafe { aic_model_destroy(self.ptr) };
         }
     }
 }
 
-// Safety: The underlying C library should be thread-safe for individual model instances
-unsafe impl Send for Model {}
-unsafe impl Sync for Model {}
+// SAFETY:
+// - Model wraps a raw pointer to an AicModel which is immutable after creation and it
+//   does not provide access to it through its public API.
+// - Methods only pass the pointer to SDK calls documented as thread-safe for const access.
+unsafe impl<'a> Send for Model<'a> {}
+// SAFETY:
+// - Model wraps a raw pointer to an AicModel which is immutable after creation and it
+//   does not provide access to it through its public API.
+// - Methods only pass the pointer to SDK calls documented as thread-safe for const access.
+unsafe impl<'a> Sync for Model<'a> {}
+
+/// Embeds the bytes of model file, ensuring proper alignment.
+///
+/// This macro uses Rust's standard library's [`include_bytes!`](std::include_bytes) macro
+/// to include the model file at compile time.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// # use aic_sdk::{include_model, Model};
+///
+/// static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
+/// let model = Model::from_buffer(MODEL).unwrap();
+/// ```
+#[macro_export]
+macro_rules! include_model {
+    ($path:expr) => {{
+        #[repr(C, align(64))]
+        struct __Aligned<T: ?Sized>(T);
+
+        const __DATA: &'static __Aligned<[u8; include_bytes!($path).len()]> =
+            &__Aligned(*include_bytes!($path));
+
+        &__DATA.0
+    }};
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn model_creation_and_basic_operations() -> Result<(), AicError> {
-        dbg!(crate::get_version());
+    fn include_model_aligns_to_64_bytes() {
+        // Use the README.md as a dummy file for testing
+        let data = include_model!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"));
 
-        // Read license key from environment variable
-        let license_key = std::env::var("AIC_SDK_LICENSE")
-            .expect("AIC_SDK_LICENSE environment variable must be set for tests");
-
-        // Test model creation with QuailL48 at optimal settings
-        let mut model = Model::new(ModelType::QuailL48, &license_key)?;
-
-        // Test initialization with QuailL48 optimal settings (48000 Hz, 480 frames)
-        model.initialize(48000, 2, 480, false)?;
-
-        let mut audio = vec![vec![0.0f32; 480]; 2]; // 2 channels, 480 frames each
-        let mut audio_refs: Vec<&mut [f32]> =
-            audio.iter_mut().map(|ch| ch.as_mut_slice()).collect();
-
-        model.process_planar(&mut audio_refs).unwrap();
-
-        Ok(())
+        let ptr = data.as_ptr() as usize;
+        assert!(
+            ptr.is_multiple_of(64),
+            "include_model should align data to 64 bytes"
+        );
     }
 
     #[test]
-    fn process_interleaved_fixed_frames() {
-        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-        let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-        let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
-        model.initialize(48000, 2, 480, false).unwrap();
-        model.process_interleaved(&mut audio).unwrap();
+    fn model_is_send_and_sync() {
+        // Compile-time check that Model implements Send and Sync.
+        // This ensures the model can be safely shared across threads.
+        fn assert_send<T: Send>() {}
+        fn assert_sync<T: Sync>() {}
+
+        assert_send::<Model>();
+        assert_sync::<Model>();
     }
+}
 
-    #[test]
-    fn process_planar_fixed_frames() {
-        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-        let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-        let mut left = vec![0.0f32; 480]; // 480 frames
-        let mut right = vec![0.0f32; 480]; // 480 frames
-        let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 480 frames
-        model.initialize(48000, 2, 480, false).unwrap();
-        model.process_planar(&mut audio).unwrap();
-    }
-
-    #[test]
-    fn process_interleaved_variable_frames() {
-        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-        let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-        let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
-        model.initialize(48000, 2, 480, true).unwrap();
-        model.process_interleaved(&mut audio).unwrap();
-
-        let mut audio = vec![0.0f32; 2 * 20]; // 2 channels, 20 frames
-        model.process_interleaved(&mut audio).unwrap();
-    }
-
-    #[test]
-    fn process_planar_variable_frames() {
-        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-        let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-        let mut left = vec![0.0f32; 480]; // 480 frames
-        let mut right = vec![0.0f32; 480]; // 480 frames
-        let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 480 frames
-        model.initialize(48000, 2, 480, true).unwrap();
-        model.process_planar(&mut audio).unwrap();
-
-        let mut left = vec![0.0f32; 20]; // 20 frames
-        let mut right = vec![0.0f32; 20]; // 20 frames
-        let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 20 frames
-        model.process_planar(&mut audio).unwrap();
-    }
-
-    #[test]
-    fn process_interleaved_variable_frames_fails_without_allow_variable_frames() {
-        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-        let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-        let mut audio = vec![0.0f32; 2 * 480]; // 2 channels, 480 frames
-        model.initialize(48000, 2, 480, false).unwrap();
-        model.process_interleaved(&mut audio).unwrap();
-
-        let mut audio = vec![0.0f32; 2 * 20]; // 2 channels, 20 frames
-        let result = model.process_interleaved(&mut audio);
-        assert_eq!(result, Err(AicError::AudioConfigMismatch));
-    }
-
-    #[test]
-    fn process_planar_variable_frames_fails_without_allow_variable_frames() {
-        let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-        let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-        let mut left = vec![0.0f32; 480]; // 480 frames
-        let mut right = vec![0.0f32; 480]; // 480 frames
-        let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 480 frames
-        model.initialize(48000, 2, 480, false).unwrap();
-        model.process_planar(&mut audio).unwrap();
-
-        let mut left = vec![0.0f32; 20]; // 20 frames
-        let mut right = vec![0.0f32; 20]; // 20 frames
-        let mut audio = [left.as_mut_slice(), right.as_mut_slice()]; // 2 channels, 20 frames
-        let result = model.process_planar(&mut audio);
-        assert_eq!(result, Err(AicError::AudioConfigMismatch));
-    }
+#[doc(hidden)]
+mod _compile_fail_tests {
+    //! Compile-fail regression: a `Model` created from a buffer must not outlive the buffer.
+    //!
+    //! ```rust,compile_fail
+    //! use aic_sdk::Model;
+    //!
+    //! fn leak_model_from_buffer() -> Model<'static> {
+    //!     let bytes = vec![0u8; 64];
+    //!     let model = Model::from_buffer(&bytes).unwrap();
+    //!     model
+    //! }
+    //!
+    //! fn main() {
+    //!     let _ = leak_model_from_buffer();
+    //! }
+    //! ```
 }

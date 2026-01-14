@@ -1,0 +1,149 @@
+{
+    "schema_version": "1.0",
+    "models": {
+        "quail-l-16khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/quail-l-16khz/v1/quail_l_16khz_dtv5nvgu_v20.aicmodel",
+                    "filename": "quail_l_16khz_dtv5nvgu_v20.aicmodel",
+                    "checksum": "b3db85b6091949cf84d9d6cde1f150cbd74746252a0ae61241d739536b5ea362",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "quail-l-8khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/quail-l-8khz/v1/quail_l_8khz_mp51agn0_v13.aicmodel",
+                    "filename": "quail_l_8khz_mp51agn0_v13.aicmodel",
+                    "checksum": "9b5e3d094c32f417d7477b4acaa4ef26510dabbb20d6009a1795940dfee28a74",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "quail-s-16khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/quail-s-16khz/v1/quail_s_16khz_ilmexgyt_v8.aicmodel",
+                    "filename": "quail_s_16khz_ilmexgyt_v8.aicmodel",
+                    "checksum": "d613cdd917a47296accb47c45bcc268994f032e1df636c504201099d61c51bf7",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "quail-s-8khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/quail-s-8khz/v1/quail_s_8khz_9q57ojki_v20.aicmodel",
+                    "filename": "quail_s_8khz_9q57ojki_v20.aicmodel",
+                    "checksum": "093103c9f17261d29d45de91e3506f412eb66c47ed5777eecdd8378a557d6746",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "quail-vf-l-16khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/quail-vf-l-16khz/v1/quail_vf_l_16khz_jc5pk1aa_v17.aicmodel",
+                    "filename": "quail_vf_l_16khz_jc5pk1aa_v17.aicmodel",
+                    "checksum": "1509e36bd30ca296204515eb777dd3663c46a6d4531136599d9e8494e6e4fc27",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-l-16khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-l-16khz/v1/sparrow_l_16khz_dtv5nvgu_v20.aicmodel",
+                    "filename": "sparrow_l_16khz_dtv5nvgu_v20.aicmodel",
+                    "checksum": "d6109ac2e9dca00ae487e04e3e6349ca1db2e6ac287e9f84db64f5568416a502",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-l-48khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-l-48khz/v1/sparrow_l_48khz_7n1r44ri_v23.aicmodel",
+                    "filename": "sparrow_l_48khz_7n1r44ri_v23.aicmodel",
+                    "checksum": "ff7d128621fd517e91efcca6dd45b19284689a215758e5187cfedec5a630bf16",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-l-8khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-l-8khz/v1/sparrow_l_8khz_mp51agn0_v13.aicmodel",
+                    "filename": "sparrow_l_8khz_mp51agn0_v13.aicmodel",
+                    "checksum": "9d1d36b4f95ccf8f0e4422eb04a970a9ce7962385adc4094c33de77968c20374",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-s-16khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-s-16khz/v1/sparrow_s_16khz_ilmexgyt_v8.aicmodel",
+                    "filename": "sparrow_s_16khz_ilmexgyt_v8.aicmodel",
+                    "checksum": "f9fe2697801c507994e5067913abf1a5339b32dd90459c42bd34418da4a931b5",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-s-48khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-s-48khz/v1/sparrow_s_48khz_kg8kp9qm_v52.aicmodel",
+                    "filename": "sparrow_s_48khz_kg8kp9qm_v52.aicmodel",
+                    "checksum": "777ed9015c3ba8d95e5d7281fb4bbdc3cee50b4b260de8f2af27464b05627c2c",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-s-8khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-s-8khz/v1/sparrow_s_8khz_9q57ojki_v20.aicmodel",
+                    "filename": "sparrow_s_8khz_9q57ojki_v20.aicmodel",
+                    "checksum": "5fb589cea729693eed15cc9f675307976713de8d9a6d74793d8af25896ca4834",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-xs-48khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-xs-48khz/v1/sparrow_xs_48khz_g4qwc6lv_v21.aicmodel",
+                    "filename": "sparrow_xs_48khz_g4qwc6lv_v21.aicmodel",
+                    "checksum": "3f71f68ef0661bea78df8deff68450e1a6436f1ba7e2173aee0384a4e77a9e5e",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        },
+        "sparrow-xxs-48khz": {
+            "versions": {
+                "v1": {
+                    "file": "models/sparrow-xxs-48khz/v1/sparrow_xxs_48khz_wsur2zkw_v7.aicmodel",
+                    "filename": "sparrow_xxs_48khz_wsur2zkw_v7.aicmodel",
+                    "checksum": "26003656195671346f73bf35ca3329e316cac585fee9b4e6802287d1be715ef9",
+                    "uploaded_at": "2026-01-14T11:48:30Z",
+                    "git_sha": "721833f87522a4ed823d553509377e36d6ce56e2"
+                }
+            }
+        }
+    },
+    "updated_at": "2026-01-14T11:48:45Z"
+}

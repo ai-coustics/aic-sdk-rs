@@ -5,26 +5,50 @@ use aic_sdk_sys::AicErrorCode::{self, *};
 /// Error type for AIC SDK operations.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum AicError {
-    #[error("Parameter is out of range")]
+    #[error(
+        "Parameter value is outside the acceptable range. Check documentation for valid values."
+    )]
     ParameterOutOfRange,
-    #[error("Processor was not initialized")]
+    #[error(
+        "Model must be initialized before calling this operation. Call `Processor::initialize` first."
+    )]
     ModelNotInitialized,
-    #[error("Audio config is not supported")]
+    #[error(
+        "Audio configuration (samplerate, num_channels, num_frames) is not supported by the model"
+    )]
     AudioConfigUnsupported,
-    #[error("Audio config does not match the initialized config")]
+    #[error("Audio buffer configuration differs from the one provided during initialization")]
     AudioConfigMismatch,
-    #[error("Audio enhancement was disallowed")]
+    #[error(
+        "SDK key was not authorized or process failed to report usage. Check if you have internet connection."
+    )]
     EnhancementNotAllowed,
-    #[error("Internal error")]
+    #[error("Internal error occurred. Contact support.")]
     Internal,
-    #[error("Parameter can't be changed for this model type")]
+    #[error("The requested parameter is read-only for this model type and cannot be modified.")]
     ParameterFixed,
-    #[error("License key is invalid")]
+    #[error("License key format is invalid or corrupted. Verify the key was copied correctly.")]
     LicenseFormatInvalid,
-    #[error("License version unsupported")]
+    #[error(
+        "License version is not compatible with the SDK version. Update SDK or contact support."
+    )]
     LicenseVersionUnsupported,
-    #[error("License key expired")]
+    #[error("License key has expired. Renew your license to continue.")]
     LicenseExpired,
+    #[error("The model file is invalid or corrupted. Verify the file is correct.")]
+    ModelInvalid,
+    #[error("The model file version is not compatible with this SDK version.")]
+    ModelVersionUnsupported,
+    #[error("The path to the model file is invalid")]
+    ModelFilePathInvalid,
+    #[error(
+        "The model file cannot be opened due to a filesystem error. Verify that the file exists."
+    )]
+    FileSystemError,
+    #[error("The model data is not aligned to 64 bytes.")]
+    ModelDataUnaligned,
+    #[error("Model download error: {0}")]
+    ModelDownload(String),
     #[error("Unknown error code: {0}")]
     Unknown(AicErrorCode::Type),
 }
@@ -49,6 +73,11 @@ impl From<AicErrorCode::Type> for AicError {
             AIC_ERROR_CODE_LICENSE_FORMAT_INVALID => AicError::LicenseFormatInvalid,
             AIC_ERROR_CODE_LICENSE_VERSION_UNSUPPORTED => AicError::LicenseVersionUnsupported,
             AIC_ERROR_CODE_LICENSE_EXPIRED => AicError::LicenseExpired,
+            AIC_ERROR_CODE_MODEL_INVALID => AicError::ModelInvalid,
+            AIC_ERROR_CODE_MODEL_VERSION_UNSUPPORTED => AicError::ModelVersionUnsupported,
+            AIC_ERROR_CODE_MODEL_FILE_PATH_INVALID => AicError::ModelFilePathInvalid,
+            AIC_ERROR_CODE_FILE_SYSTEM_ERROR => AicError::FileSystemError,
+            AIC_ERROR_CODE_MODEL_DATA_UNALIGNED => AicError::ModelDataUnaligned,
             code => AicError::Unknown(code),
         }
     }
@@ -60,4 +89,8 @@ pub(crate) fn handle_error(error_code: AicErrorCode::Type) -> Result<(), AicErro
         AIC_ERROR_CODE_SUCCESS => Ok(()),
         code => Err(AicError::from(code)),
     }
+}
+
+pub(crate) fn assert_success(error_code: AicErrorCode::Type, message: &str) {
+    assert_eq!(error_code, AIC_ERROR_CODE_SUCCESS, "{}", message);
 }

@@ -1,5 +1,71 @@
 # Changelog
 
+## 0.13.0 - 2026-01-14
+
+This release integrates ai-coustics C library version 0.13.0, which comes with a number of new features and several breaking changes.
+
+Most notably, the C library no longer includes any models, which significantly reduces the library's binary size. The models are now available separately for download at https://artifacts.ai-coustics.io.
+
+**New license keys required**: License keys previously generated in the [developer portal](https://developers.ai-coustics.io) will no longer work. New license keys must be generated.
+
+**Model naming changes**: Quail-STT models are now called "Quail" - These models are optimized for human-to-machine enhancement (e.g., Speech-to-Text (STT) applications). Quail models are now called "Sparrow" - These models are optimized for human-to-human enhancement (e.g., voice calls, conferencing). This naming change clarifies the distinction between STT-focused models and human-to-human communication model
+
+**Major architectural change**: The API has been restructured to separate model data from processing instances. What was previously called `Model` (which handled both model data and processing) has been split into:
+- `Model`: Now represents only the ML model data loaded from files or memory
+- `Processor`: New type that performs the actual audio processing using a model
+- Multiple processors can share the same model, allowing efficient resource usage across streams
+- To change parameters, reset the processor and get the output delay, a processor context must now be created via `Processor::processor_context`. This context can be freely moved between threads
+
+### New features
+
+- Models now load from files via `Model::from_file()`.
+- Models can also be created from in-memory buffers with `Model::from_buffer()`.
+- Added `include_model!` macro that embeds model binaries at compile time with guaranteed 64-byte alignment.
+- Added `Model::id()` to query the identifier of a loaded model.
+- A single `Model` can be shared across multiple `Processor` instances (wrap in `Arc` for shared ownership).
+- Added `Processor::new()` to create processors from a model, each with independent state while sharing model weights.
+- Added `get_compatible_model_version()` to query the required model version for this SDK.
+- Added optional `download-model` feature with `Model::download()` helper to fetch models from the ai-coustics artifact repository with manifest lookup, checksum verification, and compatibility checks.
+- Added `ProcessorConfig::optimal()` helper that returns a configuration pre-filled with the model's optimal sample rate and frame count.
+- Added builder methods `ProcessorConfig::with_num_channels()` and `ProcessorConfig::with_allow_variable_frames()`.
+- Model query methods are now on `Model`:
+    - `Model::optimal_sample_rate()` - gets optimal sample rate for a model
+    - `Model::optimal_num_frames()` - gets optimal frame count for a model at given sample rate
+- Added new error variants for model loading:
+    - `AicError::ModelInvalid`
+    - `AicError::ModelVersionUnsupported`
+    - `AicError::ModelFilePathInvalid`
+    - `AicError::FileSystemError`
+    - `AicError::ModelDataUnaligned`
+    - `AicError::ModelDownload`
+
+### Breaking changes
+
+- **Separated model loading from audio processing**: `Model` now only loads `.aicmodel` assets from disk or memory, while processing moved to a new `Processor` created from a borrowed `Model`.
+- Removed `ModelType` enum; callers must supply a model file instead of selecting a built-in model.
+- Removed `Model::new()`, `Model::initialize()`, and `Model::process_*()` methods.
+- `Processor::initialize()` now takes a `ProcessorConfig` struct instead of discrete arguments.
+- `EnhancementParameter` was renamed to `ProcessorParameter`:
+    - `EnhancementParameter::Bypass` → `ProcessorParameter::Bypass`
+    - `EnhancementParameter::EnhancementLevel` → `ProcessorParameter::EnhancementLevel`
+    - `EnhancementParameter::VoiceGain` → `ProcessorParameter::VoiceGain`
+- Parameter and control methods moved to `ProcessorContext` (obtained via `Processor::processor_context()`):
+    - `Model::reset()` → `ProcessorContext::reset()`
+    - `Model::parameter()` → `ProcessorContext::parameter()`
+    - `Model::set_parameter()` → `ProcessorContext::set_parameter()`
+    - `Model::output_delay()` → `ProcessorContext::output_delay()`
+- `set_parameter()` and `reset()` now take `&self` instead of `&mut self` (thread-safe).
+- `output_delay()` now returns `usize` directly instead of `Result`.
+- VAD construction moved from `Model::create_vad()` to `Processor::vad_context()` and now only needs `&self`.
+- `AicError` gained new variants; exhaustive matches must handle them.
+
+### Fixes
+
+- Improved thread safety throughout the SDK.
+- Fixed an issue where the allocated size for an FFT operation could be incorrect, leading to a crash.
+- Corrected VAD creation for the new processor API, preventing misuse when reusing a model across processors.
+- `process_planar()` now rejects channel counts above the 16-channel maximum instead of panicking.
+
 ## 0.12.0 - 2025-12-12
 
 ### New features
@@ -26,7 +92,7 @@ for how long the VAD continues to detect speech after the audio signal no longer
 - `ModelType::QuailSTT` was renamed to `ModelType::QuailSttL16`.
 - `ModelType::QuailXS` was renamed to `ModelType::QuailXs`.
 - `ModelType::QuailXXS` was renamed to `ModelType::QuailXxs`.
-- `Model::create_vad` signature changed: the model reference now has to be mutable (`&mut self` instead of `&self`).
+- `Processor::create_vad` now takes `&self` instead of `&mut self`.
 
 ### Fixes
 

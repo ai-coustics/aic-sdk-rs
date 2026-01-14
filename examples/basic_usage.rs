@@ -1,88 +1,89 @@
-use aic_sdk::{EnhancementParameter, Model, ModelType, VadParameter};
+#![cfg_attr(not(feature = "download-model"), allow(dead_code, unused_imports))]
+
+#[cfg(feature = "download-model")]
+use aic_sdk::{Model, Processor, ProcessorConfig, ProcessorParameter, VadParameter};
 use std::env;
 
-const NUM_CHANNELS: u16 = 2;
+#[cfg(not(feature = "download-model"))]
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    Err("Enable the `download-model` feature to run this example.".into())
+}
 
+#[cfg(feature = "download-model")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Display library version
-    println!("ai-coustics SDK version: {}", aic_sdk::get_version());
+    println!("ai-coustics SDK version: {}", aic_sdk::get_sdk_version());
+    println!(
+        "Compatible model version: {}",
+        aic_sdk::get_compatible_model_version()
+    );
 
     // Get license key from environment variable
-    let license = env::var("AIC_SDK_LICENSE").map_err(|_| {
-        eprintln!("Error: AIC_SDK_LICENSE environment variable not set");
-        eprintln!("Please set it with: export AIC_SDK_LICENSE=your_license_key");
-        std::io::Error::new(std::io::ErrorKind::NotFound, "AIC_SDK_LICENSE not set")
-    })?;
+    let license = env::var("AIC_SDK_LICENSE").expect("AIC_SDK_LICENSE environment variable");
 
-    // Model creation with license key
-    let mut model = Model::new(ModelType::QuailS48, &license)?;
-    println!("Model created successfully");
+    // Download the default model once and reuse the file
+    // Select a model id at https://artifacts.ai-coustics.io/
+    let model_path = Model::download("sparrow-xxs-48khz", "target")?;
+    let model = Model::from_file(&model_path)?;
+    println!("Model loaded from {}", model_path.display());
 
-    // Get optimal settings
-    let optimal_sample_rate = model.optimal_sample_rate()?;
-    println!("Optimal sample rate: {} Hz", optimal_sample_rate);
+    // Get optimal ProcessorConfig from Model
+    let config = ProcessorConfig::optimal(&model)
+        .with_num_channels(2)
+        .with_allow_variable_frames(true);
 
-    let optimal_num_frames = model.optimal_num_frames(optimal_sample_rate)?;
-    println!("Optimal frame count: {}", optimal_num_frames);
+    // Create processor with license key
+    let mut processor = Processor::new(&model, &license)?.with_config(&config)?;
+    println!(
+        "Processor created and initialized successfully with: Sample rate: {} Hz, Frames: {}, Channels: {}",
+        config.sample_rate, config.num_frames, config.num_channels
+    );
 
-    // Initialize with basic audio config
-    model.initialize(optimal_sample_rate, NUM_CHANNELS, optimal_num_frames, true)?;
-    println!("Model initialized successfully");
+    // Process Audio in different data layouts (for mono audio, the layout does not matter)
+    // Interleaved = [l, r, l, r, ..]
+    let mut audio_interleaved = vec![0.0; config.num_channels as usize * config.num_frames];
+    processor.process_interleaved(&mut audio_interleaved)?;
+
+    // Planar = [[l, l, ..], [r, r, ..]]
+    let mut audio_planar = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
+    processor.process_planar(&mut audio_planar)?;
+
+    // Sequential = [l, l, .., r, r, ..]
+    let mut audio_sequential = vec![0.0; config.num_channels as usize * config.num_frames];
+    processor.process_sequential(&mut audio_sequential)?;
+
+    // Get processor context for thread safe interaction with parameters
+    let proc_ctx = processor.processor_context();
 
     // Get output delay
-    let delay = model.output_delay()?;
+    let delay = proc_ctx.output_delay();
     println!("Output delay: {} samples", delay);
 
     // Test parameter setting and getting
-    model.set_parameter(EnhancementParameter::EnhancementLevel, 0.7)?;
+    proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.7)?;
     println!("Parameter set successfully");
 
-    let enhancement_level = model.parameter(EnhancementParameter::EnhancementLevel)?;
+    let enhancement_level = proc_ctx.parameter(ProcessorParameter::EnhancementLevel)?;
     println!("Enhancement level: {}", enhancement_level);
 
-    // Create minimal test audio - planar format (separate buffers for each channel)
-    let mut audio_buffer_left = vec![0.0f32; optimal_num_frames];
-    let mut audio_buffer_right = vec![0.0f32; optimal_num_frames];
-
-    // Create mutable references for planar processing
-    let mut audio_planar = vec![
-        audio_buffer_left.as_mut_slice(),
-        audio_buffer_right.as_mut_slice(),
-    ];
-
-    // Test planar audio processing
-    match model.process_planar(&mut audio_planar) {
-        Ok(()) => println!("Planar processing succeeded"),
-        Err(e) => println!("Planar processing failed: {}", e),
-    }
-
-    // Create interleaved test audio (all channels mixed together)
-    let mut audio_buffer_interleaved = vec![0.0f32; NUM_CHANNELS as usize * optimal_num_frames];
-
-    // Test interleaved audio processing
-    match model.process_interleaved(&mut audio_buffer_interleaved) {
-        Ok(()) => println!("Interleaved processing succeeded"),
-        Err(e) => println!("Interleaved processing failed: {}", e),
-    }
-
     // Test reset functionality
-    match model.reset() {
-        Ok(()) => println!("Model reset succeeded"),
-        Err(e) => println!("Model reset failed: {}", e),
+    match proc_ctx.reset() {
+        Ok(()) => println!("Processor reset succeeded"),
+        Err(e) => println!("Processor reset failed: {}", e),
     }
 
-    // Voice Activity Detection
-    let mut vad = model.create_vad();
-    vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
-    vad.set_parameter(VadParameter::Sensitivity, 7.0)?;
+    //  Get VAD context for thread safe interaction with voice activity detection parameters
+    let vad_ctx = processor.vad_context();
+    vad_ctx.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
+    vad_ctx.set_parameter(VadParameter::Sensitivity, 7.0)?;
 
-    let speech_hold_duration = vad.parameter(VadParameter::SpeechHoldDuration)?;
+    let speech_hold_duration = vad_ctx.parameter(VadParameter::SpeechHoldDuration)?;
     println!("Speech hold duration: {}", speech_hold_duration);
 
-    let sensitivity = vad.parameter(VadParameter::Sensitivity)?;
+    let sensitivity = vad_ctx.parameter(VadParameter::Sensitivity)?;
     println!("Sensitivity: {}", sensitivity);
 
-    if vad.is_speech_detected() {
+    if vad_ctx.is_speech_detected() {
         println!("VAD detected speech");
     } else {
         println!("VAD did not detect speech");

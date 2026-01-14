@@ -62,42 +62,51 @@ impl From<VadParameter> for AicVadParameter::Type {
 
 /// Voice Activity Detector backed by an ai-coustics speech enhancement model.
 ///
-/// The VAD works automatically using the enhanced audio output of the model
+/// The VAD works automatically using the enhanced audio output of the processor
 /// that created the VAD.
 ///
-/// **Important:** If the backing model is destroyed, the VAD instance will stop
+/// **Important:** If the backing processor is destroyed, the VAD instance will stop
 /// producing new data.
 ///
 /// # Example
 ///
-/// ```rust
-/// use aic_sdk::{Model, ModelType};
+/// ```rust,no_run
+/// use aic_sdk::{Model, Processor};
 ///
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-/// let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-/// let vad = model.create_vad();
+/// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+/// let processor = Processor::new(&model, &license_key).unwrap();
+/// let vad = processor.vad_context();
 /// ```
-pub struct Vad {
+pub struct VadContext {
     /// Raw pointer to the C VAD structure
-    inner: *mut AicVad,
+    inner: *mut AicVadContext,
 }
 
-impl Vad {
-    /// Creates a new VAD instance.
-    pub(crate) fn new(vad_ptr: *mut AicVad) -> Self {
+impl VadContext {
+    /// Creates a new VAD context.
+    pub(crate) fn new(vad_ptr: *mut AicVadContext) -> Self {
         Self { inner: vad_ptr }
+    }
+
+    fn as_const_ptr(&self) -> *const AicVadContext {
+        self.inner as *const AicVadContext
     }
 
     /// Returns the VAD's prediction.
     ///
     /// **Important:**
     /// - The latency of the VAD prediction is equal to
-    ///   the backing model's processing latency.
-    /// - If the backing model stops being processed,
+    ///   the backing processor's processing latency.
+    /// - If the backing processor stops being processed,
     ///   the VAD will not update its speech detection prediction.
     pub fn is_speech_detected(&self) -> bool {
         let mut value: bool = false;
-        let error_code = unsafe { aic_vad_is_speech_detected(self.inner, &mut value) };
+        // SAFETY:
+        // - `self.as_const_ptr()` is a valid pointer to a live VAD context.
+        // - `value` points to stack storage for output.
+        let error_code =
+            unsafe { aic_vad_context_is_speech_detected(self.as_const_ptr(), &mut value) };
 
         // This should never fail
         assert!(handle_error(error_code).is_ok());
@@ -117,16 +126,20 @@ impl Vad {
     ///
     /// # Example
     ///
-    /// ```rust
-    /// # use aic_sdk::{Model, ModelType, VadParameter};
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Processor, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// # let mut vad = model.create_vad();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let vad = processor.vad_context();
     /// vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08).unwrap();
     /// vad.set_parameter(VadParameter::Sensitivity, 5.0).unwrap();
     /// ```
-    pub fn set_parameter(&mut self, parameter: VadParameter, value: f32) -> Result<(), AicError> {
-        let error_code = unsafe { aic_vad_set_parameter(self.inner, parameter.into(), value) };
+    pub fn set_parameter(&self, parameter: VadParameter, value: f32) -> Result<(), AicError> {
+        // SAFETY:
+        // - `self.as_const_ptr()` is a live VAD context pointer.
+        let error_code =
+            unsafe { aic_vad_context_set_parameter(self.as_const_ptr(), parameter.into(), value) };
         handle_error(error_code)
     }
 
@@ -142,32 +155,38 @@ impl Vad {
     ///
     /// # Example
     ///
-    /// ```rust
-    /// # use aic_sdk::{Model, ModelType, VadParameter};
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Processor, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let mut model = Model::new(ModelType::QuailS48, &license_key).unwrap();
-    /// # let vad = model.create_vad();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let vad = processor.vad_context();
     /// let sensitivity = vad.parameter(VadParameter::Sensitivity).unwrap();
     /// println!("Current sensitivity: {sensitivity}");
     /// ```
     pub fn parameter(&self, parameter: VadParameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
-        let error_code = unsafe { aic_vad_get_parameter(self.inner, parameter.into(), &mut value) };
+        // SAFETY:
+        // - `self.as_const_ptr()` is a valid pointer to a live VAD context.
+        // - `value` points to stack storage for output.
+        let error_code = unsafe {
+            aic_vad_context_get_parameter(self.as_const_ptr(), parameter.into(), &mut value)
+        };
         handle_error(error_code)?;
         Ok(value)
     }
 }
 
-impl Drop for Vad {
+impl Drop for VadContext {
     fn drop(&mut self) {
         if !self.inner.is_null() {
-            unsafe {
-                aic_vad_destroy(self.inner);
-            }
+            // SAFETY:
+            // - `self.inner` was allocated by the SDK and is still owned by this wrapper.
+            unsafe { aic_vad_context_destroy(self.inner) };
         }
     }
 }
 
-// Safety: The underlying C library should be thread-safe for individual VAD instances
-unsafe impl Send for Vad {}
-unsafe impl Sync for Vad {}
+// Safety: The underlying C library should be thread-safe for individual VadContext instances
+unsafe impl Send for VadContext {}
+unsafe impl Sync for VadContext {}
