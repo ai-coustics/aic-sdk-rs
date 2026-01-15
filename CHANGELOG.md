@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.1 - 2026-01-15
+
+### Fixes
+
+- Fixed an issue allowing users to change processor parameters with certain models
+
+
 ## 0.13.0 - 2026-01-14
 
 This release integrates ai-coustics C library version 0.13.0, which comes with a number of new features and several breaking changes.

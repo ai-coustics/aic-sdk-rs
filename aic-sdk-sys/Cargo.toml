@@ -10,7 +10,7 @@ license.workspace = true
 name = "aic-sdk-sys"
 readme = "README.md"
 repository.workspace = true
-version = "0.13.0"
+version = "0.13.1"
 
 [package.metadata.docs.rs]
 features = ["download-lib"]
