@@ -121,7 +121,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let miss_note = match report.error.as_deref() {
             Some(reason) => {
                 number_of_missed_deadlines += 1;
-                format!(" (missed: {})", reason)
+                format!(" (deadline missed: {})", reason)
             }
             None => String::new(),
         };
