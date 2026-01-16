@@ -153,7 +153,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!(
-        "Max concurrent sessions without missed deadlines: {}",
+        "Max concurrent sessions without missing deadlines: {}",
         max_ok
     );
 
