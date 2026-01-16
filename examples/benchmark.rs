@@ -21,6 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 const MODEL: &str = "quail-vf-l-16khz";
 
+#[derive(Clone)]
 struct SessionReport {
     session_id: usize,
     max_execution_time: Duration,
@@ -73,6 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let spawn_interval = Duration::from_secs(5);
     let mut next_spawn = tokio::time::Instant::now() + spawn_interval;
 
+    let mut reports = Vec::new();
     let miss = loop {
         tokio::select! {
             // Spawn a new session at regular intervals
@@ -92,7 +94,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 next_spawn += spawn_interval;
             }
             // Check for deadline misses and break the loop if one occurs
-            Some(miss) = report_rx.recv() => break miss,
+            Some(report) = report_rx.recv() => {
+                let is_miss = report.error.is_some();
+                reports.push(report);
+                if is_miss {
+                    break reports.last().cloned();
+                }
+            }
         }
     };
 
@@ -100,11 +108,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let active_at_miss = active_sessions.load(Ordering::SeqCst);
     let max_ok = active_at_miss.saturating_sub(1);
-    println!(
-        "Missed deadline in session {} ({}).",
-        miss.session_id,
-        miss.miss_reason.as_deref().unwrap_or("unknown")
-    );
+    if let Some(miss) = &miss {
+        println!(
+            "Missed deadline in session {} ({}).",
+            miss.session_id,
+            miss.error.as_deref().unwrap_or("unknown")
+        );
+    } else {
+        println!("Missed deadline in session unknown (no report).");
+    }
     println!(
         "Max concurrent sessions without missed deadlines: {}",
         max_ok
@@ -116,7 +128,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _ = handle.await;
     }
 
-    let mut reports = Vec::new();
     while let Some(report) = report_rx.recv().await {
         reports.push(report);
     }
@@ -124,27 +135,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\nSession report (max processing time per buffer):");
     for report in &reports {
-        let max_ms = report.max_exec.as_secs_f64() * 1000.0;
-        let max_cycle_ms = report.max_cycle.as_secs_f64() * 1000.0;
-        let max_late_ms = report.max_late.as_secs_f64() * 1000.0;
+        let max_ms = report.max_execution_time.as_secs_f64() * 1000.0;
         let period_ms = period.as_secs_f64() * 1000.0;
+        
         let percent = if period_ms > 0.0 {
             (max_ms / period_ms) * 100.0
         } else {
             0.0
         };
-        let miss_note = match report.miss_reason.as_deref() {
+
+        let miss_note = match report.error.as_deref() {
             Some(reason) => format!(" (missed: {})", reason),
             None => String::new(),
         };
+
         println!(
-            "Session {:>3}: max {:>7.3} ms ({:>6.2}% of period), max cycle {:>7.3} ms, max late {:>7.3} ms, iterations {}{}",
+            "Session {:>3}: max {:>7.3} ms ({:>6.2}% of period){}",
             report.session_id,
             max_ms,
             percent,
-            max_cycle_ms,
-            max_late_ms,
-            report.iterations,
             miss_note
         );
     }
@@ -177,8 +186,8 @@ fn spawn_session(
 
         let mut buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
         
-        let mut deadline = Instant::now() + period;
         let mut max_execution_time = Duration::from_secs(0);
+        let mut error = None;
 
         loop {
             // Check if we should stop (another session missed a deadline)
@@ -186,12 +195,17 @@ fn spawn_session(
                 break;
             }
 
+            // Process the audio buffer
             let process_start = Instant::now();
-            processor.process_interleaved(&mut buffer).unwrap();
+            let deadline = process_start + period;
+            if let Err(err) = processor.process_interleaved(&mut buffer) {
+                error = Some(format!("process error: {}", err));
+                break;
+            }
             let process_end = Instant::now();
             
             let execution_time = process_end.duration_since(process_start);
-
+            
             // Keep track of the maximum execution time
             if execution_time > max_execution_time {
                 max_execution_time = execution_time;
@@ -201,11 +215,7 @@ fn spawn_session(
             if process_end > deadline {
                 let late_by = process_end.duration_since(deadline);
                 let reason = format!("late by {:?}", late_by);
-                let _ = report_tx.send(SessionReport {
-                    session_id,
-                    max_execution_time,
-                    error: Some(reason),
-                });
+                error = Some(reason);
                 break;
             }
 
@@ -214,15 +224,13 @@ fn spawn_session(
             if sleep_for > Duration::from_secs(0) {
                 std::thread::sleep(sleep_for);
             }
-
-            // Advance the deadline by one period
-            deadline += period;
         }
 
+        // Send the session report
         let _ = report_tx.send(SessionReport {
             session_id,
             max_execution_time,
-            error: None,
+            error,
         });
     })
 }
