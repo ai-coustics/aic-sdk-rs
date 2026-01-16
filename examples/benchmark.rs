@@ -95,6 +95,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
+    println!("Benchmark complete\n");
+
     let active_at_miss = active_sessions.load(Ordering::SeqCst);
     let max_ok = active_at_miss.saturating_sub(1);
     println!(
@@ -139,6 +141,7 @@ fn spawn_session(
         let mut deadline = Instant::now() + period;
 
         loop {
+            // Check if we should stop (another session missed a deadline)
             if *stop_rx.borrow() {
                 break;
             }
