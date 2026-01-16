@@ -137,7 +137,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let max_ok = active_sessions.saturating_sub(1);
     if let Some(first_session_report) = &first_session_report {
         println!(
-            "Missed deadline in session {} ({}).",
+            "After spawning {} concurrent sessions, session {} missed its deadline ({}).",
+            active_sessions,
             first_session_report.session_id,
             first_session_report.error.as_deref().unwrap_or("unknown")
         );
