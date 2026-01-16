@@ -144,12 +144,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if number_of_missed_deadlines > 1 {
             println!(
-                "Other sessions also missed deadlines after session {}.",
+                "Other sessions also missed deadlines after session {}",
                 first_session_report.session_id
             );
         }
     } else {
-        println!("Missed deadline in session unknown (no report).");
+        println!("Missed deadline in session unknown (no report)");
     }
 
     println!(
