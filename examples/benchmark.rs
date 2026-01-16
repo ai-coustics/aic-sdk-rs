@@ -30,10 +30,6 @@ struct DeadlineMiss {
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("ai-coustics SDK version: {}", aic_sdk::get_sdk_version());
-    println!(
-        "Compatible model version: {}",
-        aic_sdk::get_compatible_model_version()
-    );
 
     let license = env::var("AIC_SDK_LICENSE").expect("AIC_SDK_LICENSE not found");
 
@@ -49,7 +45,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Model: {}", model.id());
     println!("Sample rate: {} Hz", config.sample_rate);
     println!("Frames per buffer: {}", config.num_frames);
-    println!("Period: {:?}\n", period);
+    println!("Period: {} ms\n", period.as_millis());
+
+    println!("Starting benchmark: spawning a session every 5 seconds until a deadline is missed...\n");
 
     let (stop_tx, stop_rx) = watch::channel(false);
     let (miss_tx, mut miss_rx) = mpsc::unbounded_channel::<DeadlineMiss>();
