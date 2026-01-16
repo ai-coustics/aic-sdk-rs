@@ -63,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut next_spawn = tokio::time::Instant::now() + spawn_interval;
 
     let mut reports = Vec::new();
-    let miss = loop {
+    let first_session_report = loop {
         tokio::select! {
             // Spawn a new session at regular intervals
             _ = tokio::time::sleep_until(next_spawn) => {
@@ -105,6 +105,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     reports.sort_by_key(|report| report.session_id);
 
+    let mut number_of_missed_deadlines = 0;
+
     println!("\nSession report (max processing time per buffer):");
     for report in &reports {
         let max_ms = report.max_execution_time.as_secs_f64() * 1000.0;
@@ -117,7 +119,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         let miss_note = match report.error.as_deref() {
-            Some(reason) => format!(" (missed: {})", reason),
+            Some(reason) => {
+                number_of_missed_deadlines += 1;
+                format!(" (missed: {})", reason)
+            }
             None => String::new(),
         };
 
@@ -128,12 +133,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let max_ok = active_sessions.saturating_sub(1);
-    if let Some(miss) = &miss {
+    if let Some(first_session_report) = &first_session_report {
         println!(
             "Missed deadline in session {} ({}).",
-            miss.session_id,
-            miss.error.as_deref().unwrap_or("unknown")
+            first_session_report.session_id,
+            first_session_report.error.as_deref().unwrap_or("unknown")
         );
+
+        if number_of_missed_deadlines > 1 {
+            println!(
+                "Other sessions also missed deadlines after session {}.",
+                first_session_report.session_id
+            );
+        }
     } else {
         println!("Missed deadline in session unknown (no report).");
     }
