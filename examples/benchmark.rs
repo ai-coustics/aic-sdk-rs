@@ -21,9 +21,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 const MODEL: &str = "quail-vf-l-16khz";
 
-struct DeadlineMiss {
+struct SessionReport {
     session_id: usize,
-    message: String,
+    max_exec: Duration,
+    missed: bool,
+    miss_reason: Option<String>,
+    iterations: u64,
 }
 
 #[cfg(feature = "download-model")]
@@ -50,7 +53,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting benchmark: spawning a session every 5 seconds until a deadline is missed...\n");
 
     let (stop_tx, stop_rx) = watch::channel(false);
-    let (miss_tx, mut miss_rx) = mpsc::unbounded_channel::<DeadlineMiss>();
+    let (miss_tx, mut miss_rx) = mpsc::unbounded_channel::<SessionReport>();
+    let (report_tx, mut report_rx) = mpsc::unbounded_channel::<SessionReport>();
     let active_sessions = Arc::new(AtomicUsize::new(0));
 
     let mut handles = Vec::new();
@@ -64,6 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         period,
         stop_rx.clone(),
         miss_tx.clone(),
+        report_tx.clone(),
     ));
     
     println!("Started session {} (active: 1)", session_id);
@@ -85,6 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     period,
                     stop_rx.clone(),
                     miss_tx.clone(),
+                    report_tx.clone(),
                 ));
                 let active = active_sessions.fetch_add(1, Ordering::SeqCst) + 1;
                 println!("Started session {} (active: {})", session_id, active);
@@ -101,7 +107,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let max_ok = active_at_miss.saturating_sub(1);
     println!(
         "Missed deadline in session {} ({}).",
-        miss.session_id, miss.message
+        miss.session_id,
+        miss.miss_reason.as_deref().unwrap_or("unknown")
     );
     println!(
         "Max concurrent sessions without missed deadlines: {}",
@@ -109,8 +116,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let _ = stop_tx.send(true);
+    drop(report_tx);
     for handle in handles {
         let _ = handle.await;
+    }
+
+    let mut reports = Vec::new();
+    while let Some(report) = report_rx.recv().await {
+        reports.push(report);
+    }
+    reports.sort_by_key(|report| report.session_id);
+
+    println!("\nSession report (max processing time per buffer):");
+    for report in &reports {
+        let max_ms = report.max_exec.as_secs_f64() * 1000.0;
+        let period_ms = period.as_secs_f64() * 1000.0;
+        let percent = if period_ms > 0.0 {
+            (max_ms / period_ms) * 100.0
+        } else {
+            0.0
+        };
+        let miss_note = match report.miss_reason.as_deref() {
+            Some(reason) => format!(" (missed: {})", reason),
+            None => String::new(),
+        };
+        println!(
+            "Session {:>3}: max {:>7.3} ms ({:>6.2}% of period), iterations {}{}",
+            report.session_id, max_ms, percent, report.iterations, miss_note
+        );
     }
 
     Ok(())
@@ -123,15 +156,27 @@ fn spawn_session(
     config: ProcessorConfig,
     period: Duration,
     stop_rx: watch::Receiver<bool>,
-    miss_tx: mpsc::UnboundedSender<DeadlineMiss>,
+    miss_tx: mpsc::UnboundedSender<SessionReport>,
+    report_tx: mpsc::UnboundedSender<SessionReport>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::task::spawn_blocking(move || {
         let mut processor = match Processor::new(&model, &license).and_then(|p| p.with_config(&config)) {
             Ok(processor) => processor,
             Err(err) => {
-                let _ = miss_tx.send(DeadlineMiss {
+                let reason = format!("processor init failed: {}", err);
+                let _ = miss_tx.send(SessionReport {
                     session_id,
-                    message: format!("processor init failed: {}", err),
+                    max_exec: Duration::from_secs(0),
+                    missed: true,
+                    miss_reason: Some(reason.clone()),
+                    iterations: 0,
+                });
+                let _ = report_tx.send(SessionReport {
+                    session_id,
+                    max_exec: Duration::from_secs(0),
+                    missed: true,
+                    miss_reason: Some(reason),
+                    iterations: 0,
                 });
                 return;
             }
@@ -139,6 +184,10 @@ fn spawn_session(
 
         let mut buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
         let mut deadline = Instant::now() + period;
+        let mut max_exec = Duration::from_secs(0);
+        let mut missed = false;
+        let mut miss_reason = None;
+        let mut iterations = 0u64;
 
         loop {
             // Check if we should stop (another session missed a deadline)
@@ -146,10 +195,36 @@ fn spawn_session(
                 break;
             }
 
+            let start = Instant::now();
             if let Err(err) = processor.process_interleaved(&mut buffer) {
-                let _ = miss_tx.send(DeadlineMiss {
+                missed = true;
+                miss_reason = Some(format!("process error: {}", err));
+                let _ = miss_tx.send(SessionReport {
                     session_id,
-                    message: format!("process error: {}", err),
+                    max_exec,
+                    missed,
+                    miss_reason: miss_reason.clone(),
+                    iterations,
+                });
+                break;
+            }
+            let exec_time = start.elapsed();
+            if exec_time > max_exec {
+                max_exec = exec_time;
+            }
+            iterations += 1;
+
+            if exec_time > period {
+                let over_by = exec_time - period;
+                let reason = format!("exec overrun {:?}", over_by);
+                missed = true;
+                miss_reason = Some(reason);
+                let _ = miss_tx.send(SessionReport {
+                    session_id,
+                    max_exec,
+                    missed,
+                    miss_reason: miss_reason.clone(),
+                    iterations,
                 });
                 break;
             }
@@ -158,9 +233,15 @@ fn spawn_session(
             let now = Instant::now();
             if now > deadline {
                 let late_by = now.duration_since(deadline);
-                let _ = miss_tx.send(DeadlineMiss {
+                let reason = format!("late by {:?}", late_by);
+                missed = true;
+                miss_reason = Some(reason);
+                let _ = miss_tx.send(SessionReport {
                     session_id,
-                    message: format!("late by {:?}", late_by),
+                    max_exec,
+                    missed,
+                    miss_reason: miss_reason.clone(),
+                    iterations,
                 });
                 break;
             }
@@ -174,5 +255,13 @@ fn spawn_session(
             // Advance the deadline by one period
             deadline += period;
         }
+
+        let _ = report_tx.send(SessionReport {
+            session_id,
+            max_exec,
+            missed,
+            miss_reason,
+            iterations,
+        });
     })
 }
