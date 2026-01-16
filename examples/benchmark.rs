@@ -6,7 +6,13 @@ use std::{
 };
 use tokio::sync::{mpsc, watch};
 
+// Specify the model to benchmark
 const MODEL: &str = "quail-vf-l-16khz";
+
+// Safety margin to account for system variability
+// e.g. 0.3 means 30% of the period is reserved as a safety margin,
+// therefore processing time cannot exceed 70% of the period
+const SAFETY_MARGIN: f64 = 0.0;
 
 #[derive(Clone)]
 struct SessionReport {
@@ -29,35 +35,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let period = config.num_frames as f64 / config.sample_rate as f64;
     let period = Duration::from_secs_f64(period);
+    let safety_margin = Duration::from_secs_f64(period.as_secs_f64() * SAFETY_MARGIN);
 
     println!("Model: {}", model.id());
     println!("Sample rate: {} Hz", config.sample_rate);
     println!("Frames per buffer: {}", config.num_frames);
-    println!("Period: {} ms\n", period.as_millis());
+    println!("Period: {} ms", period.as_millis());
+    println!("Safety margin: {} ms\n", safety_margin.as_millis());
 
     println!(
-        "Starting benchmark: spawning a session every 5 seconds until a deadline is missed...\n"
+        "Starting benchmark: spawning a processing thread every 5 seconds until a deadline is missed...\n"
     );
 
     let (stop_tx, stop_rx) = watch::channel(false);
     let (report_tx, mut report_rx) = mpsc::unbounded_channel::<SessionReport>();
-    let mut active_sessions = 0usize;
+    let mut active_threads = 0usize;
 
     let mut handles = Vec::new();
-    let mut session_id = 1usize;
+    let mut thread_id = 1usize;
 
     handles.push(spawn_session(
-        session_id,
+        thread_id,
         Arc::clone(&model),
         license.clone(),
         config.clone(),
         period,
+        safety_margin,
         stop_rx.clone(),
         report_tx.clone(),
     ));
 
-    println!("Started session {session_id}");
-    active_sessions += 1;
+    println!("Spawned thread #{thread_id}");
+    active_threads += 1;
 
     let spawn_interval = Duration::from_secs(5);
     let mut next_spawn = tokio::time::Instant::now() + spawn_interval;
@@ -67,18 +76,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::select! {
             // Spawn a new session at regular intervals
             _ = tokio::time::sleep_until(next_spawn) => {
-                session_id += 1;
+                thread_id += 1;
                 handles.push(spawn_session(
-                    session_id,
+                    thread_id,
                     Arc::clone(&model),
                     license.clone(),
                     config.clone(),
                     period,
+                    safety_margin,
                     stop_rx.clone(),
                     report_tx.clone(),
                 ));
-                active_sessions += 1;
-                println!("Started session {session_id}");
+                active_threads += 1;
+                println!("Spawned thread #{thread_id}");
                 next_spawn += spawn_interval;
             }
             // Check for deadline misses and break the loop if one occurs
@@ -107,7 +117,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut number_of_missed_deadlines = 0;
 
-    println!("\nSession report (max processing time per buffer):");
+    println!("Benchmark report:");
+    println!(" ID | Max Exec Time |   RTF   | Notes");
+    println!("----+---------------+---------+------");
     for report in &reports {
         let max_ms = report.max_execution_time.as_secs_f64() * 1000.0;
         let period_ms = period.as_secs_f64() * 1000.0;
@@ -121,42 +133,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let miss_note = match report.error.as_deref() {
             Some(reason) => {
                 number_of_missed_deadlines += 1;
-                format!(" (deadline missed: {})", reason)
+                format!("deadline missed: {}", reason)
             }
             None => String::new(),
         };
 
         println!(
-            "Session {:>3}: max {:>7.3} ms (RTF: {:>6.3}){}",
+            "{:>3} | {:>9.3} ms  | {:>7.3} | {}",
             report.session_id, max_ms, rtf, miss_note
         );
     }
 
     println!();
 
-    let max_ok = active_sessions.saturating_sub(1);
+    let max_ok = active_threads.saturating_sub(1);
+
+    println!(
+        "System can run {} instances of this model/config concurrently while meeting real-time requirements",
+        max_ok
+    );
+
     if let Some(first_session_report) = &first_session_report {
         println!(
-            "After spawning {} concurrent sessions, session {} missed its deadline ({})",
-            active_sessions,
+            "After spawning the {}{} thread, thread #{} missed its deadline ({})",
+            active_threads,
+            number_suffix(active_threads),
             first_session_report.session_id,
             first_session_report.error.as_deref().unwrap_or("unknown")
         );
 
         if number_of_missed_deadlines > 1 {
             println!(
-                "Other sessions also missed deadlines after session {}",
+                "Other threads also missed deadlines after thread #{}",
                 first_session_report.session_id
             );
         }
     } else {
-        println!("Missed deadline in session unknown (no report)");
+        println!("Missed deadline in thread unknown (no report)");
     }
-
-    println!(
-        "Max concurrent sessions without missing deadlines: {}",
-        max_ok
-    );
 
     Ok(())
 }
@@ -167,6 +181,7 @@ fn spawn_session(
     license: String,
     config: ProcessorConfig,
     period: Duration,
+    safety_margin: Duration,
     stop_rx: watch::Receiver<bool>,
     report_tx: mpsc::UnboundedSender<SessionReport>,
 ) -> tokio::task::JoinHandle<()> {
@@ -190,6 +205,8 @@ fn spawn_session(
         let mut max_execution_time = Duration::from_secs(0);
         let mut error = None;
 
+        let deadline = period - safety_margin;
+
         loop {
             // Check if we should stop (another session missed a deadline)
             if *stop_rx.borrow() {
@@ -210,8 +227,8 @@ fn spawn_session(
             }
 
             // Check if we missed the deadline
-            if execution_time > period {
-                let late_by = execution_time - period;
+            if execution_time > deadline {
+                let late_by = execution_time - deadline;
                 let reason = format!("late by {:?}", late_by);
                 error = Some(reason);
                 break;
@@ -232,4 +249,13 @@ fn spawn_session(
             error,
         });
     })
+}
+
+fn number_suffix(n: usize) -> &'static str {
+    match n % 10 {
+        1 if n % 100 != 11 => "st",
+        2 if n % 100 != 12 => "nd",
+        3 if n % 100 != 13 => "rd",
+        _ => "th",
+    }
 }
