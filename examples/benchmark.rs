@@ -132,6 +132,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
+    println!();
+
     let max_ok = active_sessions.saturating_sub(1);
     if let Some(first_session_report) = &first_session_report {
         println!(
@@ -149,6 +151,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         println!("Missed deadline in session unknown (no report).");
     }
+
     println!(
         "Max concurrent sessions without missed deadlines: {}",
         max_ok
