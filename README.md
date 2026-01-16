@@ -211,7 +211,7 @@ if vad_ctx.is_speech_detected() {
 See the example files for complete working examples:
 - [`examples/basic_usage.rs`](examples/basic_usage.rs) - Basic usage example
 - [`examples/build-time-download`](examples/build-time-download) - Download and embed models at compile-time
-- [`examples/benchmark.rs](examples/benchmark.rs) - Run multiple processor instances concurrently until the real-time requirements are not met
+- [`examples/benchmark.rs`](examples/benchmark.rs) - Run multiple processor instances concurrently until the real-time requirements are not met
 
 Run examples with:
 ```bash
