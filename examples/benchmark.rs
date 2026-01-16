@@ -89,8 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     stop_rx.clone(),
                     report_tx.clone(),
                 ));
-                let active = active_sessions.fetch_add(1, Ordering::SeqCst) + 1;
-                println!("Started session {} (active: {})", session_id, active);
+                println!("Started session {session_id}");
                 next_spawn += spawn_interval;
             }
             // Check for deadline misses and break the loop if one occurs
