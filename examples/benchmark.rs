@@ -40,13 +40,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let period = config.num_frames as f64 / config.sample_rate as f64;
     let period = Duration::from_secs_f64(period);
-    
+
     println!("Model: {}", model.id());
     println!("Sample rate: {} Hz", config.sample_rate);
     println!("Frames per buffer: {}", config.num_frames);
     println!("Period: {} ms\n", period.as_millis());
 
-    println!("Starting benchmark: spawning a session every 5 seconds until a deadline is missed...\n");
+    println!(
+        "Starting benchmark: spawning a session every 5 seconds until a deadline is missed...\n"
+    );
 
     let (stop_tx, stop_rx) = watch::channel(false);
     let (report_tx, mut report_rx) = mpsc::unbounded_channel::<SessionReport>();
@@ -54,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut handles = Vec::new();
     let mut session_id = 1usize;
-    
+
     handles.push(spawn_session(
         session_id,
         Arc::clone(&model),
@@ -64,7 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stop_rx.clone(),
         report_tx.clone(),
     ));
-    
+
     println!("Started session {session_id}");
     active_sessions += 1;
 
@@ -133,7 +135,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for report in &reports {
         let max_ms = report.max_execution_time.as_secs_f64() * 1000.0;
         let period_ms = period.as_secs_f64() * 1000.0;
-        
+
         let rtf = if period_ms > 0.0 {
             max_ms / period_ms
         } else {
@@ -147,10 +149,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         println!(
             "Session {:>3}: max {:>7.3} ms (RTF: {:>6.3}){}",
-            report.session_id,
-            max_ms,
-            rtf,
-            miss_note
+            report.session_id, max_ms, rtf, miss_note
         );
     }
 
@@ -167,21 +166,22 @@ fn spawn_session(
     report_tx: mpsc::UnboundedSender<SessionReport>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::task::spawn_blocking(move || {
-        let mut processor = match Processor::new(&model, &license).and_then(|p| p.with_config(&config)) {
-            Ok(processor) => processor,
-            Err(err) => {
-                let reason = format!("processor init failed: {}", err);
-                let _ = report_tx.send(SessionReport {
-                    session_id,
-                    max_execution_time: Duration::from_secs(0),
-                    error: Some(reason),
-                });
-                return;
-            }
-        };
+        let mut processor =
+            match Processor::new(&model, &license).and_then(|p| p.with_config(&config)) {
+                Ok(processor) => processor,
+                Err(err) => {
+                    let reason = format!("processor init failed: {}", err);
+                    let _ = report_tx.send(SessionReport {
+                        session_id,
+                        max_execution_time: Duration::from_secs(0),
+                        error: Some(reason),
+                    });
+                    return;
+                }
+            };
 
         let mut buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
-        
+
         let mut max_execution_time = Duration::from_secs(0);
         let mut error = None;
 
@@ -199,9 +199,9 @@ fn spawn_session(
                 break;
             }
             let process_end = Instant::now();
-            
+
             let execution_time = process_end.duration_since(process_start);
-            
+
             // Keep track of the maximum execution time
             if execution_time > max_execution_time {
                 max_execution_time = execution_time;
