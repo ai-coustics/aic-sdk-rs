@@ -1,20 +1,10 @@
-#![cfg_attr(not(feature = "download-model"), allow(dead_code, unused_imports))]
-
-#[cfg(feature = "download-model")]
 use aic_sdk::{Model, Processor, ProcessorConfig};
-#[cfg(feature = "download-model")]
 use std::{
     env,
     sync::Arc,
     time::{Duration, Instant},
 };
-#[cfg(feature = "download-model")]
 use tokio::sync::{mpsc, watch};
-
-#[cfg(not(feature = "download-model"))]
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    Err("Enable the `download-model` feature to run this example.".into())
-}
 
 const MODEL: &str = "quail-vf-l-16khz";
 
@@ -25,7 +15,6 @@ struct SessionReport {
     error: Option<String>,
 }
 
-#[cfg(feature = "download-model")]
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("ai-coustics SDK version: {}", aic_sdk::get_sdk_version());
@@ -105,21 +94,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Benchmark complete\n");
 
-    let max_ok = active_sessions.saturating_sub(1);
-    if let Some(miss) = &miss {
-        println!(
-            "Missed deadline in session {} ({}).",
-            miss.session_id,
-            miss.error.as_deref().unwrap_or("unknown")
-        );
-    } else {
-        println!("Missed deadline in session unknown (no report).");
-    }
-    println!(
-        "Max concurrent sessions without missed deadlines: {}",
-        max_ok
-    );
-
     let _ = stop_tx.send(true);
     drop(report_tx);
     for handle in handles {
@@ -152,6 +126,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             report.session_id, max_ms, rtf, miss_note
         );
     }
+
+    let max_ok = active_sessions.saturating_sub(1);
+    if let Some(miss) = &miss {
+        println!(
+            "Missed deadline in session {} ({}).",
+            miss.session_id,
+            miss.error.as_deref().unwrap_or("unknown")
+        );
+    } else {
+        println!("Missed deadline in session unknown (no report).");
+    }
+    println!(
+        "Max concurrent sessions without missed deadlines: {}",
+        max_ok
+    );
 
     Ok(())
 }
