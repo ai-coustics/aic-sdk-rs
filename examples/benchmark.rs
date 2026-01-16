@@ -5,10 +5,7 @@ use aic_sdk::{Model, Processor, ProcessorConfig};
 #[cfg(feature = "download-model")]
 use std::{
     env,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::Arc,
     time::{Duration, Instant},
 };
 #[cfg(feature = "download-model")]
@@ -53,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (stop_tx, stop_rx) = watch::channel(false);
     let (report_tx, mut report_rx) = mpsc::unbounded_channel::<SessionReport>();
-    let active_sessions = Arc::new(AtomicUsize::new(0));
+    let mut active_sessions = 0usize;
 
     let mut handles = Vec::new();
     let mut session_id = 1usize;
@@ -68,8 +65,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         report_tx.clone(),
     ));
     
-    println!("Started session {} (active: 1)", session_id);
-    active_sessions.fetch_add(1, Ordering::SeqCst);
+    println!("Started session {session_id}");
+    active_sessions += 1;
 
     let spawn_interval = Duration::from_secs(5);
     let mut next_spawn = tokio::time::Instant::now() + spawn_interval;
@@ -89,6 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     stop_rx.clone(),
                     report_tx.clone(),
                 ));
+                active_sessions += 1;
                 println!("Started session {session_id}");
                 next_spawn += spawn_interval;
             }
@@ -105,8 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Benchmark complete\n");
 
-    let active_at_miss = active_sessions.load(Ordering::SeqCst);
-    let max_ok = active_at_miss.saturating_sub(1);
+    let max_ok = active_sessions.saturating_sub(1);
     if let Some(miss) = &miss {
         println!(
             "Missed deadline in session {} ({}).",
@@ -137,8 +134,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let max_ms = report.max_execution_time.as_secs_f64() * 1000.0;
         let period_ms = period.as_secs_f64() * 1000.0;
         
-        let percent = if period_ms > 0.0 {
-            (max_ms / period_ms) * 100.0
+        let rtf = if period_ms > 0.0 {
+            max_ms / period_ms
         } else {
             0.0
         };
@@ -149,10 +146,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         println!(
-            "Session {:>3}: max {:>7.3} ms ({:>6.2}% of period){}",
+            "Session {:>3}: max {:>7.3} ms (RTF: {:>6.3}){}",
             report.session_id,
             max_ms,
-            percent,
+            rtf,
             miss_note
         );
     }
