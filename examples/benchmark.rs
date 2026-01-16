@@ -193,14 +193,11 @@ fn spawn_session(
 
             // Process the audio buffer
             let process_start = Instant::now();
-            let deadline = process_start + period;
             if let Err(err) = processor.process_interleaved(&mut buffer) {
                 error = Some(format!("process error: {}", err));
                 break;
             }
-            let process_end = Instant::now();
-
-            let execution_time = process_end.duration_since(process_start);
+            let execution_time = process_start.elapsed();
 
             // Keep track of the maximum execution time
             if execution_time > max_execution_time {
@@ -208,15 +205,16 @@ fn spawn_session(
             }
 
             // Check if we missed the deadline
-            if process_end > deadline {
-                let late_by = process_end.duration_since(deadline);
+            if execution_time > period {
+                let late_by = execution_time - period;
                 let reason = format!("late by {:?}", late_by);
                 error = Some(reason);
                 break;
             }
 
             // Sleep until the next deadline
-            let sleep_for = deadline.saturating_duration_since(Instant::now());
+            let next_deadline = process_start + period;
+            let sleep_for = next_deadline.saturating_duration_since(Instant::now());
             if sleep_for > Duration::from_secs(0) {
                 std::thread::sleep(sleep_for);
             }
