@@ -1,6 +1,7 @@
 use aic_sdk::{Model, Processor, ProcessorConfig};
 use std::{
     env,
+    io::Write,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -65,7 +66,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         report_tx.clone(),
     ));
 
-    println!("Spawned thread #{thread_id}");
+    print!("*");
+    std::io::stdout().flush().unwrap();
+
     active_threads += 1;
 
     let spawn_interval = Duration::from_secs(5);
@@ -88,11 +91,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     report_tx.clone(),
                 ));
                 active_threads += 1;
-                println!("Spawned thread #{thread_id}");
+                
+                print!("*");
+                if active_threads.is_multiple_of(50) {
+                    print!("\n");
+                }
+
+                std::io::stdout().flush().unwrap();
                 next_spawn += spawn_interval;
             }
             // Check for deadline misses and break the loop if one occurs
             Some(report) = report_rx.recv() => {
+                // Print line breaks for readability
+                if active_threads.is_multiple_of(50) {
+                    println!();
+                } else {
+                    println!("\n");
+                }
+
                 let is_miss = report.error.is_some();
                 reports.push(report);
                 if is_miss {
@@ -117,7 +133,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut number_of_missed_deadlines = 0;
 
-    println!("Benchmark report:");
     println!(" ID | Max Exec Time |   RTF   | Notes");
     println!("----+---------------+---------+------");
     for report in &reports {
