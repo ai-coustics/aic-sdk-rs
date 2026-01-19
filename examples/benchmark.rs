@@ -10,6 +10,9 @@ use tokio::sync::{mpsc, watch};
 // Specify the model to benchmark
 const MODEL: &str = "quail-vf-l-16khz";
 
+// Interval between spawning new processing threads
+const THREAD_SPAWN_INTERVAL: Duration = Duration::from_secs(3);
+
 // Safety margin to account for system variability
 // e.g. 0.3 means 30% of the period is reserved as a safety margin,
 // therefore processing time cannot exceed 70% of the period
@@ -45,7 +48,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Safety margin: {} ms\n", safety_margin.as_millis());
 
     println!(
-        "Starting benchmark: spawning a processing thread every 5 seconds until a deadline is missed...\n"
+        "Starting benchmark: spawning a processing thread every {} seconds until a deadline is missed...\n",
+        THREAD_SPAWN_INTERVAL.as_secs()
     );
 
     let (stop_tx, stop_rx) = watch::channel(false);
@@ -71,7 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     active_threads += 1;
 
-    let spawn_interval = Duration::from_secs(5);
+    let spawn_interval = THREAD_SPAWN_INTERVAL;
     let mut next_spawn = tokio::time::Instant::now() + spawn_interval;
 
     let mut reports = Vec::new();
