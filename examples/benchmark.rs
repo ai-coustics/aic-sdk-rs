@@ -91,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     report_tx.clone(),
                 ));
                 active_threads += 1;
-                
+
                 print!("*");
                 if active_threads.is_multiple_of(50) {
                     print!("\n");
