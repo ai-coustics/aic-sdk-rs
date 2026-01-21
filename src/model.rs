@@ -279,18 +279,23 @@ impl<'a> Model<'a> {
     ///
     /// This method fetches the model manifest, verifies that the requested model
     /// exists in a version compatible with this library, and downloads the model
-    /// file to the specified directory.
+    /// file to the specified directory. If the model file already exists, it will not
+    /// be re-downloaded. If the existing file's checksum does not match, the model will
+    /// be downloaded and the existing file will be replaced.
+    ///
+    /// The manifest file is not cached and will always be downloaded on every call
+    /// to ensure the latest model versions are always used.
     ///
     /// Available models can be browsed at [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io/).
     ///
     /// # Arguments
     ///
     /// * `model_id` - The model identifier (e.g., `"quail-l-16khz"`).
-    /// * `download_dir` - Directory where the downloaded model file will be stored.
+    /// * `download_dir` - Directory where the model file will be stored.
     ///
     /// # Returns
     ///
-    /// Returns the full path to the downloaded model file on success, or an [`AicError`] if the
+    /// Returns the full path to the model file on success, or an [`AicError`] if the
     /// operation fails.
     ///
     /// # Note
