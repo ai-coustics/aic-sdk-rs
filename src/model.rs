@@ -282,7 +282,7 @@ impl<'a> Model<'a> {
     /// file to the specified directory. If the model file already exists, it will not
     /// be re-downloaded. If the existing file's checksum does not match, the model will
     /// be downloaded and the existing file will be replaced.
-    /// 
+    ///
     /// The manifest file is not cached and will always be downloaded on every call
     /// to ensure the latest model versions are always used.
     ///
