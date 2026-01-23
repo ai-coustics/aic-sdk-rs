@@ -36,9 +36,9 @@ typedef enum AicErrorCode {
    */
   AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE = 2,
   /**
-   * Model must be initialized before calling this operation. Call `aic_processor_initialize` first.
+   * Processor must be initialized before calling this operation. Call `aic_processor_initialize` first.
    */
-  AIC_ERROR_CODE_MODEL_NOT_INITIALIZED = 3,
+  AIC_ERROR_CODE_PROCESSOR_NOT_INITIALIZED = 3,
   /**
    * Audio configuration (samplerate, num_channels, num_frames) is not supported by the model
    */
@@ -154,7 +154,7 @@ typedef enum AicVadParameter {
    * length of 10 ms, the VAD will round up/down to the closest multiple of 10 ms.
    * Because of this, this parameter may return a different value than the one it was last set to.
    *
-   * **Range:** 0.0 to 20x model window length (value in seconds)
+   * **Range:** 0.0 to 100x model window length (value in seconds)
    *
    * **Default:** 0.05 (50 ms)
    */
@@ -230,7 +230,7 @@ const char *aic_get_sdk_version(void);
 uint32_t aic_get_compatible_model_version(void);
 
 /**
- * Creates a new model instance.
+ * Creates a new model instance from a model file.
  *
  * A single model instance can be used to create multiple processors.
  *
@@ -458,7 +458,7 @@ void aic_processor_destroy(struct AicProcessor *processor);
  *
  * This function must be called before processing any audio.
  * For the lowest delay use the sample rate and frame size returned by
- * `aic_processor_get_optimal_sample_rate` and `aic_processor_get_optimal_num_frames`.
+ * `aic_model_get_optimal_sample_rate` and `aic_model_get_optimal_num_frames`.
  *
  * # Parameters
  * - `processor`: Processor instance to configure. Must not be NULL.
@@ -724,7 +724,7 @@ enum AicErrorCode aic_processor_context_get_parameter(const struct AicProcessorC
  * `delay_ms = (delay_samples * 1000) / sample_rate`
  *
  * **Note:** Using frame sizes different from the optimal value returned by
- * `aic_processor_get_optimal_num_frames` will increase the delay beyond the processor's base latency.
+ * `aic_model_get_optimal_num_frames` will increase the delay beyond the processor's base latency.
  *
  * # Parameters
  * - `context`: Processor context instance. Must not be NULL.

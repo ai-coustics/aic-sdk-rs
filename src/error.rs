@@ -10,9 +10,9 @@ pub enum AicError {
     )]
     ParameterOutOfRange,
     #[error(
-        "Model must be initialized before calling this operation. Call `Processor::initialize` first."
+        "Processor must be initialized before calling this operation. Call `Processor::initialize` first."
     )]
-    ModelNotInitialized,
+    ProcessorNotInitialized,
     #[error(
         "Audio configuration (samplerate, num_channels, num_frames) is not supported by the model"
     )]
@@ -64,7 +64,7 @@ impl From<AicErrorCode::Type> for AicError {
                 );
             }
             AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE => AicError::ParameterOutOfRange,
-            AIC_ERROR_CODE_MODEL_NOT_INITIALIZED => AicError::ModelNotInitialized,
+            AIC_ERROR_CODE_PROCESSOR_NOT_INITIALIZED => AicError::ProcessorNotInitialized,
             AIC_ERROR_CODE_AUDIO_CONFIG_UNSUPPORTED => AicError::AudioConfigUnsupported,
             AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH => AicError::AudioConfigMismatch,
             AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED => AicError::EnhancementNotAllowed,

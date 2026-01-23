@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.14.0 - 2026-01-23
+
+## Improvements
+
+- Increased the maximum speech hold duration of the VAD from 20 to 100x the model's window size.
+
+## Fixes
+
+- Fixed an issue causing the VAD's state to be reset on every `Processor::process_*` call.
+
+## Breaking changes
+
+- `AicError::ModelNotInitialized` has been renamed to `AicError::ProcessorNotInitialized`.
+
 ## 0.13.1 - 2026-01-15
 
 ### Fixes

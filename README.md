@@ -8,7 +8,7 @@ For comprehensive documentation, visit [docs.ai-coustics.com](https://docs.ai-co
 > This SDK requires a license key. Generate your key at [developers.ai-coustics.io](https://developers.ai-coustics.io).
 
 > [!WARNING]
-> You must use a Rust version different from `1.93.0-beta.6`, which was used to build the static libraries. A solution is currently in development.
+> You must use a Rust version different from `1.94.0-beta.1`, which was used to build the static libraries. A solution is currently in development.
 
 ## Installation
 

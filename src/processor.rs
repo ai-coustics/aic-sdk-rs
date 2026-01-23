@@ -607,7 +607,7 @@ impl<'a> Processor<'a> {
         const MAX_CHANNELS: u16 = 16;
 
         let Some(num_channels) = self.num_channels else {
-            return Err(AicError::ModelNotInitialized);
+            return Err(AicError::ProcessorNotInitialized);
         };
 
         if audio.len() != num_channels as usize {
@@ -680,7 +680,7 @@ impl<'a> Processor<'a> {
     #[allow(clippy::doc_overindented_list_items)]
     pub fn process_interleaved(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
         let Some(num_channels) = self.num_channels else {
-            return Err(AicError::ModelNotInitialized);
+            return Err(AicError::ProcessorNotInitialized);
         };
 
         if !audio.len().is_multiple_of(num_channels as usize) {
@@ -741,7 +741,7 @@ impl<'a> Processor<'a> {
     #[allow(clippy::doc_overindented_list_items)]
     pub fn process_sequential(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
         let Some(num_channels) = self.num_channels else {
-            return Err(AicError::ModelNotInitialized);
+            return Err(AicError::ProcessorNotInitialized);
         };
 
         if !audio.len().is_multiple_of(num_channels as usize) {
