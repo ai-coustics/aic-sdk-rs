@@ -39,6 +39,8 @@ thiserror = { workspace = true }
 ureq = { workspace = true, optional = true, features = ["rustls"] }
 
 [dev-dependencies]
+approx = "0.5"
+hound = "3.5"
 serde_json = { workspace = true }
 tokio = { version = "1.49", features = ["macros", "rt-multi-thread", "sync", "time"] }
 
