@@ -86,27 +86,6 @@ fn load_wav_audio(path: impl AsRef<Path>) -> TestAudio {
     }
 }
 
-#[allow(dead_code)]
-fn write_wav_audio(path: impl AsRef<Path>, audio: &TestAudio) {
-    let spec = hound::WavSpec {
-        channels: audio.num_channels as u16,
-        sample_rate: audio.sample_rate,
-        bits_per_sample: 32,
-        sample_format: hound::SampleFormat::Float,
-    };
-    let mut writer = hound::WavWriter::create(path, spec).expect("Failed to create WAV file");
-    for &sample in &audio.interleaved_samples {
-        writer.write_sample(sample).expect("Failed to write sample");
-    }
-    writer.finalize().expect("Failed to finalize WAV file");
-}
-
-#[allow(dead_code)]
-fn write_vad_results(path: impl AsRef<Path>, results: &[bool]) {
-    let json = serde_json::to_string(results).expect("Failed to serialize VAD results");
-    std::fs::write(path, json).expect("Failed to write VAD results");
-}
-
 fn interleaved_to_sequential(interleaved: &[f32], num_channels: usize) -> Vec<f32> {
     let num_frames = interleaved.len() / num_channels;
     let mut sequential = vec![0.0f32; interleaved.len()];
@@ -158,8 +137,7 @@ fn planar_to_interleaved(planar: &[Vec<f32>]) -> Vec<f32> {
 /// voice gain (0.9) to exercise non-default parameter paths. Compares output against a
 /// pre-generated reference file.
 #[test]
-#[cfg_attr(miri, ignore)]
-fn process_full_file() {
+fn process_full_file_interleaved() {
     let audio = load_wav_audio(TEST_AUDIO_PATH);
     let model = Model::from_file(get_test_model_path()).expect("Failed to load model");
 
@@ -199,7 +177,6 @@ fn process_full_file() {
 /// Converts the test audio to sequential format (all samples for channel 0, then channel 1, etc.),
 /// processes it, and verifies the output matches the reference after converting back to interleaved.
 #[test]
-#[cfg_attr(miri, ignore)]
 fn process_full_file_sequential() {
     let audio = load_wav_audio(TEST_AUDIO_PATH);
     let model = Model::from_file(get_test_model_path()).expect("Failed to load model");
@@ -241,7 +218,6 @@ fn process_full_file_sequential() {
 /// Converts the test audio to planar format (separate buffer per channel),
 /// processes it, and verifies the output matches the reference after converting back to interleaved.
 #[test]
-#[cfg_attr(miri, ignore)]
 fn process_full_file_planar() {
     let audio = load_wav_audio(TEST_AUDIO_PATH);
     let model = Model::from_file(get_test_model_path()).expect("Failed to load model");
@@ -285,7 +261,6 @@ fn process_full_file_planar() {
 /// enhancement is disabled. Compares the VAD output sequence against a pre-generated reference
 /// to ensure deterministic behavior.
 #[test]
-#[cfg_attr(miri, ignore)]
 fn process_blocks_with_vad() {
     let audio = load_wav_audio(TEST_AUDIO_PATH);
     let model = Model::from_file(get_test_model_path()).expect("Failed to load model");
@@ -329,7 +304,6 @@ fn process_blocks_with_vad() {
 /// match the same reference as the bypass test, confirming enhancement settings do not
 /// affect voice activity detection.
 #[test]
-#[cfg_attr(miri, ignore)]
 fn process_blocks_with_vad_and_enhancement() {
     let audio = load_wav_audio(TEST_AUDIO_PATH);
     let model = Model::from_file(get_test_model_path()).expect("Failed to load model");
