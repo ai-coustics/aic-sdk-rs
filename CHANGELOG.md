@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.0 - 
+
+## Improvements
+
+- setting `AIC_LIB_PATH` at compile-time will now overwrite the downloaded library when the feature `download-lib` is active
+
 ## 0.14.0 - 2026-01-23
 
 ## Improvements
