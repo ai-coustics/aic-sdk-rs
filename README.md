@@ -173,7 +173,6 @@ proc_ctx.reset()?;
 
 // Set enhancement parameters
 proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.8)?;
-proc_ctx.set_parameter(ProcessorParameter::VoiceGain, 1.5)?;
 proc_ctx.set_parameter(ProcessorParameter::Bypass, 0.0)?;
 
 // Get parameter values
