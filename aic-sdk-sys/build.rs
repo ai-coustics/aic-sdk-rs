@@ -21,16 +21,21 @@ fn main() {
         return;
     }
 
-    #[cfg(feature = "download-lib")]
-    let lib_path = {
-        let downloaded_path = download_lib();
-        downloaded_path.join("lib")
+    let lib_path = if let Ok(path) = env::var("AIC_LIB_PATH") {
+        PathBuf::from(path)
+    } else {
+        #[cfg(feature = "download-lib")]
+        {
+            let downloaded_path = download_lib();
+            downloaded_path.join("lib")
+        }
+        #[cfg(not(feature = "download-lib"))]
+        {
+            panic!(
+                "Enable feature `download-lib` or use a local library by setting the environment variable `AIC_LIB_PATH`"
+            );
+        }
     };
-
-    #[cfg(not(feature = "download-lib"))]
-    let lib_path = PathBuf::from(
-        env::var("AIC_LIB_PATH").expect("Enable feature `download-lib` or use a local library by setting the environment variable `AIC_LIB_PATH`"),
-    );
 
     let lib_name = "aic";
 

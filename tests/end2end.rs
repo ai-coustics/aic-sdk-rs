@@ -19,7 +19,7 @@ fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
         if path.extension().is_some_and(|ext| ext == "aicmodel")
             && path
                 .file_name()
-                .is_some_and(|name| name.to_string_lossy().starts_with("sparrow_xxs_48khz"))
+                .is_some_and(|name| name.to_string_lossy().starts_with("sparrow_s_48khz"))
         {
             return Some(path);
         }
@@ -157,9 +157,6 @@ fn process_full_file_interleaved() {
     proc_ctx
         .set_parameter(ProcessorParameter::EnhancementLevel, 0.9)
         .expect("Failed to set enhancement level");
-    proc_ctx
-        .set_parameter(ProcessorParameter::VoiceGain, 0.9)
-        .expect("Failed to set voice gain");
 
     let mut samples = audio.interleaved_samples.clone();
     processor
@@ -197,9 +194,6 @@ fn process_full_file_sequential() {
     proc_ctx
         .set_parameter(ProcessorParameter::EnhancementLevel, 0.9)
         .expect("Failed to set enhancement level");
-    proc_ctx
-        .set_parameter(ProcessorParameter::VoiceGain, 0.9)
-        .expect("Failed to set voice gain");
 
     let mut samples = interleaved_to_sequential(&audio.interleaved_samples, audio.num_channels);
     processor
@@ -238,9 +232,6 @@ fn process_full_file_planar() {
     proc_ctx
         .set_parameter(ProcessorParameter::EnhancementLevel, 0.9)
         .expect("Failed to set enhancement level");
-    proc_ctx
-        .set_parameter(ProcessorParameter::VoiceGain, 0.9)
-        .expect("Failed to set voice gain");
 
     let mut planar = interleaved_to_planar(&audio.interleaved_samples, audio.num_channels);
     processor

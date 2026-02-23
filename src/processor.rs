@@ -109,17 +109,6 @@ pub enum ProcessorParameter {
     ///
     /// **Default:** 1.0
     EnhancementLevel,
-    /// Compensates for perceived volume reduction after noise removal.
-    ///
-    /// **Range:** 0.1 to 4.0 (linear amplitude multiplier)
-    /// - **0.1:** Significant volume reduction (-20 dB)
-    /// - **1.0:** No gain change (0 dB, default)
-    /// - **2.0:** Double amplitude (+6 dB)
-    /// - **4.0:** Maximum boost (+12 dB)
-    ///
-    /// **Formula:** Gain (dB) = 20 × log₁₀(value)
-    /// **Default:** 1.0
-    VoiceGain,
 }
 
 impl From<ProcessorParameter> for AicProcessorParameter::Type {
@@ -127,7 +116,6 @@ impl From<ProcessorParameter> for AicProcessorParameter::Type {
         match parameter {
             ProcessorParameter::Bypass => AIC_PROCESSOR_PARAMETER_BYPASS,
             ProcessorParameter::EnhancementLevel => AIC_PROCESSOR_PARAMETER_ENHANCEMENT_LEVEL,
-            ProcessorParameter::VoiceGain => AIC_PROCESSOR_PARAMETER_VOICE_GAIN,
         }
     }
 }
@@ -812,7 +800,7 @@ mod tests {
             if path
                 .file_name()
                 .and_then(|n| n.to_str())
-                .map(|name| name.contains("sparrow_xxs_48khz") && name.ends_with(".aicmodel"))
+                .map(|name| name.contains("sparrow_s_48khz") && name.ends_with(".aicmodel"))
                 .unwrap_or(false)
             {
                 if path.is_file() {
@@ -823,7 +811,7 @@ mod tests {
         None
     }
 
-    /// Downloads the default test model `sparrow-xxs-48khz` into the crate's `target/` directory.
+    /// Downloads the default test model `sparrow-s-48khz` into the crate's `target/` directory.
     /// Returns the path to the downloaded model file.
     fn get_sparrow_xxs_48khz() -> Result<PathBuf, AicError> {
         let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
@@ -839,13 +827,13 @@ mod tests {
 
         #[cfg(feature = "download-model")]
         {
-            return Model::download("sparrow-xxs-48khz", target_dir);
+            return Model::download("sparrow-s-48khz", target_dir);
         }
 
         #[cfg(not(feature = "download-model"))]
         {
             panic!(
-                "Model `sparrow-xxs-48khz` not found in {} and `download-model` feature is disabled",
+                "Model `sparrow-s-48khz` not found in {} and `download-model` feature is disabled",
                 target_dir.display()
             );
         }

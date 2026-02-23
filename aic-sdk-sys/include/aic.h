@@ -56,10 +56,6 @@ typedef enum AicErrorCode {
    */
   AIC_ERROR_CODE_INTERNAL_ERROR = 7,
   /**
-   * The requested parameter is read-only for this model type and cannot be modified.
-   */
-  AIC_ERROR_CODE_PARAMETER_FIXED = 8,
-  /**
    * License key format is invalid or corrupted. Verify the key was copied correctly.
    */
   AIC_ERROR_CODE_LICENSE_FORMAT_INVALID = 50,
@@ -121,19 +117,6 @@ typedef enum AicProcessorParameter {
    * **Default:** 1.0
    */
   AIC_PROCESSOR_PARAMETER_ENHANCEMENT_LEVEL = 1,
-  /**
-   * Compensates for perceived volume reduction after noise removal.
-   *
-   * **Range:** 0.1 to 4.0 (linear amplitude multiplier)
-   * - **0.1:** Significant volume reduction (-20 dB)
-   * - **1.0:** No gain change (0 dB, default)
-   * - **2.0:** Double amplitude (+6 dB)
-   * - **4.0:** Maximum boost (+12 dB)
-   *
-   * **Formula:** Gain (dB) = 20 × log₁₀(value)
-   * **Default:** 1.0
-   */
-  AIC_PROCESSOR_PARAMETER_VOICE_GAIN = 2,
 } AicProcessorParameter;
 
 /**
@@ -144,10 +127,16 @@ typedef enum AicVadParameter {
    * Controls for how long the VAD continues to detect speech after the audio signal
    * no longer contains speech.
    *
-   * The VAD reports speech detected if the audio signal contained speech in at least 50%
-   * of the frames processed in the last `speech_hold_duration` seconds.
-   *
    * This affects the stability of speech detected -> not detected transitions.
+   *
+   * The VAD reports speech detected if the audio signal contained speech in at least 50%
+   * of the frames processed in the last `speech_hold_duration * 2` seconds.
+   *
+   * For example, if `speech_hold_duration` is set to 0.5 seconds and the VAD stops detecting speech
+   * in the audio signal, the VAD will continue to report speech for 0.5 seconds assuming the
+   * VAD does not detect speech again during that period. If a few frames of speech are detected
+   * during that period, those frames will be included in the 50% calculation, which will extend
+   * the speech detection period until the 50% threshold is no longer met.
    *
    * NOTE: The VAD returns a value per processed buffer, so this duration is rounded
    * to the closest model window length. For example, if the model has a processing window
@@ -495,10 +484,8 @@ enum AicErrorCode aic_processor_initialize(struct AicProcessor *processor,
  * - `audio` is an array of pointers, one pointer per channel
  * - Each pointer points to a separate buffer containing `num_frames` samples for that channel
  * - Example for 2 channels, 4 frames:
- *   ```
- *   audio[0] -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3]
- *   audio[1] -> [ch1_f0, ch1_f1, ch1_f2, ch1_f3]
- *   ```
+ *   `audio[0] -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3]`
+ *   `audio[1] -> [ch1_f0, ch1_f1, ch1_f2, ch1_f3]`
  *
  * The planar function allows a maximum of 16 channels.
  *
@@ -533,9 +520,7 @@ enum AicErrorCode aic_processor_process_planar(struct AicProcessor *processor,
  * - Single contiguous buffer with channels interleaved
  * - Buffer size: `num_channels` * `num_frames` floats
  * - Example for 2 channels, 4 frames:
- *   ```
- *   audio -> [ch0_f0, ch1_f0, ch0_f1, ch1_f1, ch0_f2, ch1_f2, ch0_f3, ch1_f3]
- *   ```
+ *   `audio -> [ch0_f0, ch1_f0, ch0_f1, ch1_f1, ch0_f2, ch1_f2, ch0_f3, ch1_f3]`
  *
  * # Parameters
  * - `processor`: Initialized processor instance. Must not be NULL.
@@ -568,9 +553,7 @@ enum AicErrorCode aic_processor_process_interleaved(struct AicProcessor *process
  * - Single contiguous buffer with all samples for each channel stored sequentially
  * - Buffer size: `num_channels` * `num_frames` floats
  * - Example for 2 channels, 4 frames:
- *   ```
- *   audio -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3, ch1_f0, ch1_f1, ch1_f2, ch1_f3]
- *   ```
+ *   `audio -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3, ch1_f0, ch1_f1, ch1_f2, ch1_f3]`
  *
  * # Parameters
  * - `processor`: Initialized processor instance. Must not be NULL.
