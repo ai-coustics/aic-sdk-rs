@@ -41,7 +41,7 @@ fn get_test_model_path() -> PathBuf {
         return existing;
     }
 
-    Model::download("sparrow-xxs-48khz", &target_dir).expect("Failed to download test model")
+    Model::download("sparrow-s-48khz", &target_dir).expect("Failed to download test model")
 }
 
 fn license_key() -> String {
