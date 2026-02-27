@@ -5,10 +5,10 @@ Rust wrapper for the ai-coustics Speech Enhancement SDK.
 For comprehensive documentation, visit [docs.ai-coustics.com](https://docs.ai-coustics.com).
 
 > [!NOTE]
-> This SDK requires a license key. Generate your key at [developers.ai-coustics.io](https://developers.ai-coustics.io).
+> This SDK requires a license key. Generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com).
 
 > [!WARNING]
-> You must use a Rust version different from `1.94.0-beta.1`, which was used to build the static libraries. A solution is currently in development.
+> You must use a Rust version different from `1.94.0-beta.5`, which was used to build the static libraries. A solution is currently in development.
 
 ## Installation
 
@@ -90,7 +90,7 @@ cargo add aic-sdk --features download-lib,download-model
 ```rust,ignore
 use aic_sdk::Model;
 
-let model_path = Model::download("sparrow-xxs-48khz", "./models")?;
+let model_path = Model::download("quail-vf-2.0-l-16khz", "./models")?;
 let model = Model::from_file(&model_path)?;
 ```
 
@@ -173,7 +173,6 @@ proc_ctx.reset()?;
 
 // Set enhancement parameters
 proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.8)?;
-proc_ctx.set_parameter(ProcessorParameter::VoiceGain, 1.5)?;
 proc_ctx.set_parameter(ProcessorParameter::Bypass, 0.0)?;
 
 // Get parameter values

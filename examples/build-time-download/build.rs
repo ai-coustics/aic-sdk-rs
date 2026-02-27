@@ -5,7 +5,7 @@ fn main() {
 
     // Select a model id at https://artifacts.ai-coustics.io/
     let model_path =
-        Model::download("sparrow-xxs-48khz", out_dir).expect("Failed to download model");
+        Model::download("quail-vf-2.0-l-16khz", out_dir).expect("Failed to download model");
 
     // Emit the model path as an environment variable for use in main.rs
     println!("cargo:rustc-env=MODEL_PATH={}", model_path.display());

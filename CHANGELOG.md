@@ -1,16 +1,39 @@
 # Changelog
 
+## 0.15.0 - 2026-02-27
+
+### New features
+
+- Support for V2 model files, which includes support for the new Quail Voice Focus 2.0 model.
+
+### Improvements
+
+- The parameters of Quail models are no longer fixed. The enhancement level of every model can now be adjusted between 0.0 and 1.0
+- setting `AIC_LIB_PATH` at compile-time will now overwrite the downloaded library when the feature `download-lib` is active
+
+### Breaking Changes
+
+- V1 model files are no longer supported.
+- The error `AicError::ParameterFixed` was removed
+- The parameter `ProcessorParameter::VoiceGain` was removed
+- The parameter `VadParameter::SpeechHoldDuration` previously held detected speech for half of the specified duration. It has now been changed to better represent the intention of the developer.
+- The default value for `VadParameter::SpeechHoldDuration` was changed from 50 ms to 30 ms to match the existing behavior.
+
+### Fixes
+
+- `VadContext::set_parameter` no longer returns an error when trying to set a valid speech hold duration value before calling `Processor::initialize`.
+
 ## 0.14.0 - 2026-01-23
 
-## Improvements
+### Improvements
 
 - Increased the maximum speech hold duration of the VAD from 20 to 100x the model's window size.
 
-## Fixes
+### Fixes
 
 - Fixed an issue causing the VAD's state to be reset on every `Processor::process_*` call.
 
-## Breaking changes
+### Breaking changes
 
 - `AicError::ModelNotInitialized` has been renamed to `AicError::ProcessorNotInitialized`.
 
