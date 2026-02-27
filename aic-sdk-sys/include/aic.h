@@ -145,7 +145,7 @@ typedef enum AicVadParameter {
    *
    * **Range:** 0.0 to 100x model window length (value in seconds)
    *
-   * **Default:** 0.05 (50 ms)
+   * **Default:** 0.03 (30 ms)
    */
   AIC_VAD_PARAMETER_SPEECH_HOLD_DURATION = 0,
   /**
