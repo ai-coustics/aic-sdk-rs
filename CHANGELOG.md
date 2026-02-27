@@ -17,6 +17,11 @@
 - The error `AicError::ParameterFixed` was removed
 - The parameter `ProcessorParameter::VoiceGain` was removed
 - The parameter `VadParameter::SpeechHoldDuration` previously held detected speech for half of the specified duration. It has now been changed to better represent the intention of the developer.
+- The default value for `VadParameter::SpeechHoldDuration` was changed from 50 ms to 30 ms to match the existing behavior.
+
+### Fixes
+
+- `VadContext::set_parameter` no longer returns an error when trying to set a valid speech hold duration value before calling `Processor::initialize`.
 
 ## 0.14.0 - 2026-01-23
 
