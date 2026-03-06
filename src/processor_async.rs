@@ -4,8 +4,6 @@ use tokio::sync::Mutex;
 
 /// An async wrapper around [`Processor`] for use in async/await contexts.
 ///
-/// This requires a **multi-threaded** runtime (e.g. `#[tokio::main]`).
-///
 /// # Example
 ///
 /// ```rust,no_run
@@ -32,11 +30,8 @@ impl ProcessorAsync {
     /// Creates a new async audio enhancement processor instance.
     ///
     /// See [`Processor::new`] for details.
-    pub fn new(model: &Model<'_>, license_key: &str) -> Result<Self, AicError> {
+    pub fn new(model: &Model<'static>, license_key: &str) -> Result<Self, AicError> {
         let processor = Processor::new(model, license_key)?;
-        // SAFETY: The C library internally reference-counts the model weights,
-        // so the Processor remains valid even after the Rust Model is dropped.
-        let processor: Processor<'static> = unsafe { std::mem::transmute(processor) };
         Ok(Self {
             inner: Arc::new(Mutex::new(processor)),
         })
@@ -47,7 +42,7 @@ impl ProcessorAsync {
     /// This is a convenience method combining [`ProcessorAsync::new`] and
     /// [`ProcessorAsync::initialize`].
     pub async fn with_config(
-        model: &Model<'_>,
+        model: &Model<'static>,
         license_key: &str,
         config: &ProcessorConfig,
     ) -> Result<Self, AicError> {
