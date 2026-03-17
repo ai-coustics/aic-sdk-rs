@@ -108,13 +108,16 @@ typedef enum AicProcessorParameter {
    */
   AIC_PROCESSOR_PARAMETER_BYPASS = 0,
   /**
-   * Controls the intensity of speech enhancement processing.
+   * A tunable parameter to optimize for specific STT engines, deployment environments,
+   * and user experience requirements.
+   *
+   * The exact behavior depends on the active model:
+   * - **Quail Models:** Controls how aggressively the model suppresses noise. When used
+   *   with Quail Voice Focus, it also suppresses background and competing speech.
+   * - **Sparrow Models:** Controls the mixback and therefore the intensity of the
+   *   enhancement.
    *
    * **Range:** 0.0 to 1.0
-   * - **0.0:** No enhancement - original signal passes through unchanged
-   * - **1.0:** Full enhancement - maximum noise reduction but also more audible artifacts
-   *
-   * **Default:** 1.0
    */
   AIC_PROCESSOR_PARAMETER_ENHANCEMENT_LEVEL = 1,
 } AicProcessorParameter;
