@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.15.1 - 2026-03-17
+
+## Improvements
+
+- Improved performance of telemetry when using multiple processors.
+
+## Fixes
+
+- The scaling factor of the STFT now changes depending on the sample rate.
+
 ## 0.15.0 - 2026-02-27
 
 ### New features
