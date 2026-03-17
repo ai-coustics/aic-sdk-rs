@@ -16,4 +16,6 @@ Before creating a release, check that everything can be published to crates.io.
 
 5. Update [changelog](CHANGELOG.md)
 
-5. Create a new release on the GitHub main branch with a tag that has the same version number as the main crate
+6. Run `cargo build` (to update `Cargo.lock`, if necessary)
+
+7. Create a new release on the GitHub main branch with a tag that has the same version number as the main crate
