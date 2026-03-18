@@ -47,8 +47,6 @@ serde_json = { workspace = true }
 tokio = { version = "1.49", features = ["macros", "rt-multi-thread", "sync", "time"] }
 
 [features]
-default = ["async", "download-lib", "download-model"]
-
 async = ["dep:tokio"]
 download-lib = ["aic-sdk-sys/download-lib"]
 download-model = ["dep:serde", "dep:serde_json", "dep:sha2", "dep:ureq"]
