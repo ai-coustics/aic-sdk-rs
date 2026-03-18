@@ -30,7 +30,7 @@ dependencies = [
 
 [[package]]
 name = "aic-sdk"
-version = "0.15.1"
+version = "0.15.2"
 dependencies = [
  "aic-sdk-sys",
  "approx",
@@ -114,7 +114,7 @@ dependencies = [
 
 [[package]]
 name = "build-time-download"
-version = "0.15.1"
+version = "0.15.2"
 dependencies = [
  "aic-sdk",
 ]

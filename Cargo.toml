@@ -6,7 +6,7 @@ edition = "2024"
 homepage = "https://ai-coustics.com/sdk/"
 license = "Apache-2.0"
 repository = "https://github.com/ai-coustics/aic-sdk-rs"
-version = "0.15.1"
+version = "0.15.2"
 
 [workspace.dependencies]
 aic-sdk-sys = { version = "0.15.1", path = "aic-sdk-sys" }
