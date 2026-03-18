@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.2 - 2026-03-18
+
+### New features
+
+- Added `ProcessorAsync`, an async wrapper around `Processor` for use in `async`/`await` contexts (requires the `async` feature flag). It offloads blocking audio processing to a thread pool via `tokio::task::spawn_blocking`, keeping the async runtime responsive. All methods mirror the synchronous `Processor` API. A `ProcessorAsync::with_config` convenience constructor is also provided.
+
 ## 0.15.1 - 2026-03-17
 
 ## Improvements
