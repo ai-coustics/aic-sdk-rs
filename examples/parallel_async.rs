@@ -2,8 +2,8 @@
 /// parallel when awaited concurrently.
 ///
 /// Each processor records its own wall-clock processing time.  If they ran
-/// sequentially, the total elapsed time would be roughly `N × per-processor
-/// time`.  When running in parallel the total time is close to the slowest
+/// sequentially, the total elapsed time would be roughly `N × per-processor time`.
+/// When running in parallel the total time is close to the slowest
 /// single processor, which is what we verify and print.
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
