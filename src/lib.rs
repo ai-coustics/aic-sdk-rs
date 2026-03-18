@@ -2,6 +2,8 @@
 use aic_sdk_sys::{aic_get_compatible_model_version, aic_get_sdk_version, aic_set_sdk_wrapper_id};
 use std::ffi::CStr;
 
+#[cfg(feature = "async")]
+mod processor_async;
 #[cfg(feature = "download-model")]
 mod download;
 mod error;
@@ -9,6 +11,8 @@ mod model;
 mod processor;
 mod vad;
 
+#[cfg(feature = "async")]
+pub use processor_async::*;
 pub use error::*;
 pub use model::*;
 pub use processor::*;

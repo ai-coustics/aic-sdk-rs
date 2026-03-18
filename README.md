@@ -211,11 +211,13 @@ See the example files for complete working examples:
 - [`examples/basic_usage.rs`](examples/basic_usage.rs) - Basic usage example
 - [`examples/build-time-download`](examples/build-time-download) - Download and embed models at compile-time
 - [`examples/benchmark.rs`](examples/benchmark.rs) - Run multiple processor instances concurrently until the real-time requirements are not met
+- [`examples/parallel_async.rs`](examples/parallel_async.rs) - Demonstrates parallel processing with `ProcessorAsync`: runs N processors concurrently via `tokio::join_all` and prints each processor's individual time alongside a sequential baseline to confirm the speedup
 
 Run examples with:
 ```bash
 export AIC_SDK_LICENSE="your_license_key_here"
 cargo run --example basic_usage --features download-lib,download-model
+cargo run --example parallel_async --features download-lib,download-model,async
 ```
 
 ## Documentation
