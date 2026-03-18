@@ -129,16 +129,16 @@ impl ProcessorAsync {
     /// Creates a [`ProcessorContext`] for real-time parameter control.
     ///
     /// See [`Processor::processor_context`] for details.
-    pub fn processor_context(&self) -> ProcessorContext {
-        let processor = self.inner.blocking_lock();
+    pub async fn processor_context(&self) -> ProcessorContext {
+        let processor = self.inner.lock().await;
         processor.processor_context()
     }
 
     /// Creates a [`VadContext`] for voice activity detection.
     ///
     /// See [`Processor::vad_context`] for details.
-    pub fn vad_context(&self) -> VadContext {
-        let processor = self.inner.blocking_lock();
+    pub async fn vad_context(&self) -> VadContext {
+        let processor = self.inner.lock().await;
         processor.vad_context()
     }
 }
