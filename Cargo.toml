@@ -54,10 +54,12 @@ download-model = ["dep:serde", "dep:serde_json", "dep:sha2", "dep:ureq"]
 [[example]]
 name = "basic_usage"
 path = "examples/basic_usage.rs"
+required-features = ["download-model"]
 
 [[example]]
 name = "benchmark"
 path = "examples/benchmark.rs"
+required-features = ["download-model"]
 
 [[example]]
 name = "parallel_async"
