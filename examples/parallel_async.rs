@@ -1,13 +1,3 @@
-#![cfg_attr(
-    not(all(feature = "download-model", feature = "async")),
-    allow(dead_code, unused_imports)
-)]
-
-#[cfg(not(all(feature = "download-model", feature = "async")))]
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    Err("Enable the `download-model` and `async` features to run this example.".into())
-}
-
 /// Demonstrates that multiple [`ProcessorAsync`] instances genuinely run in
 /// parallel when awaited concurrently.
 ///
@@ -15,7 +5,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// sequentially, the total elapsed time would be roughly `N × per-processor
 /// time`.  When running in parallel the total time is close to the slowest
 /// single processor, which is what we verify and print.
-#[cfg(all(feature = "download-model", feature = "async"))]
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     use aic_sdk::{Model, ProcessorAsync, ProcessorConfig};
