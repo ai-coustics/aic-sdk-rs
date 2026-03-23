@@ -17,7 +17,7 @@ use tokio::{
 const MODEL: &str = "quail-vf-2.0-l-16khz";
 
 // Interval between spawning new processor sessions
-const SESSION_SPAWN_INTERVAL: Duration = Duration::from_secs(3);
+const SESSION_SPAWN_INTERVAL: Duration = Duration::from_secs(1);
 
 // Safety margin to account for system variability
 // e.g. 0.3 means 30% of the period is reserved as a safety margin,
