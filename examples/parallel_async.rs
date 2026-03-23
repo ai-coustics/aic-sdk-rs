@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build all processors upfront so initialization is not part of the timed
     // section.
     // -------------------------------------------------------------------------
-    let mut processors: Vec<ProcessorAsync> = Vec::with_capacity(NUM_PROCESSORS);
+    let mut processors = Vec::with_capacity(NUM_PROCESSORS);
     for _ in 0..NUM_PROCESSORS {
         let p = ProcessorAsync::with_config(&model, &license, &config).await?;
         processors.push(p);
