@@ -5,7 +5,7 @@
 /// sequentially, the total elapsed time would be roughly `N × per-processor time`.
 /// When running in parallel the total time is close to the slowest
 /// single processor, which is what we verify and print.
-#[tokio::main(flavor = "multi_thread")]
+#[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     use aic_sdk::{Model, ProcessorAsync, ProcessorConfig};
     use std::{env, sync::Arc, time::Instant};
@@ -115,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if speedup > 1.5 {
             "Parallel execution confirmed."
         } else {
-            "Warning: low speedup – are you running with a multi-thread runtime?"
+            "Warning: low speedup – your system may not have enough CPU cores for parallel blocking tasks."
         }
     );
 
