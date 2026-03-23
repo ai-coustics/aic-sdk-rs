@@ -64,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // -------------------------------------------------------------------------
-    // Parallel run – drive all processors concurrently with tokio::join_all.
+    // Parallel run – drive all processors concurrently with futures::future::try_join_all.
     // Each task times itself and returns its own elapsed duration.
     // -------------------------------------------------------------------------
     let parallel_start = Instant::now();
@@ -97,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let max_individual = results.iter().max().copied().unwrap_or_default();
 
     println!(
-        "\nParallel wall-clock: {:>8.1} ms",
+        "\nParallel total:      {:>8.1} ms",
         parallel_elapsed.as_secs_f64() * 1000.0
     );
     println!(
