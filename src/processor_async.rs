@@ -77,7 +77,7 @@ impl ProcessorAsync {
         let audio_len = audio.len();
 
         // SAFETY: We `.await` the JoinHandle immediately, so `audio` outlives
-        // the blocking task.  The Mutex guarantees exclusive Processor access.
+        // the blocking task. The Mutex guarantees exclusive Processor access.
         tokio::task::spawn_blocking(move || {
             let mut processor = inner.blocking_lock();
             let audio =
