@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Safety margin: {} ms\n", safety_margin.as_millis());
 
     println!(
-        "Starting benchmark: spawning a processor session every {} seconds until a deadline is missed...\n",
+        "Starting benchmark: spawning a processor session every {} seconds until a deadline is missed or a process error occurs...\n",
         SESSION_SPAWN_INTERVAL.as_secs()
     );
 
@@ -109,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if spawned_sessions.is_multiple_of(50) {
                     println!();
                 } else {
-                    println!("\n");
+                    println!();
                 }
 
                 let is_miss = report.error.is_some();
