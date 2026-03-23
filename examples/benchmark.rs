@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Safety margin: {} ms\n", safety_margin.as_millis());
 
     println!(
-        "Starting benchmark: spawning a processor session every {} seconds until a deadline is missed or a process error occurs...\n",
+        "Starting benchmark: spawning a processor session every {} second(s) until a deadline is missed or a process error occurs...\n",
         SESSION_SPAWN_INTERVAL.as_secs()
     );
 
