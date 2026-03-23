@@ -73,38 +73,38 @@ impl ProcessorAsync {
     /// See [`Processor::process_interleaved`] for details on the memory layout.
     pub async fn process_interleaved(&self, audio: &mut [f32]) -> Result<(), AicError> {
         let inner = Arc::clone(&self.inner);
-        let audio_addr = audio.as_mut_ptr() as usize;
-        let audio_len = audio.len();
-
-        // SAFETY: We `.await` the JoinHandle immediately, so `audio` outlives
-        // the blocking task. The Mutex guarantees exclusive Processor access.
+        let mut buf = audio.to_vec();
         tokio::task::spawn_blocking(move || {
             let mut processor = inner.blocking_lock();
-            let audio =
-                unsafe { std::slice::from_raw_parts_mut(audio_addr as *mut f32, audio_len) };
-            processor.process_interleaved(audio)
+            processor.process_interleaved(&mut buf)?;
+            Ok(buf)
         })
         .await
         .expect("spawn_blocking task panicked")
+        .map(|buf| audio.copy_from_slice(&buf))
     }
 
     /// Processes audio with separate buffers for each channel (planar layout).
     ///
     /// See [`Processor::process_planar`] for details on the memory layout.
-    pub async fn process_planar<V: AsMut<[f32]>>(&self, audio: &mut [V]) -> Result<(), AicError> {
+    pub async fn process_planar<V: AsMut<[f32]> + AsRef<[f32]>>(
+        &self,
+        audio: &mut [V],
+    ) -> Result<(), AicError> {
         let inner = Arc::clone(&self.inner);
-        let audio_addr = audio.as_mut_ptr() as usize;
-        let audio_len = audio.len();
-
-        // SAFETY: Same as process_interleaved.
+        let mut buf: Vec<Vec<f32>> = audio.iter().map(|ch| ch.as_ref().to_vec()).collect();
         tokio::task::spawn_blocking(move || {
             let mut processor = inner.blocking_lock();
-            let audio: &mut [V] =
-                unsafe { std::slice::from_raw_parts_mut(audio_addr as *mut V, audio_len) };
-            processor.process_planar(audio)
+            processor.process_planar(&mut buf)?;
+            Ok(buf)
         })
         .await
         .expect("spawn_blocking task panicked")
+        .map(|buf| {
+            for (dst, src) in audio.iter_mut().zip(buf.iter()) {
+                dst.as_mut().copy_from_slice(src);
+            }
+        })
     }
 
     /// Processes audio with sequential channel data.
@@ -112,18 +112,15 @@ impl ProcessorAsync {
     /// See [`Processor::process_sequential`] for details on the memory layout.
     pub async fn process_sequential(&self, audio: &mut [f32]) -> Result<(), AicError> {
         let inner = Arc::clone(&self.inner);
-        let audio_addr = audio.as_mut_ptr() as usize;
-        let audio_len = audio.len();
-
-        // SAFETY: Same as process_interleaved.
+        let mut buf = audio.to_vec();
         tokio::task::spawn_blocking(move || {
             let mut processor = inner.blocking_lock();
-            let audio =
-                unsafe { std::slice::from_raw_parts_mut(audio_addr as *mut f32, audio_len) };
-            processor.process_sequential(audio)
+            processor.process_sequential(&mut buf)?;
+            Ok(buf)
         })
         .await
         .expect("spawn_blocking task panicked")
+        .map(|buf| audio.copy_from_slice(&buf))
     }
 
     /// Creates a [`ProcessorContext`] for real-time parameter control.
