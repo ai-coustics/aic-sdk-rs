@@ -61,11 +61,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut sessions = JoinSet::new();
     let mut reports = Vec::new();
     let mut spawned_sessions = 0usize;
-    let mut next_session_id = 1usize;
 
     spawn_session(
         &mut sessions,
-        next_session_id,
+        spawned_sessions,
         Arc::clone(&model),
         license.clone(),
         config.clone(),
@@ -85,10 +84,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let first_failed_report = loop {
         tokio::select! {
             _ = spawn_ticks.tick() => {
-                next_session_id += 1;
                 spawn_session(
                     &mut sessions,
-                    next_session_id,
+                    spawned_sessions,
                     Arc::clone(&model),
                     license.clone(),
                     config.clone(),
