@@ -186,7 +186,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn spawn_session(
     sessions: &mut JoinSet<SessionReport>,
-    session_id: usize,
+    previous_session_id: usize,
     model: Arc<Model<'static>>,
     license: String,
     config: ProcessorConfig,
@@ -195,7 +195,7 @@ fn spawn_session(
     stop: Arc<AtomicBool>,
 ) {
     sessions.spawn(run_session(
-        session_id,
+        previous_session_id + 1,
         model,
         license,
         config,
