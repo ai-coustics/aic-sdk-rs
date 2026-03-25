@@ -61,19 +61,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut sessions = JoinSet::new();
     let mut reports = Vec::new();
     let mut spawned_sessions = 0usize;
-    let mut next_session_id = 1usize;
 
-    spawn_session(
-        &mut sessions,
-        next_session_id,
+    spawned_sessions += 1;
+    sessions.spawn(run_session(
+        spawned_sessions,
         Arc::clone(&model),
         license.clone(),
         config.clone(),
         period,
         safety_margin,
         Arc::clone(&stop),
-    );
-    spawned_sessions += 1;
+    ));
 
     print!("*");
     std::io::stdout().flush().unwrap();
@@ -85,44 +83,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let first_failed_report = loop {
         tokio::select! {
             _ = spawn_ticks.tick() => {
-                next_session_id += 1;
-                spawn_session(
-                    &mut sessions,
-                    next_session_id,
+                spawned_sessions += 1;
+                sessions.spawn(run_session(
+                    spawned_sessions,
                     Arc::clone(&model),
                     license.clone(),
                     config.clone(),
                     period,
                     safety_margin,
                     Arc::clone(&stop),
-                );
-                spawned_sessions += 1;
+                ));
 
                 print!("*");
-                if spawned_sessions.is_multiple_of(50) {
-                    print!("\n");
-                }
                 std::io::stdout().flush().unwrap();
             }
             Some(result) = sessions.join_next() => {
                 let report = result?;
-                if spawned_sessions.is_multiple_of(50) {
-                    println!();
-                } else {
-                    println!();
-                }
-
-                let is_miss = report.error.is_some();
-                reports.push(report);
-                if is_miss {
+                if report.error.is_some() {
                     stop.store(true, Ordering::Relaxed);
-                    break reports.last().cloned();
+                    reports.push(report.clone());
+                    break report;
                 }
+                reports.push(report);
             }
         }
     };
 
-    println!("Benchmark complete\n");
+    println!("\nBenchmark complete\n");
 
     while let Some(result) = sessions.join_next().await {
         reports.push(result?);
@@ -130,17 +117,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     reports.sort_by_key(|report| report.session_id);
 
     let mut number_of_missed_deadlines = 0usize;
+    let period_ms = period.as_secs_f64() * 1000.0;
 
     println!(" ID | Max Exec Time |   RTF   | Notes");
     println!("----+---------------+---------+------");
     for report in &reports {
         let max_ms = report.max_execution_time.as_secs_f64() * 1000.0;
-        let period_ms = period.as_secs_f64() * 1000.0;
-        let rtf = if period_ms > 0.0 {
-            max_ms / period_ms
-        } else {
-            0.0
-        };
+        let rtf = max_ms / period_ms;
 
         let note = match report.error.as_deref() {
             Some(reason) => {
@@ -164,47 +147,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         max_ok
     );
 
-    if let Some(first_failed_report) = &first_failed_report {
-        println!(
-            "After spawning the {}{} session, session #{} missed its deadline ({})",
-            spawned_sessions,
-            number_suffix(spawned_sessions),
-            first_failed_report.session_id,
-            first_failed_report.error.as_deref().unwrap_or("unknown")
-        );
+    println!(
+        "After spawning the {}{} session, session #{} missed its deadline ({})",
+        spawned_sessions,
+        number_suffix(spawned_sessions),
+        first_failed_report.session_id,
+        first_failed_report.error.as_deref().unwrap_or("unknown")
+    );
 
-        if number_of_missed_deadlines > 1 {
-            println!(
-                "Other sessions also missed deadlines after session #{}",
-                first_failed_report.session_id
-            );
-        }
-    } else {
-        println!("Missed deadline in session unknown (no report)");
+    if number_of_missed_deadlines > 1 {
+        println!(
+            "Other sessions also missed deadlines after session #{}",
+            first_failed_report.session_id
+        );
     }
 
     Ok(())
-}
-
-fn spawn_session(
-    sessions: &mut JoinSet<SessionReport>,
-    session_id: usize,
-    model: Arc<Model<'static>>,
-    license: String,
-    config: ProcessorConfig,
-    period: Duration,
-    safety_margin: Duration,
-    stop: Arc<AtomicBool>,
-) {
-    sessions.spawn(run_session(
-        session_id,
-        model,
-        license,
-        config,
-        period,
-        safety_margin,
-        stop,
-    ));
 }
 
 async fn run_session(
