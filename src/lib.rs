@@ -7,11 +7,15 @@ mod download;
 mod error;
 mod model;
 mod processor;
+#[cfg(feature = "async")]
+mod processor_async;
 mod vad;
 
 pub use error::*;
 pub use model::*;
 pub use processor::*;
+#[cfg(feature = "async")]
+pub use processor_async::*;
 pub use vad::*;
 
 /// Returns the version of the ai-coustics SDK library.
