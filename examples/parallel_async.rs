@@ -71,8 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let tasks: Vec<_> = processors
         .iter()
-        .enumerate()
-        .map(|(id, p)| {
+        .map(|p| {
             let config = config.clone();
             async move {
                 let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
@@ -81,11 +80,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     p.process_interleaved(&mut audio).await?;
                 }
                 let elapsed = t0.elapsed();
-                println!(
-                    "  Processor {:>2} finished in {:>8.1} ms",
-                    id + 1,
-                    elapsed.as_secs_f64() * 1000.0,
-                );
                 Ok::<_, aic_sdk::AicError>(elapsed)
             }
         })
@@ -93,6 +87,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let results = futures::future::try_join_all(tasks).await?;
     let parallel_elapsed = parallel_start.elapsed();
+
+    for (id, elapsed) in results.iter().enumerate() {
+        println!(
+            "  Processor {:>2} finished in {:>8.1} ms",
+            id + 1,
+            elapsed.as_secs_f64() * 1000.0,
+        );
+    }
 
     let max_individual = results.iter().max().copied().unwrap_or_default();
 
