@@ -34,11 +34,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build all processors upfront so initialization is not part of the timed
     // section.
     // -------------------------------------------------------------------------
-    let mut processors = Vec::with_capacity(NUM_PROCESSORS);
-    for _ in 0..NUM_PROCESSORS {
-        let p = ProcessorAsync::with_config(&model, &license, &config).await?;
-        processors.push(p);
-    }
+    let processors = futures::future::try_join_all(
+        (0..NUM_PROCESSORS).map(|_| ProcessorAsync::with_config(&model, &license, &config)),
+    )
+    .await?;
 
     println!(
         "Running {} processors × {} iterations each",
