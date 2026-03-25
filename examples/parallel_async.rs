@@ -1,26 +1,27 @@
-/// Demonstrates that multiple [`ProcessorAsync`] instances genuinely run in
-/// parallel when awaited concurrently.
-///
-/// Each processor records its own wall-clock processing time.  If they ran
-/// sequentially, the total elapsed time would be roughly `N × per-processor time`.
-/// When running in parallel the total time is close to the slowest
-/// single processor, which is what we verify and print.
+// Demonstrates that multiple `ProcessorAsync` instances genuinely run in
+// parallel when awaited concurrently.
+//
+// Each processor records its own wall-clock processing time.  If they ran
+// sequentially, the total elapsed time would be roughly `N × per-processor time`.
+// When running in parallel the total time is close to the slowest
+// single processor, which is what we verify and print.
+
+use aic_sdk::{Model, ProcessorAsync, ProcessorConfig};
+use std::time::Instant;
+
+const MODEL: &str = "quail-vf-2.0-l-16khz";
+const NUM_PROCESSORS: usize = 4;
+// Number of process calls per processor – enough to make timing visible.
+const ITERATIONS: usize = 50;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use aic_sdk::{Model, ProcessorAsync, ProcessorConfig};
-    use std::{env, sync::Arc, time::Instant};
-
-    const MODEL: &str = "quail-vf-2.0-l-16khz";
-    const NUM_PROCESSORS: usize = 4;
-    // Number of process calls per processor – enough to make timing visible.
-    const ITERATIONS: usize = 50;
-
     println!("ai-coustics SDK version: {}", aic_sdk::get_sdk_version());
 
-    let license = env::var("AIC_SDK_LICENSE").expect("AIC_SDK_LICENSE not set");
+    let license = std::env::var("AIC_SDK_LICENSE").expect("AIC_SDK_LICENSE not set");
 
     let model_path = Model::download(MODEL, "target")?;
-    let model = Arc::new(Model::from_file(&model_path)?);
+    let model = Model::from_file(&model_path)?;
     println!("Model loaded from {}", model_path.display());
 
     let config = ProcessorConfig::optimal(&model);
