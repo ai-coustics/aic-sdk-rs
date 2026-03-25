@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build all processors upfront so initialization is not part of the timed
     // section.
     // -------------------------------------------------------------------------
-    let processors = futures::future::try_join_all(
+    let mut processors = futures::future::try_join_all(
         (0..NUM_PROCESSORS).map(|_| ProcessorAsync::with_config(&model, &license, &config)),
     )
     .await?;
@@ -50,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let buf_len = config.num_channels as usize * config.num_frames;
 
     let sequential_start = Instant::now();
-    for p in &processors {
+    for p in &mut processors {
         let mut audio = vec![0.0f32; buf_len];
         for _ in 0..ITERATIONS {
             p.process_interleaved(&mut audio).await?;
@@ -70,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let parallel_start = Instant::now();
 
     let tasks: Vec<_> = processors
-        .iter()
+        .iter_mut()
         .map(|p| {
             let config = config.clone();
             async move {

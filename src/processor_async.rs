@@ -1,6 +1,4 @@
 use crate::{AicError, Model, Processor, ProcessorConfig, ProcessorContext, VadContext};
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
 /// An async wrapper around [`Processor`] for use in async/await contexts.
 ///
@@ -23,7 +21,7 @@ use tokio::sync::Mutex;
 /// }
 /// ```
 pub struct ProcessorAsync {
-    inner: Arc<Mutex<Processor<'static>>>,
+    inner: Processor<'static>,
 }
 
 impl ProcessorAsync {
@@ -32,9 +30,7 @@ impl ProcessorAsync {
     /// See [`Processor::new`] for details.
     pub fn new(model: &Model<'static>, license_key: &str) -> Result<Self, AicError> {
         let processor = Processor::new(model, license_key)?;
-        Ok(Self {
-            inner: Arc::new(Mutex::new(processor)),
-        })
+        Ok(Self { inner: processor })
     }
 
     /// Creates a new async processor and initializes it with the given configuration.
@@ -46,7 +42,7 @@ impl ProcessorAsync {
         license_key: &str,
         config: &ProcessorConfig,
     ) -> Result<Self, AicError> {
-        let this = Self::new(model, license_key)?;
+        let mut this = Self::new(model, license_key)?;
         this.initialize(config).await?;
         Ok(this)
     }
@@ -57,85 +53,77 @@ impl ProcessorAsync {
     ///
     /// # Warning
     /// This allocates memory internally. Do not call from latency-sensitive paths.
-    pub async fn initialize(&self, config: &ProcessorConfig) -> Result<(), AicError> {
-        let inner = Arc::clone(&self.inner);
-        let config = config.clone();
-        tokio::task::spawn_blocking(move || {
-            let mut processor = inner.blocking_lock();
-            processor.initialize(&config)
-        })
-        .await
-        .expect("spawn_blocking task panicked")
+    pub async fn initialize(&mut self, config: &ProcessorConfig) -> Result<(), AicError> {
+        // SAFETY: We are using `'static` for `spawn_blocking()`,
+        // but in reality `processor` is not accessible after the end of this method.
+        let processor: &'static mut Processor = unsafe { std::mem::transmute(&mut self.inner) };
+        // SAFETY: We are using `'static` for `spawn_blocking()`,
+        // but in reality `config` is not accessible after the end of this method.
+        let config: &'static _ = unsafe { std::mem::transmute(config) };
+        tokio::task::spawn_blocking(move || processor.initialize(config))
+            .await
+            .expect("spawn_blocking task panicked")
     }
 
     /// Processes audio with interleaved channel data.
     ///
     /// See [`Processor::process_interleaved`] for details on the memory layout.
-    pub async fn process_interleaved(&self, audio: &mut [f32]) -> Result<(), AicError> {
-        let inner = Arc::clone(&self.inner);
-        let mut buf = audio.to_vec();
-        tokio::task::spawn_blocking(move || {
-            let mut processor = inner.blocking_lock();
-            processor.process_interleaved(&mut buf)?;
-            Ok(buf)
-        })
-        .await
-        .expect("spawn_blocking task panicked")
-        .map(|buf| audio.copy_from_slice(&buf))
+    pub async fn process_interleaved(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
+        // SAFETY: We are using `'static` for `spawn_blocking()`,
+        // but in reality `processor` is not accessible after the end of this method.
+        let processor: &'static mut Processor = unsafe { std::mem::transmute(&mut self.inner) };
+        // SAFETY: We are using `'static` for `spawn_blocking()`,
+        // but in reality `audio` is not accessible after the end of this method.
+        let audio: &'static mut _ = unsafe { std::mem::transmute(audio) };
+        tokio::task::spawn_blocking(move || processor.process_interleaved(audio))
+            .await
+            .expect("spawn_blocking task panicked")
     }
 
     /// Processes audio with separate buffers for each channel (planar layout).
     ///
     /// See [`Processor::process_planar`] for details on the memory layout.
-    pub async fn process_planar<V: AsMut<[f32]> + AsRef<[f32]>>(
-        &self,
+    pub async fn process_planar<V: AsMut<[f32]> + AsRef<[f32]> + Send + 'static>(
+        &mut self,
         audio: &mut [V],
     ) -> Result<(), AicError> {
-        let inner = Arc::clone(&self.inner);
-        let mut buf: Vec<Vec<f32>> = audio.iter().map(|ch| ch.as_ref().to_vec()).collect();
-        tokio::task::spawn_blocking(move || {
-            let mut processor = inner.blocking_lock();
-            processor.process_planar(&mut buf)?;
-            Ok(buf)
-        })
-        .await
-        .expect("spawn_blocking task panicked")
-        .map(|buf| {
-            for (dst, src) in audio.iter_mut().zip(buf.iter()) {
-                dst.as_mut().copy_from_slice(src);
-            }
-        })
+        // SAFETY: We are using `'static` for `spawn_blocking()`,
+        // but in reality `processor` is not accessible after the end of this method.
+        let processor: &'static mut Processor = unsafe { std::mem::transmute(&mut self.inner) };
+        // SAFETY: We are using `'static` for `spawn_blocking()`,
+        // but in reality `audio` is not accessible after the end of this method.
+        let audio: &'static mut [V] = unsafe { std::mem::transmute(audio) };
+        tokio::task::spawn_blocking(move || processor.process_planar(audio))
+            .await
+            .expect("spawn_blocking task panicked")
     }
 
     /// Processes audio with sequential channel data.
     ///
     /// See [`Processor::process_sequential`] for details on the memory layout.
-    pub async fn process_sequential(&self, audio: &mut [f32]) -> Result<(), AicError> {
-        let inner = Arc::clone(&self.inner);
-        let mut buf = audio.to_vec();
-        tokio::task::spawn_blocking(move || {
-            let mut processor = inner.blocking_lock();
-            processor.process_sequential(&mut buf)?;
-            Ok(buf)
-        })
-        .await
-        .expect("spawn_blocking task panicked")
-        .map(|buf| audio.copy_from_slice(&buf))
+    pub async fn process_sequential(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
+        // SAFETY: We are using `'static` for `spawn_blocking()`,
+        // but in reality `processor` is not accessible after the end of this method.
+        let processor: &'static mut Processor = unsafe { std::mem::transmute(&mut self.inner) };
+        // SAFETY: We are using `'static` for `spawn_blocking()`,
+        // but in reality `audio` is not accessible after the end of this method.
+        let audio: &'static mut _ = unsafe { std::mem::transmute(audio) };
+        tokio::task::spawn_blocking(move || processor.process_sequential(audio))
+            .await
+            .expect("spawn_blocking task panicked")
     }
 
     /// Creates a [`ProcessorContext`] for real-time parameter control.
     ///
     /// See [`Processor::processor_context`] for details.
     pub async fn processor_context(&self) -> ProcessorContext {
-        let processor = self.inner.lock().await;
-        processor.processor_context()
+        self.inner.processor_context()
     }
 
     /// Creates a [`VadContext`] for voice activity detection.
     ///
     /// See [`Processor::vad_context`] for details.
     pub async fn vad_context(&self) -> VadContext {
-        let processor = self.inner.lock().await;
-        processor.vad_context()
+        self.inner.vad_context()
     }
 }
