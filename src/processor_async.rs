@@ -12,7 +12,7 @@ use crate::{AicError, Model, Processor, ProcessorConfig, ProcessorContext, VadCo
 ///     let model = Model::from_file("/path/to/model.aicmodel")?;
 ///     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 ///
-///     let processor = ProcessorAsync::new(&model, &license_key)?;
+///     let mut processor = ProcessorAsync::new(&model, &license_key)?;
 ///     processor.initialize(&config).await?;
 ///
 ///     let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
