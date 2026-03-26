@@ -174,7 +174,7 @@ async fn run_session(
     safety_margin: Duration,
     stop: Arc<AtomicBool>,
 ) -> SessionReport {
-    let processor = match ProcessorAsync::with_config(&model, &license, &config).await {
+    let mut processor = match ProcessorAsync::with_config(&model, &license, &config).await {
         Ok(processor) => processor,
         Err(err) => {
             return SessionReport {
