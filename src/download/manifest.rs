@@ -82,9 +82,14 @@ mod tests {
     fn metadata_for_model_returns_requested_version() {
         let manifest = load_manifest();
 
-        let model = manifest.metadata_for_model("quail-vf-2.0-l-16khz", 2).unwrap();
+        let model = manifest
+            .metadata_for_model("quail-vf-2.0-l-16khz", 2)
+            .unwrap();
 
-        assert_eq!(model.file_name, "quail_vf_2_0_l_16khz_d42jls1e_v18.aicmodel");
+        assert_eq!(
+            model.file_name,
+            "quail_vf_2_0_l_16khz_d42jls1e_v18.aicmodel"
+        );
         assert_eq!(
             model.url_path,
             "models/quail-vf-2-0-l-16khz/v2/quail_vf_2_0_l_16khz_d42jls1e_v18.aicmodel"
