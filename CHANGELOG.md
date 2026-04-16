@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16.0 - 2026-04-16
+
+## New Features
+
+- This release adds an **experimental** feature to export real-time audio processing metrics via OpenTelemetry (OTel).
+  The new feature is currently disabled by default and available for testing on early access only.
+
 ## 0.15.1 - 2026-03-17
 
 ## Improvements

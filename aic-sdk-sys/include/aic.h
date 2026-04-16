@@ -114,7 +114,7 @@ typedef enum AicProcessorParameter {
    * The exact behavior depends on the active model:
    * - **Quail Models:** Controls how aggressively the model suppresses noise. When used
    *   with Quail Voice Focus, it also suppresses background and competing speech.
-   * - **Sparrow Models:** Controls the mixback and therefore the intensity of the
+   * - **Rook Models:** Controls the mixback and therefore the intensity of the
    *   enhancement.
    *
    * **Range:** 0.0 to 1.0
@@ -498,6 +498,10 @@ enum AicErrorCode aic_processor_initialize(struct AicProcessor *processor,
  * - `num_channels`: Number of channels (must match initialization).
  * - `num_frames`: Number of samples per channel (must match initialization value, or if `allow_variable_frames` was enabled, must be ≤ initialization value).
  *
+ * # Note
+ * All channels are mixed to mono for processing. To process channels
+ * independently, create separate processor instances.
+ *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Audio processed successfully
  * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `audio` is NULL
@@ -531,6 +535,10 @@ enum AicErrorCode aic_processor_process_planar(struct AicProcessor *processor,
  * - `num_channels`: Number of channels (must match initialization).
  * - `num_frames`: Number of samples per channel (must match initialization value, or if `allow_variable_frames` was enabled, must be ≤ initialization value).
  *
+ * # Note
+ * All channels are mixed to mono for processing. To process channels
+ * independently, create separate processor instances.
+ *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Audio processed successfully
  * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `audio` is NULL
@@ -563,6 +571,10 @@ enum AicErrorCode aic_processor_process_interleaved(struct AicProcessor *process
  * - `audio`: Single buffer containing sequential audio data of size `num_channels` * `num_frames`. Must not be NULL.
  * - `num_channels`: Number of channels (must match initialization).
  * - `num_frames`: Number of samples per channel (must match initialization value, or if `allow_variable_frames` was enabled, must be ≤ initialization value).
+ *
+ * # Note
+ * All channels are mixed to mono for processing. To process channels
+ * independently, create separate processor instances.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Audio processed successfully
@@ -617,7 +629,7 @@ enum AicErrorCode aic_processor_context_create(struct AicProcessorContext **cont
 void aic_processor_context_destroy(struct AicProcessorContext *context);
 
 /**
- * Clears all internal state and buffers.
+ * Clears all internal state and buffers. This also resets the VAD state associated with this processor.
  *
  * Call this when the audio stream is interrupted or when seeking
  * to prevent artifacts from previous audio content.
@@ -734,6 +746,7 @@ enum AicErrorCode aic_processor_context_get_output_delay(const struct AicProcess
  * of a given processor.
  *
  * This uses the processor associated with the provided processor handle.
+ * All handles created from a given processor reference the same VAD instance.
  *
  * **Important:** If the backing processor is destroyed, the VAD instance will stop
  * producing new data. It is safe to destroy the processor without destroying the VAD.

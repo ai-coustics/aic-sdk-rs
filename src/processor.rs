@@ -101,13 +101,16 @@ pub enum ProcessorParameter {
     ///
     /// **Default:** 0.0
     Bypass,
-    /// Controls the intensity of speech enhancement processing.
+    /// A tunable parameter to optimize for specific STT engines, deployment environments,
+    /// and user experience requirements.
+    ///
+    /// The exact behavior depends on the active model:
+    /// - **Quail Models:** Controls how aggressively the model suppresses noise. When used
+    ///   with Quail Voice Focus, it also suppresses background and competing speech.
+    /// - **Rook Models:** Controls the mixback and therefore the intensity of the
+    ///   enhancement.
     ///
     /// **Range:** 0.0 to 1.0
-    /// - **0.0:** Bypass mode - original signal passes through unchanged
-    /// - **1.0:** Full enhancement - maximum noise reduction but also more audible artifacts
-    ///
-    /// **Default:** 1.0
     EnhancementLevel,
 }
 
@@ -257,6 +260,7 @@ impl ProcessorContext {
     }
 
     /// Clears all internal state and buffers.
+    /// This also resets the VAD state associated with this processor.
     ///
     /// Call this when the audio stream is interrupted or when seeking
     /// to prevent artifacts from previous audio content.
@@ -466,6 +470,7 @@ impl<'a> Processor<'a> {
     }
 
     /// Creates a [Voice Activity Detector Context](crate::vad::VadContext) instance.
+    /// All handles created from a given processor reference the same VAD instance.
     ///
     /// # Example
     ///
@@ -570,9 +575,11 @@ impl<'a> Processor<'a> {
     ///             Each channel buffer must be exactly of size `num_frames`,
     ///             or if `allow_variable_frames` was enabled, less than the initialization value.
     ///
-    /// # Note
+    /// # Notes
     ///
-    /// Maximum supported number of channels is 16. Exceeding this will return an error.
+    /// - All channels are mixed to mono for processing. To process channels
+    ///   independently, create separate processor instances.
+    /// - Maximum supported number of channels is 16. Exceeding this will return an error.
     ///
     /// # Returns
     ///
@@ -649,6 +656,11 @@ impl<'a> Processor<'a> {
     ///             Must be exactly of size `num_channels` * `num_frames`,
     ///             or if `allow_variable_frames` was enabled, less than the initialization value per channel.
     ///
+    /// # Note
+    ///
+    /// All channels are mixed to mono for processing. To process channels
+    /// independently, create separate processor instances.
+    ///
     /// # Returns
     ///
     /// Returns `Ok(())` on success or an `AicError` if processing fails.
@@ -709,6 +721,10 @@ impl<'a> Processor<'a> {
     /// * `audio` - Sequential audio buffer to be enhanced in-place.
     ///             Must be exactly of size `num_channels` * `num_frames`,
     ///             or if `allow_variable_frames` was enabled, less than the initialization value per channel.
+    /// # Note
+    ///
+    /// All channels are mixed to mono for processing. To process channels
+    /// independently, create separate processor instances.
     ///
     /// # Returns
     ///
@@ -800,7 +816,7 @@ mod tests {
             if path
                 .file_name()
                 .and_then(|n| n.to_str())
-                .map(|name| name.contains("sparrow_s_48khz") && name.ends_with(".aicmodel"))
+                .map(|name| name.contains("rook_s_48khz") && name.ends_with(".aicmodel"))
                 .unwrap_or(false)
             {
                 if path.is_file() {
@@ -811,9 +827,9 @@ mod tests {
         None
     }
 
-    /// Downloads the default test model `sparrow-s-48khz` into the crate's `target/` directory.
+    /// Downloads the default test model `rook-s-48khz` into the crate's `target/` directory.
     /// Returns the path to the downloaded model file.
-    fn get_sparrow_xxs_48khz() -> Result<PathBuf, AicError> {
+    fn get_rook_xxs_48khz() -> Result<PathBuf, AicError> {
         let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
 
         if let Some(existing) = find_existing_model(&target_dir) {
@@ -827,13 +843,13 @@ mod tests {
 
         #[cfg(feature = "download-model")]
         {
-            return Model::download("sparrow-s-48khz", target_dir);
+            return Model::download("rook-s-48khz", target_dir);
         }
 
         #[cfg(not(feature = "download-model"))]
         {
             panic!(
-                "Model `sparrow-s-48khz` not found in {} and `download-model` feature is disabled",
+                "Model `rook-s-48khz` not found in {} and `download-model` feature is disabled",
                 target_dir.display()
             );
         }
@@ -843,7 +859,7 @@ mod tests {
         let license_key = std::env::var("AIC_SDK_LICENSE")
             .expect("AIC_SDK_LICENSE environment variable must be set for tests");
 
-        let model_path = get_sparrow_xxs_48khz()?;
+        let model_path = get_rook_xxs_48khz()?;
         let model = Model::from_file(&model_path)?;
 
         Ok((model, license_key))

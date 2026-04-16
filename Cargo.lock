@@ -30,7 +30,7 @@ dependencies = [
 
 [[package]]
 name = "aic-sdk"
-version = "0.15.1"
+version = "0.16.0"
 dependencies = [
  "aic-sdk-sys",
  "approx",
@@ -45,7 +45,7 @@ dependencies = [
 
 [[package]]
 name = "aic-sdk-sys"
-version = "0.15.1"
+version = "0.16.0"
 dependencies = [
  "bindgen",
  "flate2",
@@ -113,7 +113,7 @@ dependencies = [
 
 [[package]]
 name = "build-time-download"
-version = "0.15.1"
+version = "0.16.0"
 dependencies = [
  "aic-sdk",
 ]
