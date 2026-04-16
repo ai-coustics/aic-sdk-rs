@@ -829,7 +829,7 @@ mod tests {
 
     /// Downloads the default test model `rook-s-48khz` into the crate's `target/` directory.
     /// Returns the path to the downloaded model file.
-    fn get_rook_xxs_48khz() -> Result<PathBuf, AicError> {
+    fn get_rook_s_48khz() -> Result<PathBuf, AicError> {
         let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
 
         if let Some(existing) = find_existing_model(&target_dir) {
@@ -859,7 +859,7 @@ mod tests {
         let license_key = std::env::var("AIC_SDK_LICENSE")
             .expect("AIC_SDK_LICENSE environment variable must be set for tests");
 
-        let model_path = get_rook_xxs_48khz()?;
+        let model_path = get_rook_s_48khz()?;
         let model = Model::from_file(&model_path)?;
 
         Ok((model, license_key))

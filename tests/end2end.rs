@@ -27,7 +27,7 @@ fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
     None
 }
 
-/// Downloads the test model `rook-xxs-48khz` into the crate's `target/` directory.
+/// Downloads the test model `rook-s-48khz` into the crate's `target/` directory.
 /// Returns the path to the downloaded model file.
 fn get_test_model_path() -> PathBuf {
     let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
