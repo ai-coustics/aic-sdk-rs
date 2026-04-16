@@ -19,7 +19,7 @@ fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
         if path.extension().is_some_and(|ext| ext == "aicmodel")
             && path
                 .file_name()
-                .is_some_and(|name| name.to_string_lossy().starts_with("sparrow_s_48khz"))
+                .is_some_and(|name| name.to_string_lossy().starts_with("rook_s_48khz"))
         {
             return Some(path);
         }
@@ -27,7 +27,7 @@ fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
     None
 }
 
-/// Downloads the test model `sparrow-xxs-48khz` into the crate's `target/` directory.
+/// Downloads the test model `rook-s-48khz` into the crate's `target/` directory.
 /// Returns the path to the downloaded model file.
 fn get_test_model_path() -> PathBuf {
     let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
@@ -41,7 +41,7 @@ fn get_test_model_path() -> PathBuf {
         return existing;
     }
 
-    Model::download("sparrow-s-48khz", &target_dir).expect("Failed to download test model")
+    Model::download("rook-s-48khz", &target_dir).expect("Failed to download test model")
 }
 
 fn license_key() -> String {
