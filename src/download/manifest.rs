@@ -82,16 +82,16 @@ mod tests {
     fn metadata_for_model_returns_requested_version() {
         let manifest = load_manifest();
 
-        let model = manifest.metadata_for_model("rook-xxs-48khz", 1).unwrap();
+        let model = manifest.metadata_for_model("quail-vf-2.0-l-16khz", 2).unwrap();
 
-        assert_eq!(model.file_name, "rook_xxs_48khz_wsur2zkw_v7.aicmodel");
+        assert_eq!(model.file_name, "quail_vf_2_0_l_16khz_d42jls1e_v18.aicmodel");
         assert_eq!(
             model.url_path,
-            "models/rook-xxs-48khz/v1/rook_xxs_48khz_wsur2zkw_v7.aicmodel"
+            "models/quail-vf-2-0-l-16khz/v2/quail_vf_2_0_l_16khz_d42jls1e_v18.aicmodel"
         );
         assert_eq!(
             model.checksum,
-            "26003656195671346f73bf35ca3329e316cac585fee9b4e6802287d1be715ef9"
+            "c33a73442e2598acfd2fdc88ca127d1e8ecea0941dc93e4d3e1169246941de6e"
         );
     }
 }
