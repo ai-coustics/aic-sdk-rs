@@ -98,7 +98,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 print!("*");
                 if active_threads.is_multiple_of(50) {
-                    print!("\n");
+                    println!();
                 }
 
                 std::io::stdout().flush().unwrap();
@@ -194,6 +194,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn spawn_session(
     session_id: usize,
     model: Arc<Model<'static>>,

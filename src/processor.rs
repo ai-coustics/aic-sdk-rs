@@ -818,10 +818,9 @@ mod tests {
                 .and_then(|n| n.to_str())
                 .map(|name| name.contains("rook_s_48khz") && name.ends_with(".aicmodel"))
                 .unwrap_or(false)
+                && path.is_file()
             {
-                if path.is_file() {
-                    return Some(path);
-                }
+                return Some(path);
             }
         }
         None
@@ -841,13 +840,9 @@ mod tests {
             return Ok(existing);
         }
 
-        #[cfg(feature = "download-model")]
-        {
-            return Model::download("rook-s-48khz", target_dir);
-        }
-
-        #[cfg(not(feature = "download-model"))]
-        {
+        if cfg!(feature = "download-model") {
+            Model::download("rook-s-48khz", target_dir)
+        } else {
             panic!(
                 "Model `rook-s-48khz` not found in {} and `download-model` feature is disabled",
                 target_dir.display()
