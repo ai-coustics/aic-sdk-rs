@@ -19,7 +19,7 @@ fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
         if path.extension().is_some_and(|ext| ext == "aicmodel")
             && path
                 .file_name()
-                .is_some_and(|name| name.to_string_lossy().starts_with("rook_s_48khz"))
+                .is_some_and(|name| name.to_string_lossy().starts_with("quail_vf_2_1_s_16khz"))
         {
             return Some(path);
         }
@@ -27,7 +27,7 @@ fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
     None
 }
 
-/// Downloads the test model `rook-s-48khz` into the crate's `target/` directory.
+/// Downloads the test model `quail-vf-2.1-s-16khz` into the crate's `target/` directory.
 /// Returns the path to the downloaded model file.
 fn get_test_model_path() -> PathBuf {
     let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
@@ -41,49 +41,15 @@ fn get_test_model_path() -> PathBuf {
         return existing;
     }
 
-    Model::download("rook-s-48khz", &target_dir).expect("Failed to download test model")
+    Model::download("quail-vf-2.1-s-16khz", &target_dir).expect("Failed to download test model")
 }
 
 fn license_key() -> String {
     std::env::var("AIC_SDK_LICENSE").expect("AIC_SDK_LICENSE environment variable not set")
 }
 
-struct TestAudio {
-    sample_rate: u32,
-    num_channels: usize,
-    num_frames: usize,
-    interleaved_samples: Vec<f32>,
-}
-
-fn load_wav_audio(path: impl AsRef<Path>) -> TestAudio {
-    let reader = hound::WavReader::open(path).expect("Failed to open WAV file");
-    let spec = reader.spec();
-    let num_channels = spec.channels as usize;
-    let sample_rate = spec.sample_rate;
-
-    let samples: Vec<f32> = match spec.sample_format {
-        hound::SampleFormat::Float => reader
-            .into_samples::<f32>()
-            .map(|s| s.expect("Failed to read sample"))
-            .collect(),
-        hound::SampleFormat::Int => {
-            let bits = spec.bits_per_sample;
-            let max_value = (1 << (bits - 1)) as f32;
-            reader
-                .into_samples::<i32>()
-                .map(|s| s.expect("Failed to read sample") as f32 / max_value)
-                .collect()
-        }
-    };
-
-    let num_frames = samples.len() / num_channels;
-
-    TestAudio {
-        sample_rate,
-        num_channels,
-        num_frames,
-        interleaved_samples: samples,
-    }
+fn load_audio(path: impl AsRef<Path>) -> audio_file::Audio<f32> {
+    audio_file::read(path, audio_file::ReadConfig::default()).expect("Failed to read audio file")
 }
 
 fn interleaved_to_sequential(interleaved: &[f32], num_channels: usize) -> Vec<f32> {
@@ -138,13 +104,15 @@ fn planar_to_interleaved(planar: &[Vec<f32>]) -> Vec<f32> {
 /// pre-generated reference file.
 #[test]
 fn process_full_file_interleaved() {
-    let audio = load_wav_audio(TEST_AUDIO_PATH);
+    let audio = load_audio(TEST_AUDIO_PATH);
+    let num_channels = audio.num_channels as usize;
+    let num_frames = audio.samples_interleaved.len() / num_channels;
     let model = Model::from_file(get_test_model_path()).expect("Failed to load model");
 
     let config = ProcessorConfig {
         sample_rate: audio.sample_rate,
-        num_channels: audio.num_channels as u16,
-        num_frames: audio.num_frames,
+        num_channels: audio.num_channels,
+        num_frames,
         allow_variable_frames: false,
     };
 
@@ -158,15 +126,14 @@ fn process_full_file_interleaved() {
         .set_parameter(ProcessorParameter::EnhancementLevel, 0.9)
         .expect("Failed to set enhancement level");
 
-    let mut samples = audio.interleaved_samples.clone();
+    let mut samples = audio.samples_interleaved.clone();
     processor
         .process_interleaved(&mut samples)
         .expect("Failed to process audio");
 
-    let expected_output = load_wav_audio(TEST_AUDIO_ENHANCED_PATH);
-
-    for (&sample1, sample2) in samples.iter().zip(expected_output.interleaved_samples) {
-        assert!(approx::abs_diff_eq!(sample1, sample2, epsilon = 1e-6));
+    let expected = load_audio(TEST_AUDIO_ENHANCED_PATH);
+    for (&sample, expected) in samples.iter().zip(expected.samples_interleaved) {
+        assert!(approx::abs_diff_eq!(sample, expected, epsilon = 1e-6));
     }
 }
 
@@ -175,13 +142,15 @@ fn process_full_file_interleaved() {
 /// processes it, and verifies the output matches the reference after converting back to interleaved.
 #[test]
 fn process_full_file_sequential() {
-    let audio = load_wav_audio(TEST_AUDIO_PATH);
+    let audio = load_audio(TEST_AUDIO_PATH);
+    let num_channels = audio.num_channels as usize;
+    let num_frames = audio.samples_interleaved.len() / num_channels;
     let model = Model::from_file(get_test_model_path()).expect("Failed to load model");
 
     let config = ProcessorConfig {
         sample_rate: audio.sample_rate,
-        num_channels: audio.num_channels as u16,
-        num_frames: audio.num_frames,
+        num_channels: audio.num_channels,
+        num_frames,
         allow_variable_frames: false,
     };
 
@@ -195,16 +164,15 @@ fn process_full_file_sequential() {
         .set_parameter(ProcessorParameter::EnhancementLevel, 0.9)
         .expect("Failed to set enhancement level");
 
-    let mut samples = interleaved_to_sequential(&audio.interleaved_samples, audio.num_channels);
+    let mut samples = interleaved_to_sequential(&audio.samples_interleaved, num_channels);
     processor
         .process_sequential(&mut samples)
         .expect("Failed to process audio");
 
-    let result = sequential_to_interleaved(&samples, audio.num_channels);
-    let expected_output = load_wav_audio(TEST_AUDIO_ENHANCED_PATH);
-
-    for (&sample1, sample2) in result.iter().zip(expected_output.interleaved_samples) {
-        assert!(approx::abs_diff_eq!(sample1, sample2, epsilon = 1e-6));
+    let result = sequential_to_interleaved(&samples, num_channels);
+    let expected = load_audio(TEST_AUDIO_ENHANCED_PATH);
+    for (&sample, expected) in result.iter().zip(expected.samples_interleaved) {
+        assert!(approx::abs_diff_eq!(sample, expected, epsilon = 1e-6));
     }
 }
 
@@ -213,13 +181,15 @@ fn process_full_file_sequential() {
 /// processes it, and verifies the output matches the reference after converting back to interleaved.
 #[test]
 fn process_full_file_planar() {
-    let audio = load_wav_audio(TEST_AUDIO_PATH);
+    let audio = load_audio(TEST_AUDIO_PATH);
+    let num_channels = audio.num_channels as usize;
+    let num_frames = audio.samples_interleaved.len() / num_channels;
     let model = Model::from_file(get_test_model_path()).expect("Failed to load model");
 
     let config = ProcessorConfig {
         sample_rate: audio.sample_rate,
-        num_channels: audio.num_channels as u16,
-        num_frames: audio.num_frames,
+        num_channels: audio.num_channels,
+        num_frames,
         allow_variable_frames: false,
     };
 
@@ -233,16 +203,15 @@ fn process_full_file_planar() {
         .set_parameter(ProcessorParameter::EnhancementLevel, 0.9)
         .expect("Failed to set enhancement level");
 
-    let mut planar = interleaved_to_planar(&audio.interleaved_samples, audio.num_channels);
+    let mut planar = interleaved_to_planar(&audio.samples_interleaved, num_channels);
     processor
         .process_planar(&mut planar)
         .expect("Failed to process audio");
 
     let result = planar_to_interleaved(&planar);
-    let expected_output = load_wav_audio(TEST_AUDIO_ENHANCED_PATH);
-
-    for (&sample1, sample2) in result.iter().zip(expected_output.interleaved_samples) {
-        assert!(approx::abs_diff_eq!(sample1, sample2, epsilon = 1e-6));
+    let expected = load_audio(TEST_AUDIO_ENHANCED_PATH);
+    for (&sample, expected) in result.iter().zip(expected.samples_interleaved) {
+        assert!(approx::abs_diff_eq!(sample, expected, epsilon = 1e-6));
     }
 }
 
@@ -253,10 +222,16 @@ fn process_full_file_planar() {
 /// to ensure deterministic behavior.
 #[test]
 fn process_blocks_with_vad() {
-    let audio = load_wav_audio(TEST_AUDIO_PATH);
+    let audio = load_audio(TEST_AUDIO_PATH);
+    let num_channels = audio.num_channels as usize;
     let model = Model::from_file(get_test_model_path()).expect("Failed to load model");
 
-    let config = ProcessorConfig::optimal(&model).with_num_channels(audio.num_channels as u16);
+    let config = ProcessorConfig {
+        sample_rate: audio.sample_rate,
+        num_channels: audio.num_channels,
+        num_frames: model.optimal_num_frames(audio.sample_rate),
+        allow_variable_frames: false,
+    };
 
     let mut processor = Processor::new(&model, &license_key())
         .expect("Failed to create processor")
@@ -270,8 +245,8 @@ fn process_blocks_with_vad() {
 
     let vad_ctx = processor.vad_context();
 
-    let mut samples = audio.interleaved_samples.clone();
-    let block_size = config.num_frames * audio.num_channels;
+    let mut samples = audio.samples_interleaved.clone();
+    let block_size = config.num_frames * num_channels;
     let mut speech_detected_results = Vec::new();
 
     for chunk in samples.chunks_mut(block_size) {
@@ -296,10 +271,16 @@ fn process_blocks_with_vad() {
 /// affect voice activity detection.
 #[test]
 fn process_blocks_with_vad_and_enhancement() {
-    let audio = load_wav_audio(TEST_AUDIO_PATH);
+    let audio = load_audio(TEST_AUDIO_PATH);
+    let num_channels = audio.num_channels as usize;
     let model = Model::from_file(get_test_model_path()).expect("Failed to load model");
 
-    let config = ProcessorConfig::optimal(&model).with_num_channels(audio.num_channels as u16);
+    let config = ProcessorConfig {
+        sample_rate: audio.sample_rate,
+        num_channels: audio.num_channels,
+        num_frames: model.optimal_num_frames(audio.sample_rate),
+        allow_variable_frames: false,
+    };
 
     let mut processor = Processor::new(&model, &license_key())
         .expect("Failed to create processor")
@@ -313,8 +294,8 @@ fn process_blocks_with_vad_and_enhancement() {
 
     let vad_ctx = processor.vad_context();
 
-    let mut samples = audio.interleaved_samples.clone();
-    let block_size = config.num_frames * audio.num_channels;
+    let mut samples = audio.samples_interleaved.clone();
+    let block_size = config.num_frames * num_channels;
     let mut speech_detected_results = Vec::new();
 
     for chunk in samples.chunks_mut(block_size) {
