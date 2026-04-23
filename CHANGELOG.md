@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.17.0 - 2026-04-23
+
+## New Features
+
+- Added support for Quail Voice Focus 2.1 models.
+
+## Breaking Changes
+
+- Quail Voice Focus 2.0 is no longer supported.
+- Compatible model file version was bumped to 3.
+
 ## 0.16.0 - 2026-04-16
 
 ## New Features

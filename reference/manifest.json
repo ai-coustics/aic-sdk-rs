@@ -16,6 +16,13 @@
           "checksum": "3327953548d078d575394181f7df265fe5d32383a55e4fcdb8a08f2688c93549",
           "uploaded_at": "2026-02-23T12:03:06Z",
           "git_sha": "1def392ec8244283141394322a910608d67c4180"
+        },
+        "v3": {
+          "file": "models/quail-l-16khz/v3/quail_l_16khz_dtv5nvgu_v20.aicmodel",
+          "filename": "quail_l_16khz_dtv5nvgu_v20.aicmodel",
+          "checksum": "8839706f3462adcef003181e70919cc5ca41fa62096634d005ba1fbc89f2f0f4",
+          "uploaded_at": "2026-04-23T08:27:28Z",
+          "git_sha": "cdadd56af61e9c78c15a833223b5b90ae7d3e6d8"
         }
       }
     },
@@ -34,6 +41,13 @@
           "checksum": "fe26e46f03451791f592ff69972a7b845a9092ebc305062ed46a713571743738",
           "uploaded_at": "2026-02-23T12:03:06Z",
           "git_sha": "1def392ec8244283141394322a910608d67c4180"
+        },
+        "v3": {
+          "file": "models/quail-l-8khz/v3/quail_l_8khz_mp51agn0_v13.aicmodel",
+          "filename": "quail_l_8khz_mp51agn0_v13.aicmodel",
+          "checksum": "689eeea2ddd54c1081e6c6bb5287060b631ea4d704fc285ef40af48d296cc445",
+          "uploaded_at": "2026-04-23T08:27:29Z",
+          "git_sha": "cdadd56af61e9c78c15a833223b5b90ae7d3e6d8"
         }
       }
     },
@@ -52,6 +66,13 @@
           "checksum": "027242aa1a5174a1eec7a77fdd60c0895c934bd24020cb57cd76117ab5c0f197",
           "uploaded_at": "2026-02-23T12:03:06Z",
           "git_sha": "1def392ec8244283141394322a910608d67c4180"
+        },
+        "v3": {
+          "file": "models/quail-s-16khz/v3/quail_s_16khz_ilmexgyt_v8.aicmodel",
+          "filename": "quail_s_16khz_ilmexgyt_v8.aicmodel",
+          "checksum": "bbdcb6b0f43957ddc7b1ef150e31b906fd03e5732f41082bebfe81c52f690022",
+          "uploaded_at": "2026-04-23T08:27:29Z",
+          "git_sha": "cdadd56af61e9c78c15a833223b5b90ae7d3e6d8"
         }
       }
     },
@@ -70,6 +91,13 @@
           "checksum": "80581fe9d63f1170357db24c2edd214e03701450d57b3befa5d92e59acdef2fb",
           "uploaded_at": "2026-02-23T12:03:06Z",
           "git_sha": "1def392ec8244283141394322a910608d67c4180"
+        },
+        "v3": {
+          "file": "models/quail-s-8khz/v3/quail_s_8khz_9q57ojki_v20.aicmodel",
+          "filename": "quail_s_8khz_9q57ojki_v20.aicmodel",
+          "checksum": "6e1f83c0ad0c341f253d77e5dda08088379e0937c349d9c8ccfbbf880a2e496e",
+          "uploaded_at": "2026-04-23T08:27:29Z",
+          "git_sha": "cdadd56af61e9c78c15a833223b5b90ae7d3e6d8"
         }
       }
     },
@@ -229,6 +257,13 @@
           "checksum": "5f6808ec14d53534d78738d8e05bd2fa27953eb58b960240971307a19dfc9ecf",
           "uploaded_at": "2026-03-17T15:37:50Z",
           "git_sha": "0c9a6cf583f5936ed562bed36c22ec02b42a9946"
+        },
+        "v3": {
+          "file": "models/bypass/v3/bypass.aicmodel",
+          "filename": "bypass.aicmodel",
+          "checksum": "bcaffed11b4eaa6bf9ad656089b1192628c68df2ad56880d3aa8b1982e9f8d4a",
+          "uploaded_at": "2026-04-23T08:27:28Z",
+          "git_sha": "cdadd56af61e9c78c15a833223b5b90ae7d3e6d8"
         }
       }
     },
@@ -269,6 +304,13 @@
           "checksum": "ec8550a4f41f58beac13d2a576fdb36f62a89410192ce0f52ed43b8289b7970c",
           "uploaded_at": "2026-03-17T16:40:37Z",
           "git_sha": "d5d4115ba64912c0153584882ed7017fbff928d3"
+        },
+        "v3": {
+          "file": "models/rook-l-16khz/v3/rook_l_16khz_dtv5nvgu_v20.aicmodel",
+          "filename": "rook_l_16khz_dtv5nvgu_v20.aicmodel",
+          "checksum": "b90223799cac9f92bc92a1bb87c27b3b072a5c34897680b9953180fdca0610df",
+          "uploaded_at": "2026-04-23T08:27:29Z",
+          "git_sha": "cdadd56af61e9c78c15a833223b5b90ae7d3e6d8"
         }
       }
     },
@@ -287,6 +329,13 @@
           "checksum": "04a63bf298821874ebef7ac558e66be7964c21baf651fb9638d557766353bbcb",
           "uploaded_at": "2026-03-17T16:40:37Z",
           "git_sha": "d5d4115ba64912c0153584882ed7017fbff928d3"
+        },
+        "v3": {
+          "file": "models/rook-l-48khz/v3/rook_l_48khz_7n1r44ri_v23.aicmodel",
+          "filename": "rook_l_48khz_7n1r44ri_v23.aicmodel",
+          "checksum": "51a41edd010809035deddaf3914abc6382fd2bb2592994ca8a514cc58de5deab",
+          "uploaded_at": "2026-04-23T08:27:29Z",
+          "git_sha": "cdadd56af61e9c78c15a833223b5b90ae7d3e6d8"
         }
       }
     },
@@ -305,6 +354,13 @@
           "checksum": "e916757e356dd299bde6842a31c2e50ea11d81bdca0434a09c9d6e25f2ab5038",
           "uploaded_at": "2026-03-17T16:40:37Z",
           "git_sha": "d5d4115ba64912c0153584882ed7017fbff928d3"
+        },
+        "v3": {
+          "file": "models/rook-l-8khz/v3/rook_l_8khz_mp51agn0_v13.aicmodel",
+          "filename": "rook_l_8khz_mp51agn0_v13.aicmodel",
+          "checksum": "9a335d6ad7f456256e244d2594101b26f06c4cafd9a62f3d85e211782785515c",
+          "uploaded_at": "2026-04-23T08:27:29Z",
+          "git_sha": "cdadd56af61e9c78c15a833223b5b90ae7d3e6d8"
         }
       }
     },
@@ -323,6 +379,13 @@
           "checksum": "43ef287f103839330e71f508f130339c5753b50ac1254436368168ab759faf2d",
           "uploaded_at": "2026-03-17T16:40:37Z",
           "git_sha": "d5d4115ba64912c0153584882ed7017fbff928d3"
+        },
+        "v3": {
+          "file": "models/rook-s-16khz/v3/rook_s_16khz_ilmexgyt_v8.aicmodel",
+          "filename": "rook_s_16khz_ilmexgyt_v8.aicmodel",
+          "checksum": "1952e587be74c2a409ab1795af1bb9e892f46ffcb254525a8109debae31f989e",
+          "uploaded_at": "2026-04-23T08:27:29Z",
+          "git_sha": "cdadd56af61e9c78c15a833223b5b90ae7d3e6d8"
         }
       }
     },
@@ -341,6 +404,13 @@
           "checksum": "291ca14c21b66e1acc3b6ca352e9452c5a04da2730f433ab9d49edf2528229ac",
           "uploaded_at": "2026-03-17T16:40:37Z",
           "git_sha": "d5d4115ba64912c0153584882ed7017fbff928d3"
+        },
+        "v3": {
+          "file": "models/rook-s-48khz/v3/rook_s_48khz_kg8kp9qm_v52.aicmodel",
+          "filename": "rook_s_48khz_kg8kp9qm_v52.aicmodel",
+          "checksum": "35529310b22b132d3a30443a0d66a280cec407f3bb406a79dcb1d2dab7f975bb",
+          "uploaded_at": "2026-04-23T08:27:29Z",
+          "git_sha": "cdadd56af61e9c78c15a833223b5b90ae7d3e6d8"
         }
       }
     },
@@ -359,6 +429,13 @@
           "checksum": "a97d221f192730532109125effdbb22da64cb07a66c473cf4e2f9a9559d94c68",
           "uploaded_at": "2026-03-17T16:40:37Z",
           "git_sha": "d5d4115ba64912c0153584882ed7017fbff928d3"
+        },
+        "v3": {
+          "file": "models/rook-s-8khz/v3/rook_s_8khz_9q57ojki_v20.aicmodel",
+          "filename": "rook_s_8khz_9q57ojki_v20.aicmodel",
+          "checksum": "a8212ae3b9addffa06b56629c31dda4ad30fd9a30fbf7dece1f41319f3736d14",
+          "uploaded_at": "2026-04-23T08:27:29Z",
+          "git_sha": "cdadd56af61e9c78c15a833223b5b90ae7d3e6d8"
         }
       }
     },
@@ -383,7 +460,29 @@
           "git_sha": "d5d4115ba64912c0153584882ed7017fbff928d3"
         }
       }
+    },
+    "quail-vf-2.1-l-16khz": {
+      "versions": {
+        "v3": {
+          "file": "models/quail-vf-2-1-l-16khz/v3/quail_vf_2_1_l_16khz_8xope536_v11.aicmodel",
+          "filename": "quail_vf_2_1_l_16khz_8xope536_v11.aicmodel",
+          "checksum": "04c1ef610feccf2e6f24af608c6cf3f73490ffd34c31a8000a898b24d70998a8",
+          "uploaded_at": "2026-04-23T08:27:29Z",
+          "git_sha": "cdadd56af61e9c78c15a833223b5b90ae7d3e6d8"
+        }
+      }
+    },
+    "quail-vf-2.1-s-16khz": {
+      "versions": {
+        "v3": {
+          "file": "models/quail-vf-2-1-s-16khz/v3/quail_vf_2_1_s_16khz_5i8jb8of_v12.aicmodel",
+          "filename": "quail_vf_2_1_s_16khz_5i8jb8of_v12.aicmodel",
+          "checksum": "4f46d47179a4505e0220d1c7e2ccc3041a59724dff0afdb9218507274b4b6616",
+          "uploaded_at": "2026-04-23T08:27:29Z",
+          "git_sha": "cdadd56af61e9c78c15a833223b5b90ae7d3e6d8"
+        }
+      }
     }
   },
-  "updated_at": "2026-03-17T16:40:37Z"
+  "updated_at": "2026-04-23T08:27:29Z"
 }

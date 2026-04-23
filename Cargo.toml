@@ -6,10 +6,10 @@ edition = "2024"
 homepage = "https://ai-coustics.com/sdk/"
 license = "Apache-2.0"
 repository = "https://github.com/ai-coustics/aic-sdk-rs"
-version = "0.16.0"
+version = "0.17.0"
 
 [workspace.dependencies]
-aic-sdk-sys = { version = "0.16.0", path = "aic-sdk-sys" }
+aic-sdk-sys = { version = "0.17.0", path = "aic-sdk-sys" }
 serde = { version = "1.0" }
 serde_json = { version = "1.0" }
 sha2 = { version = "0.10" }
@@ -40,7 +40,7 @@ ureq = { workspace = true, optional = true, features = ["rustls"] }
 
 [dev-dependencies]
 approx = "0.5"
-hound = "3.5"
+audio-file = "0.4.1"
 serde_json = { workspace = true }
 tokio = { version = "1.49", features = ["macros", "rt-multi-thread", "sync", "time"] }
 

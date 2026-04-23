@@ -8,7 +8,7 @@ use std::{
 use tokio::sync::{mpsc, watch};
 
 // Specify the model to benchmark
-const MODEL: &str = "quail-vf-2.0-l-16khz";
+const MODEL: &str = "quail-vf-2.1-s-16khz";
 
 // Interval between spawning new processing threads
 const THREAD_SPAWN_INTERVAL: Duration = Duration::from_secs(3);

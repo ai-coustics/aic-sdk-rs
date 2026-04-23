@@ -8,7 +8,7 @@ For comprehensive documentation, visit [docs.ai-coustics.com](https://docs.ai-co
 > This SDK requires a license key. Generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com).
 
 > [!WARNING]
-> You must use a Rust version different from `1.95.0-beta.8`, which was used to build the static libraries. A solution is currently in development.
+> You must use a Rust version different from `1.96.0-beta.4`, which was used to build the static libraries. A solution is currently in development.
 
 ## Installation
 
@@ -90,7 +90,7 @@ cargo add aic-sdk --features download-lib,download-model
 ```rust,ignore
 use aic_sdk::Model;
 
-let model_path = Model::download("quail-vf-2.0-l-16khz", "./models")?;
+let model_path = Model::download("quail-vf-2.1-s-16khz", "./models")?;
 let model = Model::from_file(&model_path)?;
 ```
 
