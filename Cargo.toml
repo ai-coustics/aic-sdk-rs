@@ -39,7 +39,7 @@ serde = { workspace = true, optional = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
 sha2 = { workspace = true, optional = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["sync", "rt"] }
+tokio = { workspace = true, features = ["rt", "sync"] }
 ureq = { workspace = true, optional = true, features = ["rustls"] }
 
 [dev-dependencies]
