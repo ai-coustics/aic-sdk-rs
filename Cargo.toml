@@ -10,10 +10,12 @@ version = "0.17.0"
 
 [workspace.dependencies]
 aic-sdk-sys = { version = "0.17.0", path = "aic-sdk-sys" }
+rayon = "1"
 serde = { version = "1.0" }
 serde_json = { version = "1.0" }
 sha2 = { version = "0.10" }
 thiserror = "2.0"
+tokio = { version = "1" }
 ureq = { version = "3.1", default-features = false }
 
 [package]
@@ -32,17 +34,20 @@ version.workspace = true
 
 [dependencies]
 aic-sdk-sys = { workspace = true }
+rayon = { workspace = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true }
 sha2 = { workspace = true, optional = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, features = ["rt", "sync"] }
 ureq = { workspace = true, optional = true, features = ["rustls"] }
 
 [dev-dependencies]
 approx = "0.5"
 audio-file = "0.4.1"
+futures = "0.3"
 serde_json = { workspace = true }
-tokio = { version = "1.49", features = ["macros", "rt-multi-thread", "sync", "time"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
 
 [features]
 download-lib = ["aic-sdk-sys/download-lib"]
@@ -55,3 +60,7 @@ path = "examples/basic_usage.rs"
 [[example]]
 name = "benchmark"
 path = "examples/benchmark.rs"
+
+[[example]]
+name = "parallel_async"
+path = "examples/parallel_async.rs"

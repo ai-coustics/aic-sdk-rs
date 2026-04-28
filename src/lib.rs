@@ -7,11 +7,13 @@ mod download;
 mod error;
 mod model;
 mod processor;
+mod processor_async;
 mod vad;
 
 pub use error::*;
 pub use model::*;
 pub use processor::*;
+pub use processor_async::*;
 pub use vad::*;
 
 /// Returns the version of the ai-coustics SDK library.
