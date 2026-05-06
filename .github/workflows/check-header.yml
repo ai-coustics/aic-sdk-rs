@@ -1,4 +1,4 @@
-name: Check aic.h Sync
+name: Check Header Sync
 
 on:
   push:
@@ -10,8 +10,6 @@ on:
     paths:
       - aic-sdk-sys/checksum.txt
       - aic-sdk-sys/include/aic.h
-  schedule:
-    - cron: "0 8 * * 1" # Every Monday at 08:00 UTC
   workflow_dispatch:
 
 concurrency:
