@@ -1,0 +1,65 @@
+name: Check aic.h Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - aic-sdk-sys/checksum.txt
+      - aic-sdk-sys/include/aic.h
+  pull_request:
+    paths:
+      - aic-sdk-sys/checksum.txt
+      - aic-sdk-sys/include/aic.h
+  schedule:
+    - cron: "0 8 * * 1" # Every Monday at 08:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  check-aic-h:
+    name: aic.h matches SDK release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse SDK version from checksum.txt
+        id: sdk
+        run: |
+          VERSION=$(grep 'x86_64-unknown-linux-gnu' aic-sdk-sys/checksum.txt \
+            | grep -oP '\d+\.\d+\.\d+')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "SDK version: $VERSION"
+
+      - name: Download SDK archive
+        run: |
+          VERSION=${{ steps.sdk.outputs.version }}
+          URL="https://github.com/ai-coustics/aic-sdk-c/releases/download/${VERSION}/aic-sdk-x86_64-unknown-linux-gnu-${VERSION}.tar.gz"
+          echo "Downloading $URL"
+          curl -fsSL "$URL" -o sdk.tar.gz
+
+      - name: Verify checksum
+        run: |
+          EXPECTED=$(grep 'x86_64-unknown-linux-gnu' aic-sdk-sys/checksum.txt | awk '{print $1}')
+          ACTUAL=$(sha256sum sdk.tar.gz | awk '{print $1}')
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::SHA256 mismatch — expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
+          echo "Checksum OK: $ACTUAL"
+
+      - name: Extract aic.h from archive
+        run: |
+          mkdir extracted
+          tar -xzf sdk.tar.gz -C extracted include/aic.h
+
+      - name: Compare aic.h
+        run: |
+          if diff -u aic-sdk-sys/include/aic.h extracted/include/aic.h; then
+            echo "aic.h is in sync with SDK ${{ steps.sdk.outputs.version }}"
+          else
+            echo "::error::aic-sdk-sys/include/aic.h differs from SDK release ${{ steps.sdk.outputs.version }}. Update the header to match."
+            exit 1
+          fi
