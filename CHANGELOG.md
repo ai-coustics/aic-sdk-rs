@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.17.1 - 2026-05-06
+
+## Improvements
+
+- Increased maximum VAD speech hold duration from 100x to 300x the model's window size.
+
+## Bug Fixes
+
+- Removed zero-padding when the host frame size does not match the model frame size, which caused unexpected behavior for some models.
+
 ## 0.17.0 - 2026-04-23
 
 ## New Features
