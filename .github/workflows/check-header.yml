@@ -51,7 +51,7 @@ jobs:
       - name: Extract aic.h from archive
         run: |
           mkdir extracted
-          tar -xzf sdk.tar.gz -C extracted include/aic.h
+          tar -xzf sdk.tar.gz -C extracted ./include/aic.h
 
       - name: Compare aic.h
         run: |
