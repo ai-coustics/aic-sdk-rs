@@ -6,9 +6,6 @@
 // When running in parallel the total time is close to the slowest
 // single processor, which is what we verify and print.
 
-#![cfg_attr(not(feature = "download-model"), allow(dead_code, unused_imports))]
-
-#[cfg(feature = "download-model")]
 use aic_sdk::{Model, ProcessorAsync, ProcessorConfig};
 use std::time::Instant;
 
@@ -17,12 +14,6 @@ const NUM_PROCESSORS: usize = 4;
 // Number of process calls per processor – enough to make timing visible.
 const ITERATIONS: usize = 50;
 
-#[cfg(not(feature = "download-model"))]
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    Err("Enable the `download-model` feature to run this example.".into())
-}
-
-#[cfg(feature = "download-model")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("ai-coustics SDK version: {}", aic_sdk::get_sdk_version());

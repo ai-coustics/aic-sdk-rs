@@ -1,15 +1,6 @@
-#![cfg_attr(not(feature = "download-model"), allow(dead_code, unused_imports))]
-
-#[cfg(feature = "download-model")]
 use aic_sdk::{Model, Processor, ProcessorConfig, ProcessorParameter, VadParameter};
 use std::env;
 
-#[cfg(not(feature = "download-model"))]
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    Err("Enable the `download-model` feature to run this example.".into())
-}
-
-#[cfg(feature = "download-model")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Display library version
     println!("ai-coustics SDK version: {}", aic_sdk::get_sdk_version());
