@@ -5,7 +5,7 @@ use std::sync::{Arc, OnceLock};
 
 static RAYON_POOL: OnceLock<rayon::ThreadPool> = OnceLock::new();
 
-fn pool() -> &'static rayon::ThreadPool {
+fn get_global_thread_pool() -> &'static rayon::ThreadPool {
     RAYON_POOL.get_or_init(|| {
         let num_threads = std::env::var("AIC_NUM_THREADS")
             .ok()
@@ -90,7 +90,7 @@ impl ProcessorAsync {
         let config = config.clone();
         let (tx, rx) = oneshot::channel();
         let mut processor = self.inner.lock_arc().await;
-        pool().spawn(move || {
+        get_global_thread_pool().spawn(move || {
             let _ = tx.send(processor.initialize(&config));
         });
         rx.await.expect("Rayon worker dropped")
@@ -105,7 +105,7 @@ impl ProcessorAsync {
     pub async fn process_interleaved(&self, mut audio: Vec<f32>) -> Result<Vec<f32>, AicError> {
         let (tx, rx) = oneshot::channel();
         let mut processor = self.inner.lock_arc().await;
-        pool().spawn(move || {
+        get_global_thread_pool().spawn(move || {
             let result = processor.process_interleaved(&mut audio).map(|_| audio);
             let _ = tx.send(result);
         });
@@ -124,7 +124,7 @@ impl ProcessorAsync {
     ) -> Result<Vec<Vec<f32>>, AicError> {
         let (tx, rx) = oneshot::channel();
         let mut processor = self.inner.lock_arc().await;
-        pool().spawn(move || {
+        get_global_thread_pool().spawn(move || {
             let result = processor.process_planar(&mut audio).map(|_| audio);
             let _ = tx.send(result);
         });
@@ -140,7 +140,7 @@ impl ProcessorAsync {
     pub async fn process_sequential(&self, mut audio: Vec<f32>) -> Result<Vec<f32>, AicError> {
         let (tx, rx) = oneshot::channel();
         let mut processor = self.inner.lock_arc().await;
-        pool().spawn(move || {
+        get_global_thread_pool().spawn(move || {
             let result = processor.process_sequential(&mut audio).map(|_| audio);
             let _ = tx.send(result);
         });
