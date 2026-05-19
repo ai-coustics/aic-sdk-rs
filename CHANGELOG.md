@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.18.0 - 2026-05-19
+
+## New Features
+
+- Added `ProcessorAsync`, an async wrapper around `Processor` that offloads processing to a background thread pool, gated behind the new `async-processor` feature. The implementation is runtime-agnostic and works on any executor (tokio, smol, async-std, ...).
+
+  ```toml
+  [dependencies]
+  aic-sdk = { version = "0.18", features = ["async-processor"] }
+  ```
+
+  ```rust,no_run
+  use aic_sdk::{Model, ProcessorAsync, ProcessorConfig};
+
+  #[tokio::main]
+  async fn main() -> Result<(), aic_sdk::AicError> {
+      let model = Model::from_file("/path/to/model.aicmodel")?;
+      let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+      let processor = ProcessorAsync::with_config(&model, "license", &config).await?;
+
+      let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
+      let audio = processor.process_interleaved(audio).await?;
+      Ok(())
+  }
+  ```
+
 ## 0.17.1 - 2026-05-06
 
 ## Improvements
@@ -81,7 +107,6 @@
 
 - Fixed an issue allowing users to change processor parameters with certain models
 
-
 ## 0.13.0 - 2026-01-14
 
 This release integrates ai-coustics C library version 0.13.0, which comes with a number of new features and several breaking changes.
@@ -93,6 +118,7 @@ Most notably, the C library no longer includes any models, which significantly r
 **Model naming changes**: Quail-STT models are now called "Quail" - These models are optimized for human-to-machine enhancement (e.g., Speech-to-Text (STT) applications). Quail models are now called "Sparrow" - These models are optimized for human-to-human enhancement (e.g., voice calls, conferencing). This naming change clarifies the distinction between STT-focused models and human-to-human communication model
 
 **Major architectural change**: The API has been restructured to separate model data from processing instances. What was previously called `Model` (which handled both model data and processing) has been split into:
+
 - `Model`: Now represents only the ML model data loaded from files or memory
 - `Processor`: New type that performs the actual audio processing using a model
 - Multiple processors can share the same model, allowing efficient resource usage across streams
@@ -111,15 +137,15 @@ Most notably, the C library no longer includes any models, which significantly r
 - Added `ProcessorConfig::optimal()` helper that returns a configuration pre-filled with the model's optimal sample rate and frame count.
 - Added builder methods `ProcessorConfig::with_num_channels()` and `ProcessorConfig::with_allow_variable_frames()`.
 - Model query methods are now on `Model`:
-    - `Model::optimal_sample_rate()` - gets optimal sample rate for a model
-    - `Model::optimal_num_frames()` - gets optimal frame count for a model at given sample rate
+  - `Model::optimal_sample_rate()` - gets optimal sample rate for a model
+  - `Model::optimal_num_frames()` - gets optimal frame count for a model at given sample rate
 - Added new error variants for model loading:
-    - `AicError::ModelInvalid`
-    - `AicError::ModelVersionUnsupported`
-    - `AicError::ModelFilePathInvalid`
-    - `AicError::FileSystemError`
-    - `AicError::ModelDataUnaligned`
-    - `AicError::ModelDownload`
+  - `AicError::ModelInvalid`
+  - `AicError::ModelVersionUnsupported`
+  - `AicError::ModelFilePathInvalid`
+  - `AicError::FileSystemError`
+  - `AicError::ModelDataUnaligned`
+  - `AicError::ModelDownload`
 
 ### Breaking changes
 
@@ -128,14 +154,14 @@ Most notably, the C library no longer includes any models, which significantly r
 - Removed `Model::new()`, `Model::initialize()`, and `Model::process_*()` methods.
 - `Processor::initialize()` now takes a `ProcessorConfig` struct instead of discrete arguments.
 - `EnhancementParameter` was renamed to `ProcessorParameter`:
-    - `EnhancementParameter::Bypass` → `ProcessorParameter::Bypass`
-    - `EnhancementParameter::EnhancementLevel` → `ProcessorParameter::EnhancementLevel`
-    - `EnhancementParameter::VoiceGain` → `ProcessorParameter::VoiceGain`
+  - `EnhancementParameter::Bypass` → `ProcessorParameter::Bypass`
+  - `EnhancementParameter::EnhancementLevel` → `ProcessorParameter::EnhancementLevel`
+  - `EnhancementParameter::VoiceGain` → `ProcessorParameter::VoiceGain`
 - Parameter and control methods moved to `ProcessorContext` (obtained via `Processor::processor_context()`):
-    - `Model::reset()` → `ProcessorContext::reset()`
-    - `Model::parameter()` → `ProcessorContext::parameter()`
-    - `Model::set_parameter()` → `ProcessorContext::set_parameter()`
-    - `Model::output_delay()` → `ProcessorContext::output_delay()`
+  - `Model::reset()` → `ProcessorContext::reset()`
+  - `Model::parameter()` → `ProcessorContext::parameter()`
+  - `Model::set_parameter()` → `ProcessorContext::set_parameter()`
+  - `Model::output_delay()` → `ProcessorContext::output_delay()`
 - `set_parameter()` and `reset()` now take `&self` instead of `&mut self` (thread-safe).
 - `output_delay()` now returns `usize` directly instead of `Result`.
 - VAD construction moved from `Model::create_vad()` to `Processor::vad_context()` and now only needs `&self`.
@@ -153,12 +179,12 @@ Most notably, the C library no longer includes any models, which significantly r
 ### New features
 
 - Added new VAD parameter `VadParameter::MinimumSpeechDuration` used to control for how long speech needs to be present
-in the audio signal before the VAD considers it speech.
+  in the audio signal before the VAD considers it speech.
 
 ### Breaking changes
 
 - Replaced VAD parameter `VadParameter::LookbackBufferSize` with `VadParameter::SpeechHoldDuration`, used to control
-for how long the VAD continues to detect speech after the audio signal no longer contains speech.
+  for how long the VAD continues to detect speech after the audio signal no longer contains speech.
 
 ## 0.11.0 - 2025-12-11
 
@@ -219,40 +245,46 @@ for how long the VAD continues to detect speech after the audio signal no longer
 ## 0.9.0 - 2025-11-06
 
 ### Features
+
 - **Voice Activity Detection**: This release adds a new Quail-based VAD. The VAD automatically uses the output of a Quail model to calculate a voice activity prediction.
 
 ### Breaking Changes
+
 - `handle_error()`'s visibility is now `pub(crate)`.
 
 ## 0.8.2 - 2025-11-06
 
 ### Fixes
+
 - Fixed build error on macOS
 
 ## 0.8.1 - 2025-10-29
 
 ### Fixes
+
 - Fixed documentation build on docs.rs
 
 ## 0.8.0 - 2025-10-28
 
 ### New features
+
 - **Self-Service Licenses**: Starting with this release, you can use self-service licenses directly from our development portal.
 - **Usage-Based Telemetry**: This release introduces a new telemetry feature that collects usage data, paving the way for future usage-based pricing models such as pay-per-minute billing.
-    - **What we collect**: We collect only the processing time used and some diagnostic data
-    - **Privacy**: We do not collect any information about your audio content. Your audio never leaves your device during our processing.
-    - **Requirements**: Requires a constant internet connection. If the SDK cannot be activated online, enhancement will stop after 10 seconds. If telemetry data cannot be sent, enhancement will stop after 5 minutes. When enhancement is stopped an error will be returned, the audio will be bypassed and the processing delay will be still applied to ensure an uninterrupted audio stream without discontinuities.
-    - **Error Handling**: When processing is bypassed because our backend cannot be reached or does not allow you to process, the process functions will return `AicError::EnhancementNotAllowed`. Make sure to handle this error in your implementation.
-    - **Offline Licenses**: If you cannot provide a constant internet connection, please contact us to obtain a special offline license that does not require telemetry.
-
+  - **What we collect**: We collect only the processing time used and some diagnostic data
+  - **Privacy**: We do not collect any information about your audio content. Your audio never leaves your device during our processing.
+  - **Requirements**: Requires a constant internet connection. If the SDK cannot be activated online, enhancement will stop after 10 seconds. If telemetry data cannot be sent, enhancement will stop after 5 minutes. When enhancement is stopped an error will be returned, the audio will be bypassed and the processing delay will be still applied to ensure an uninterrupted audio stream without discontinuities.
+  - **Error Handling**: When processing is bypassed because our backend cannot be reached or does not allow you to process, the process functions will return `AicError::EnhancementNotAllowed`. Make sure to handle this error in your implementation.
+  - **Offline Licenses**: If you cannot provide a constant internet connection, please contact us to obtain a special offline license that does not require telemetry.
 
 ### Breaking changes
+
 - **Variable number of frames supported**: `Model::initialize` now supports a variable number of frames per call. To enable this feature, use the new `allow_variable_frames` parameter in the initialize function. Set allow_variable_frames to true to enable variable frame processing, or false to maintain the previous fixed frame behavior. Note that enabling variable frames results in higher processing delay.
 - **New bypass parameter**: A new parameter `Parameter::Bypass` has been added to control audio processing bypass while preserving algorithmic delay. When enabled, the input audio passes through unmodified, but the output is still delayed by the same amount as during normal processing. This ensures seamless transitions when toggling enhancement on/off without audible clicks or timing shifts.
 - **Updated Error Codes**: Expanded and renamed error variants, with additional license-related errors.
 - **Version API improved**: `aic_sdk_version()` was renamed to `aic_sdk::get_version()` and it now returns a `&'static str`.
 
 ### Fixes
+
 - The internal model state is now automatically reset when processing is paused (e.g., when bypass is enabled or enhancement level is set to 0). This ensures a clean state when processing resumes.
 - The reset operation now ensures that all internal DSP components are properly reset, providing a more thorough clean state.
 - Fixed an issue where, after a successful initialization, a subsequent initialization error would not properly block processing, potentially allowing operations on a partially initialized model.

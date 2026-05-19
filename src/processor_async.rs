@@ -1,6 +1,7 @@
 use crate::{AicError, Model, Processor, ProcessorConfig, ProcessorContext, VadContext};
+use async_lock::Mutex;
+use futures_channel::oneshot;
 use std::sync::{Arc, OnceLock};
-use tokio::sync::Mutex;
 
 static RAYON_POOL: OnceLock<rayon::ThreadPool> = OnceLock::new();
 
@@ -86,12 +87,13 @@ impl ProcessorAsync {
     /// # Warning
     /// This allocates memory internally. Do not call from latency-sensitive paths.
     pub async fn initialize(&self, config: &ProcessorConfig) -> Result<(), AicError> {
-        let inner = Arc::clone(&self.inner);
         let config = config.clone();
-        let mut processor = inner.lock_owned().await;
-        tokio::task::spawn_blocking(move || processor.initialize(&config))
-            .await
-            .expect("spawn_blocking task panicked")
+        let (tx, rx) = oneshot::channel();
+        let mut processor = self.inner.lock_arc().await;
+        pool().spawn(move || {
+            let _ = tx.send(processor.initialize(&config));
+        });
+        rx.await.expect("Rayon worker dropped")
     }
 
     /// Processes audio with interleaved channel data.
@@ -101,9 +103,8 @@ impl ProcessorAsync {
     ///
     /// See [`Processor::process_interleaved`] for details on the memory layout.
     pub async fn process_interleaved(&self, mut audio: Vec<f32>) -> Result<Vec<f32>, AicError> {
-        let inner = Arc::clone(&self.inner);
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        let mut processor = inner.lock_owned().await;
+        let (tx, rx) = oneshot::channel();
+        let mut processor = self.inner.lock_arc().await;
         pool().spawn(move || {
             let result = processor.process_interleaved(&mut audio).map(|_| audio);
             let _ = tx.send(result);
@@ -121,9 +122,8 @@ impl ProcessorAsync {
         &self,
         mut audio: Vec<Vec<f32>>,
     ) -> Result<Vec<Vec<f32>>, AicError> {
-        let inner = Arc::clone(&self.inner);
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        let mut processor = inner.lock_owned().await;
+        let (tx, rx) = oneshot::channel();
+        let mut processor = self.inner.lock_arc().await;
         pool().spawn(move || {
             let result = processor.process_planar(&mut audio).map(|_| audio);
             let _ = tx.send(result);
@@ -138,9 +138,8 @@ impl ProcessorAsync {
     ///
     /// See [`Processor::process_sequential`] for details on the memory layout.
     pub async fn process_sequential(&self, mut audio: Vec<f32>) -> Result<Vec<f32>, AicError> {
-        let inner = Arc::clone(&self.inner);
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        let mut processor = inner.lock_owned().await;
+        let (tx, rx) = oneshot::channel();
+        let mut processor = self.inner.lock_arc().await;
         pool().spawn(move || {
             let result = processor.process_sequential(&mut audio).map(|_| audio);
             let _ = tx.send(result);

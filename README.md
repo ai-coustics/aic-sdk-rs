@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load the embedded model (or download manually at https://artifacts.ai-coustics.io/)
     let model = Model::from_buffer(MODEL)?;
-    
+
     // Get optimal configuration based on the selected model
     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
@@ -66,6 +66,7 @@ println!("Compatible model version: {}", aic_sdk::get_compatible_model_version()
 Download models and find available IDs at [artifacts.ai-coustics.io](https://artifacts.ai-coustics.io/).
 
 #### Load from File
+
 ```rust,ignore
 use aic_sdk::Model;
 
@@ -73,6 +74,7 @@ let model = Model::from_file("path/to/model.aicmodel")?;
 ```
 
 #### Embed at Compile Time
+
 ```rust,ignore
 use aic_sdk::{Model, include_model};
 
@@ -81,6 +83,7 @@ let model = Model::from_buffer(MODEL)?;
 ```
 
 #### Download from CDN
+
 Enable the `download-model` feature:
 
 ```bash
@@ -205,14 +208,45 @@ if vad_ctx.is_speech_detected() {
 }
 ```
 
+### Async Processing
+
+Enable the `async-processor` feature to use [`ProcessorAsync`], which offloads
+processing to a background thread pool and returns a future. The implementation
+is runtime-agnostic and works on any executor (tokio, smol, async-std, ...).
+
+```bash
+cargo add aic-sdk --features async-processor
+```
+
+```rust,ignore
+use aic_sdk::{Model, ProcessorAsync, ProcessorConfig};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let license_key = std::env::var("AIC_SDK_LICENSE")?;
+    let model = Model::from_file("path/to/model.aicmodel")?;
+    let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+
+    let processor = ProcessorAsync::with_config(&model, &license_key, &config).await?;
+
+    // The async API takes ownership of the buffer and returns it back.
+    let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
+    let audio = processor.process_interleaved(audio).await?;
+    Ok(())
+}
+```
+
 ## Examples
 
 See the example files for complete working examples:
+
 - [`examples/basic_usage.rs`](examples/basic_usage.rs) - Basic usage example
 - [`examples/build-time-download`](examples/build-time-download) - Download and embed models at compile-time
 - [`examples/benchmark.rs`](examples/benchmark.rs) - Run multiple processor instances concurrently until the real-time requirements are not met
+- [`examples/parallel_async.rs`](examples/parallel_async.rs) - Async processing with `ProcessorAsync` across multiple instances (requires `async-processor`)
 
 Run examples with:
+
 ```bash
 export AIC_SDK_LICENSE="your_license_key_here"
 cargo run --example basic_usage --features download-lib,download-model
