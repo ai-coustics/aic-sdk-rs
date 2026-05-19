@@ -213,6 +213,8 @@ if vad_ctx.is_speech_detected() {
 Enable the `async` feature to use [`ProcessorAsync`], which offloads
 processing to a background thread pool and returns a future. The implementation
 is runtime-agnostic and works on any executor (tokio, smol, async-std, ...).
+The pool defaults to one thread per logical CPU; override with the
+`AIC_NUM_THREADS` environment variable.
 
 ```bash
 cargo add aic-sdk --features async

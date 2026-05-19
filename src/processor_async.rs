@@ -21,11 +21,18 @@ fn get_global_thread_pool() -> &'static rayon::ThreadPool {
             .num_threads(num_threads)
             .thread_name(|i| format!("aic-processing-thread-{i}"))
             .build()
-            .expect("failed to build aic thread-pool")
+            .expect("failed to build aic thread pool")
     })
 }
 
-/// An async wrapper around [`Processor`] for use in async/await contexts.
+/// A wrapper around [`Processor`] for use in async contexts.
+///
+/// # Threading
+///
+/// Processing runs on a background thread pool shared across all
+/// [`ProcessorAsync`] instances. The pool defaults to one thread per logical
+/// CPU. Override with the `AIC_NUM_THREADS` environment variable, which is
+/// read once on first use.
 ///
 /// # Example
 ///
@@ -47,8 +54,6 @@ fn get_global_thread_pool() -> &'static rayon::ThreadPool {
 /// ```
 pub struct ProcessorAsync {
     inner: Arc<Mutex<Processor<'static>>>,
-    processor_context: Arc<ProcessorContext>,
-    vad_context: Arc<VadContext>,
 }
 
 impl ProcessorAsync {
@@ -57,12 +62,8 @@ impl ProcessorAsync {
     /// See [`Processor::new`] for details.
     pub fn new(model: &Model<'static>, license_key: &str) -> Result<Self, AicError> {
         let processor = Processor::new(model, license_key)?;
-        let processor_context = Arc::new(processor.processor_context());
-        let vad_context = Arc::new(processor.vad_context());
         Ok(Self {
             inner: Arc::new(Mutex::new(processor)),
-            processor_context,
-            vad_context,
         })
     }
 
@@ -149,21 +150,15 @@ impl ProcessorAsync {
 
     /// Returns a [`ProcessorContext`] for real-time parameter control.
     ///
-    /// The handle is created once at construction time and shared across calls;
-    /// every caller gets a clone of the same underlying context.
-    ///
     /// See [`Processor::processor_context`] for details.
-    pub fn processor_context(&self) -> Arc<ProcessorContext> {
-        Arc::clone(&self.processor_context)
+    pub async fn processor_context(&self) -> ProcessorContext {
+        self.inner.lock().await.processor_context()
     }
 
     /// Returns a [`VadContext`] for voice activity detection.
     ///
-    /// The handle is created once at construction time and shared across calls;
-    /// every caller gets a clone of the same underlying context.
-    ///
     /// See [`Processor::vad_context`] for details.
-    pub fn vad_context(&self) -> Arc<VadContext> {
-        Arc::clone(&self.vad_context)
+    pub async fn vad_context(&self) -> VadContext {
+        self.inner.lock().await.vad_context()
     }
 }
