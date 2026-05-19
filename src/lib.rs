@@ -1,4 +1,5 @@
 #![doc = include_str!("../README.md")]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 use aic_sdk_sys::{aic_get_compatible_model_version, aic_get_sdk_version, aic_set_sdk_wrapper_id};
 use std::ffi::CStr;
 
@@ -7,14 +8,14 @@ mod download;
 mod error;
 mod model;
 mod processor;
-#[cfg(feature = "async-processor")]
+#[cfg(feature = "async")]
 mod processor_async;
 mod vad;
 
 pub use error::*;
 pub use model::*;
 pub use processor::*;
-#[cfg(feature = "async-processor")]
+#[cfg(feature = "async")]
 pub use processor_async::*;
 pub use vad::*;
 

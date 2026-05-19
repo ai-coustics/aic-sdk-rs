@@ -4,11 +4,11 @@
 
 ## New Features
 
-- Added `ProcessorAsync`, an async wrapper around `Processor` that offloads processing to a background thread pool, gated behind the new `async-processor` feature. The implementation is runtime-agnostic and works on any executor (tokio, smol, async-std, ...).
+- Added `ProcessorAsync`, an async wrapper around `Processor` that offloads processing to a background thread pool, gated behind the new `async` feature. The implementation is runtime-agnostic and works on any executor (tokio, smol, async-std, ...).
 
   ```toml
   [dependencies]
-  aic-sdk = { version = "0.18", features = ["async-processor"] }
+  aic-sdk = { version = "0.18", features = ["async"] }
   ```
 
   ```rust,no_run

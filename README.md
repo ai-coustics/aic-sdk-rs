@@ -210,12 +210,12 @@ if vad_ctx.is_speech_detected() {
 
 ### Async Processing
 
-Enable the `async-processor` feature to use [`ProcessorAsync`], which offloads
+Enable the `async` feature to use [`ProcessorAsync`], which offloads
 processing to a background thread pool and returns a future. The implementation
 is runtime-agnostic and works on any executor (tokio, smol, async-std, ...).
 
 ```bash
-cargo add aic-sdk --features async-processor
+cargo add aic-sdk --features async
 ```
 
 ```rust,ignore
@@ -243,7 +243,7 @@ See the example files for complete working examples:
 - [`examples/basic_usage.rs`](examples/basic_usage.rs) - Basic usage example
 - [`examples/build-time-download`](examples/build-time-download) - Download and embed models at compile-time
 - [`examples/benchmark.rs`](examples/benchmark.rs) - Run multiple processor instances concurrently until the real-time requirements are not met
-- [`examples/parallel_async.rs`](examples/parallel_async.rs) - Async processing with `ProcessorAsync` across multiple instances (requires `async-processor`)
+- [`examples/parallel_async.rs`](examples/parallel_async.rs) - Async processing with `ProcessorAsync` across multiple instances (requires `async`)
 
 Run examples with:
 

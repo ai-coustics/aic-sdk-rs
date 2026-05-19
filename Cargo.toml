@@ -53,9 +53,13 @@ serde_json = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
 
 [features]
-async-processor = ["dep:async-lock", "dep:futures-channel", "dep:rayon"]
+async = ["dep:async-lock", "dep:futures-channel", "dep:rayon"]
 download-lib = ["aic-sdk-sys/download-lib"]
 download-model = ["dep:serde", "dep:serde_json", "dep:sha2", "dep:ureq"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [[example]]
 name = "basic_usage"
@@ -68,4 +72,4 @@ path = "examples/benchmark.rs"
 [[example]]
 name = "parallel_async"
 path = "examples/parallel_async.rs"
-required-features = ["async-processor"]
+required-features = ["async"]
