@@ -7,12 +7,14 @@ mod download;
 mod error;
 mod model;
 mod processor;
+#[cfg(feature = "async-processor")]
 mod processor_async;
 mod vad;
 
 pub use error::*;
 pub use model::*;
 pub use processor::*;
+#[cfg(feature = "async-processor")]
 pub use processor_async::*;
 pub use vad::*;
 
