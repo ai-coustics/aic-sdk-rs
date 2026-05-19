@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for p in &processors {
         let mut audio = vec![0.0f32; buf_len];
         for _ in 0..ITERATIONS {
-            p.process_interleaved(&mut audio).await?;
+            audio = p.process_interleaved(audio).await?;
         }
     }
     let sequential_elapsed = sequential_start.elapsed();
@@ -78,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
                 let t0 = Instant::now();
                 for _ in 0..ITERATIONS {
-                    p.process_interleaved(&mut audio).await?;
+                    audio = p.process_interleaved(audio).await?;
                 }
                 Ok::<_, aic_sdk::AicError>(t0.elapsed())
             }
