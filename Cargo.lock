@@ -29,9 +29,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aic-model-downloader"
+version = "0.17.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "ureq",
+]
+
+[[package]]
 name = "aic-sdk"
 version = "0.17.1"
 dependencies = [
+ "aic-model-downloader",
  "aic-sdk-sys",
  "approx",
  "async-lock",
@@ -39,12 +51,9 @@ dependencies = [
  "futures",
  "futures-channel",
  "rayon",
- "serde",
  "serde_json",
- "sha2",
  "thiserror",
  "tokio",
- "ureq",
 ]
 
 [[package]]
@@ -1553,6 +1562,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fdc97a28575b85cfedf2a7e7d3cc64b3e11bd8ac766666318003abbacc7a21fc"
 dependencies = [
  "base64",
+ "flate2",
  "log",
  "percent-encoding",
  "rustls",

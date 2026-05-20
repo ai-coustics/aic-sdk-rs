@@ -25,6 +25,10 @@ pub struct ModelMetadata {
 }
 
 impl Manifest {
+    pub fn from_json(json: &str) -> Result<Self, Error> {
+        serde_json::from_str(json).map_err(|err| Error::ManifestParse(err.to_string()))
+    }
+
     pub fn download() -> Result<Self, Error> {
         let mut response = ureq::get(MANIFEST_URL)
             .call()
@@ -35,7 +39,7 @@ impl Manifest {
             .read_to_string()
             .map_err(|err| Error::ManifestDownload(err.to_string()))?;
 
-        serde_json::from_str(&body).map_err(|err| Error::ManifestParse(err.to_string()))
+        Self::from_json(&body)
     }
 
     pub fn metadata_for_model(&self, id: &str, version: u32) -> Result<&ModelMetadata, Error> {
@@ -73,7 +77,7 @@ mod tests {
     fn load_manifest() -> Manifest {
         serde_json::from_str(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/reference/manifest.json"
+            "/fixtures/manifest.json"
         )))
         .unwrap()
     }
