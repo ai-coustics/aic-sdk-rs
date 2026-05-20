@@ -307,7 +307,7 @@ impl<'a> Model<'a> {
         download_dir: P,
     ) -> Result<std::path::PathBuf, AicError> {
         let compatible_version = crate::get_compatible_model_version();
-        crate::download::download(model_id, compatible_version, download_dir)
+        aic_model_downloader::download(model_id, compatible_version, download_dir)
             .map_err(|err| AicError::ModelDownload(err.to_string()))
     }
 

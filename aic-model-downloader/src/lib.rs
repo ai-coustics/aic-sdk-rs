@@ -96,6 +96,10 @@ fn checksum_matches(path: &Path, expected: &str) -> Result<bool, Error> {
         hasher.update(&buffer[..read]);
     }
 
-    let checksum = format!("{:x}", hasher.finalize());
+    let checksum = hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
     Ok(checksum.eq_ignore_ascii_case(expected))
 }

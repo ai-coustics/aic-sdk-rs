@@ -1,0 +1,20 @@
+[package]
+categories = ["multimedia::audio"]
+description = "Helper crate for downloading ai-coustics aicmodel files"
+documentation = "https://docs.rs/aic-model-downloader"
+edition.workspace = true
+exclude = [".github"]
+homepage.workspace = true
+keywords = ["audio", "download", "model", "speech", "voice"]
+license.workspace = true
+name = "aic-model-downloader"
+readme = "README.md"
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+ureq = { workspace = true, features = ["rustls"] }

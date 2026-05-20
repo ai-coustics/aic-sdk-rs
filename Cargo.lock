@@ -29,9 +29,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aic-model-downloader"
+version = "0.17.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "ureq",
+]
+
+[[package]]
 name = "aic-sdk"
 version = "0.17.1"
 dependencies = [
+ "aic-model-downloader",
  "aic-sdk-sys",
  "approx",
  "async-lock",
@@ -39,12 +51,9 @@ dependencies = [
  "futures",
  "futures-channel",
  "rayon",
- "serde",
  "serde_json",
- "sha2",
  "thiserror",
  "tokio",
- "ureq",
 ]
 
 [[package]]
