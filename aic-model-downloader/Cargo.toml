@@ -2,6 +2,7 @@
 edition.workspace = true
 homepage.workspace = true
 name = "aic-model-downloader"
+publish = false
 version.workspace = true
 
 [dependencies]

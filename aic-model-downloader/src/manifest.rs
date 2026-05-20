@@ -75,7 +75,7 @@ mod tests {
     use super::*;
 
     fn load_manifest() -> Manifest {
-        serde_json::from_str(include_str!(concat!(
+        Manifest::from_json(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/fixtures/manifest.json"
         )))

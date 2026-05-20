@@ -1,5 +1,5 @@
 [workspace]
-members = ["aic-sdk-sys", "examples/build-time-download"]
+members = ["aic-model-downloader", "aic-sdk-sys", "examples/build-time-download"]
 
 [workspace.package]
 edition = "2024"
