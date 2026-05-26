@@ -33,6 +33,10 @@ pub enum AicError {
     LicenseVersionUnsupported,
     #[error("License key has expired. Renew your license to continue.")]
     LicenseExpired,
+    #[error(
+        "Updating the token is only supported when both the original and new keys are JWT-form licenses."
+    )]
+    TokenUpdateUnsupported,
     #[error("The model file is invalid or corrupted. Verify the file is correct.")]
     ModelInvalid,
     #[error("The model file version is not compatible with this SDK version.")]
@@ -70,6 +74,7 @@ impl From<AicErrorCode::Type> for AicError {
             AIC_ERROR_CODE_LICENSE_FORMAT_INVALID => AicError::LicenseFormatInvalid,
             AIC_ERROR_CODE_LICENSE_VERSION_UNSUPPORTED => AicError::LicenseVersionUnsupported,
             AIC_ERROR_CODE_LICENSE_EXPIRED => AicError::LicenseExpired,
+            AIC_ERROR_CODE_TOKEN_UPDATE_UNSUPPORTED => AicError::TokenUpdateUnsupported,
             AIC_ERROR_CODE_MODEL_INVALID => AicError::ModelInvalid,
             AIC_ERROR_CODE_MODEL_VERSION_UNSUPPORTED => AicError::ModelVersionUnsupported,
             AIC_ERROR_CODE_MODEL_FILE_PATH_INVALID => AicError::ModelFilePathInvalid,

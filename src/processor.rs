@@ -332,6 +332,61 @@ impl ProcessorContext {
         let error_code = unsafe { aic_processor_context_reset(self.as_const_ptr()) };
         handle_error(error_code)
     }
+
+    /// Replaces the bearer token on a running processor.
+    ///
+    /// Use this when your license key is a JWT and needs to be refreshed
+    /// before it expires. Calling this with a renewed token lets you stay
+    /// authenticated without tearing down and recreating the processor: audio
+    /// processing continues uninterrupted, the context handle stays valid, and
+    /// the new token is used for all subsequent authentication against the
+    /// ai-coustics backend.
+    ///
+    /// In-place updates are only supported when both the originally configured
+    /// key and the new token are JWTs. Other license kinds cannot be swapped
+    /// in this way. If either side is unsupported, the call returns
+    /// [`AicError::TokenUpdateUnsupported`] and the existing token stays in
+    /// use.
+    ///
+    /// Safe to call concurrently with audio processing on the originating
+    /// [`Processor`].
+    ///
+    /// # Arguments
+    ///
+    /// * `token` - The new JWT to use for backend requests.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success, [`AicError::LicenseFormatInvalid`] if the
+    /// new token cannot be parsed, or [`AicError::TokenUpdateUnsupported`] if
+    /// the original or new key does not support in-place updates.
+    ///
+    /// # Warning
+    ///
+    /// Do not call from real-time audio threads as this allocates memory and
+    /// performs cryptographic work.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Processor};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let processor_context = processor.processor_context();
+    /// # let new_jwt = std::env::var("AIC_SDK_LICENSE_REFRESHED").unwrap();
+    /// processor_context.update_bearer_token(&new_jwt).unwrap();
+    /// ```
+    pub fn update_bearer_token(&self, token: &str) -> Result<(), AicError> {
+        let c_token = CString::new(token).map_err(|_| AicError::LicenseFormatInvalid)?;
+        // SAFETY:
+        // - `self.as_const_ptr()` is a valid pointer to a live processor context.
+        // - `c_token` is a null-terminated CString owned for the duration of the call.
+        let error_code = unsafe {
+            aic_processor_context_update_bearer_token(self.as_const_ptr(), c_token.as_ptr())
+        };
+        handle_error(error_code)
+    }
 }
 
 impl Drop for ProcessorContext {

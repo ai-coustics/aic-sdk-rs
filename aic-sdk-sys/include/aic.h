@@ -68,6 +68,10 @@ typedef enum AicErrorCode {
    */
   AIC_ERROR_CODE_LICENSE_EXPIRED = 52,
   /**
+   * Updating the token is only supported when both the original and new keys are JWT-form licenses.
+   */
+  AIC_ERROR_CODE_TOKEN_UPDATE_UNSUPPORTED = 53,
+  /**
    * The model file is invalid or corrupted. Verify the file is correct.
    */
   AIC_ERROR_CODE_MODEL_INVALID = 100,
@@ -753,6 +757,42 @@ enum AicErrorCode aic_processor_context_get_parameter(const struct AicProcessorC
  */
 enum AicErrorCode aic_processor_context_get_output_delay(const struct AicProcessorContext *context,
                                                          size_t *delay);
+
+/**
+ * Replaces the bearer token on a running processor.
+ *
+ * Use this when your license key is a JWT and needs to be refreshed
+ * before it expires. Calling this with a renewed token lets you stay authenticated
+ * without tearing down and recreating the processor: audio processing continues
+ * uninterrupted, the context handle stays valid, and the new token is used for all
+ * subsequent authentication against the ai-coustics backend.
+ *
+ * In-place updates are only supported when both the originally configured key and
+ * the new token are JWTs. Other license kinds
+ * cannot be swapped in this way. If either side is unsupported, the call returns
+ * `AIC_ERROR_CODE_TOKEN_UPDATE_UNSUPPORTED` and the existing token stays in use.
+ *
+ * Safe to call concurrently with `aic_processor_process()` on the originating
+ * processor.
+ *
+ * # Parameters
+ * - `context`: Processor context instance. Must not be NULL.
+ * - `token`: NULL-terminated string containing the new JWT. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Token replaced successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` or `token` is NULL
+ * - `AIC_ERROR_CODE_LICENSE_INVALID`: New token could not be parsed
+ * - `AIC_ERROR_CODE_TOKEN_UPDATE_UNSUPPORTED`: The original or new key does not support in-place updates
+ *
+ * # Safety
+ * - This function allocates memory and performs network-free cryptographic work. Avoid calling it from real-time audio threads.
+ * - Thread-safe: Can be called from any thread.
+ * - The `context` pointer must have been created by `aic_processor_context_create`.
+ * - `token` must point to a valid null-terminated UTF-8 string.
+ */
+enum AicErrorCode aic_processor_context_update_bearer_token(const struct AicProcessorContext *context,
+                                                            const char *token);
 
 /**
  * Creates a VAD context handle for thread-safe control APIs.
