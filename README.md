@@ -148,8 +148,8 @@ telemetry setting or session ID.
 ```rust,ignore
 use aic_sdk::{OtelConfig, Processor};
 
-let otel = OtelConfig::enabled().with_session_id("session-1");
-let processor = Processor::new_with_otel_config(&model, &license_key, &otel)?
+let otel = OtelConfig::with_session_id("session-1");
+let processor = Processor::with_otel_config(&model, &license_key, &otel)?
     .with_config(&config)?;
 ```
 

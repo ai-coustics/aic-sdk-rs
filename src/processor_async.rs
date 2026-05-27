@@ -46,9 +46,7 @@ fn get_global_thread_pool() -> &'static rayon::ThreadPool {
 ///     let model = Model::from_file("/path/to/model.aicmodel")?;
 ///     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 ///
-///     let processor = ProcessorAsync::new(&model, &license_key)?
-///         .with_config(&config)
-///         .await?;
+///     let processor = ProcessorAsync::new(&model, &license_key)?.with_config(&config).await?;
 ///
 ///     let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
 ///     let audio = processor.process_interleaved(audio).await?;
@@ -73,13 +71,13 @@ impl ProcessorAsync {
     /// Creates a new async audio enhancement processor instance with explicit
     /// OpenTelemetry configuration.
     ///
-    /// See [`Processor::new_with_otel_config`] for details.
-    pub fn new_with_otel_config(
+    /// See [`Processor::with_otel_config`] for details.
+    pub fn with_otel_config(
         model: &Model<'static>,
         license_key: &str,
         otel_config: &OtelConfig,
     ) -> Result<Self, AicError> {
-        let processor = Processor::new_with_otel_config(model, license_key, otel_config)?;
+        let processor = Processor::with_otel_config(model, license_key, otel_config)?;
         Ok(Self {
             inner: Arc::new(Mutex::new(processor)),
         })

@@ -125,11 +125,11 @@ impl From<ProcessorParameter> for AicProcessorParameter::Type {
 
 /// OpenTelemetry configuration for a [`Processor`].
 ///
-/// Pass to [`Processor::new_with_otel_config`] to control telemetry on a per-processor
+/// Pass to [`Processor::with_otel_config`] to control telemetry on a per-processor
 /// basis. When no [`OtelConfig`] is provided (e.g. when using [`Processor::new`]), telemetry
 /// is configured according to the runtime environment (e.g. the `AIC_SDK_OTEL_ENABLE`
 /// environment variable).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OtelConfig {
     /// Whether to enable OpenTelemetry telemetry.
     ///
@@ -140,6 +140,14 @@ pub struct OtelConfig {
 }
 
 impl OtelConfig {
+    /// Returns an [`OtelConfig`] with telemetry disabled.
+    pub fn disabled() -> Self {
+        Self {
+            enable: false,
+            session_id: None,
+        }
+    }
+
     /// Returns an [`OtelConfig`] with telemetry enabled and no session ID set.
     pub fn enabled() -> Self {
         Self {
@@ -148,10 +156,12 @@ impl OtelConfig {
         }
     }
 
-    /// Sets the session ID for telemetry.
-    pub fn with_session_id(mut self, session_id: impl Into<String>) -> Self {
-        self.session_id = Some(session_id.into());
-        self
+    /// Returns an [`OtelConfig`] with telemetry enabled and the provided session ID.
+    pub fn with_session_id(session_id: impl Into<String>) -> Self {
+        Self {
+            enable: true,
+            session_id: Some(session_id.into()),
+        }
     }
 }
 
@@ -357,13 +367,11 @@ unsafe impl Sync for ProcessorContext {}
 ///     ..ProcessorConfig::optimal(&model)
 /// };
 ///
-/// let mut processor = Processor::new(&model, &license_key)
-///     .unwrap()
-///     .with_config(&config)
-///     .unwrap();
+/// let mut processor = Processor::new(&model, &license_key)?.with_config(&config)?;
 ///
 /// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
-/// processor.process_interleaved(&mut audio_buffer).unwrap();
+/// processor.process_interleaved(&mut audio_buffer)?;
+/// # Ok::<(), aic_sdk::AicError>(())
 /// ```
 pub struct Processor<'a> {
     /// Raw pointer to the C processor structure
@@ -413,12 +421,13 @@ impl<'a> Processor<'a> {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, OtelConfig, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// let model = Model::from_file("/path/to/model.aicmodel")?;
     /// let otel = OtelConfig::enabled();
     ///
-    /// let processor = Processor::new_with_otel_config(&model, &license_key, &otel).unwrap();
+    /// let processor = Processor::new_with_otel_config(&model, &license_key, &otel)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
-    pub fn new_with_otel_config(
+    pub fn with_otel_config(
         model: &Model<'a>,
         license_key: &str,
         otel_config: &OtelConfig,
