@@ -424,7 +424,7 @@ impl<'a> Processor<'a> {
     /// let model = Model::from_file("/path/to/model.aicmodel")?;
     /// let otel = OtelConfig::enabled();
     ///
-    /// let processor = Processor::new_with_otel_config(&model, &license_key, &otel)?;
+    /// let processor = Processor::with_otel_config(&model, &license_key, &otel)?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn with_otel_config(
