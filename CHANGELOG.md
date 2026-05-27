@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.19.0 - 2026-05-27
+
+## New Features
+
+- Added JWT bearer token refresh via `ProcessorContext::update_bearer_token`. When the processor was created with a JWT license, this swaps in a renewed token while audio processing continues uninterrupted.
+
+  ```rust,no_run
+  use aic_sdk::{Model, Processor};
+
+  let model = Model::from_file("/path/to/model.aicmodel")?;
+  let processor = Processor::new(&model, "<jwt-license>")?;
+  let processor_context = processor.processor_context();
+  processor_context.update_bearer_token("<renewed-jwt>")?;
+  ```
+
+- Added `AicError::TokenUpdateUnsupported`, returned by `ProcessorContext::update_bearer_token` when either the originally configured key or the new token is not a JWT. The existing token stays in use in that case.
+
+- `VadParameter::Sensitivity` is now also supported on dedicated VAD models (e.g. Quail VAD), where the value is interpreted as the speech probability threshold in the range `0.0` to `1.0`. Energy-based VADs continue to use the existing `1.0` to `15.0` range. The default is now model-specific.
+
+- Added `OtelConfig::export_interval_ms` to control how often OpenTelemetry metrics are exported. Set to `0` to keep the SDK default of 60 000 ms.
+
+  ```rust,no_run
+  use aic_sdk::{Model, OtelConfig, Processor};
+
+  let model = Model::from_file("/path/to/model.aicmodel")?;
+  let otel = OtelConfig {
+      export_interval_ms: 5_000,
+      ..OtelConfig::enabled()
+  };
+  let processor = Processor::with_otel_config(&model, "license", &otel)?;
+  ```
+
+## Breaking Changes
+
+- Compatible model file version was bumped to 4. Models built for earlier versions are no longer supported.
+
 ## 0.18.0 - 2026-05-27
 
 ## New Features

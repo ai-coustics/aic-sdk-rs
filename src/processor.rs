@@ -137,6 +137,10 @@ pub struct OtelConfig {
     pub enable: bool,
     /// Optional session ID for telemetry. If `None`, a random session ID is generated.
     pub session_id: Option<String>,
+    /// OpenTelemetry metric export interval in milliseconds.
+    ///
+    /// Set to `0` to use the SDK default of 60 000 ms.
+    pub export_interval_ms: u32,
 }
 
 impl OtelConfig {
@@ -145,6 +149,7 @@ impl OtelConfig {
         Self {
             enable: false,
             session_id: None,
+            export_interval_ms: 0,
         }
     }
 
@@ -153,6 +158,7 @@ impl OtelConfig {
         Self {
             enable: true,
             session_id: None,
+            export_interval_ms: 0,
         }
     }
 
@@ -161,6 +167,7 @@ impl OtelConfig {
         Self {
             enable: true,
             session_id: Some(session_id.into()),
+            export_interval_ms: 0,
         }
     }
 }
@@ -332,6 +339,50 @@ impl ProcessorContext {
         let error_code = unsafe { aic_processor_context_reset(self.as_const_ptr()) };
         handle_error(error_code)
     }
+
+    /// Replaces the bearer token on the running processor.
+    ///
+    /// Use this when your license key is a JWT and needs to be refreshed before it expires.
+    /// Audio processing continues uninterrupted, the context handle stays valid, and the new
+    /// token is used for all subsequent authentication against the ai-coustics backend.
+    ///
+    /// In-place updates are only supported when both the originally configured key and the
+    /// new token are JWTs. If either side is not, the call returns
+    /// [`AicError::TokenUpdateUnsupported`] and the existing token stays in use.
+    ///
+    /// # Arguments
+    ///
+    /// * `token` - The new JWT to install.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an `AicError` if the update fails.
+    ///
+    /// # Warning
+    /// This allocates memory and performs cryptographic work.
+    /// Avoid calling it from real-time audio threads.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Processor};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// let processor = Processor::new(&model, &license_key).unwrap();
+    /// let processor_context = processor.processor_context();
+    /// let renewed_jwt = String::from("<JWT_BEARER_TOKEN>");
+    /// processor_context.update_bearer_token(&renewed_jwt).unwrap();
+    /// ```
+    pub fn update_bearer_token(&self, token: &str) -> Result<(), AicError> {
+        let c_token = CString::new(token).map_err(|_| AicError::LicenseFormatInvalid)?;
+        // SAFETY:
+        // - `self.as_const_ptr()` is a valid pointer to a live processor context.
+        // - `c_token` is a null-terminated CString that outlives the call.
+        let error_code = unsafe {
+            aic_processor_context_update_bearer_token(self.as_const_ptr(), c_token.as_ptr())
+        };
+        handle_error(error_code)
+    }
 }
 
 impl Drop for ProcessorContext {
@@ -450,6 +501,7 @@ impl<'a> Processor<'a> {
         let c_otel = otel_config.map(|o| AicOtelConfig {
             enable: o.enable,
             session_id: c_session_id.as_ref().map_or(ptr::null(), |s| s.as_ptr()),
+            export_interval_ms: o.export_interval_ms,
         });
         let c_otel_ptr = c_otel
             .as_ref()

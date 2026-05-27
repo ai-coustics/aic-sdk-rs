@@ -28,17 +28,28 @@ pub enum VadParameter {
     ///
     /// **Default:** 0.03 (30 ms)
     SpeechHoldDuration,
-    /// Controls the sensitivity (energy threshold) of the VAD.
+    /// Controls the sensitivity of the VAD.
     ///
-    /// This value is used by the VAD as the threshold a
-    /// speech audio signal's energy has to exceed in order to be
-    /// considered speech.
+    /// There are two kinds of VADs offered by the SDK:
     ///
-    /// **Range:** 1.0 to 15.0
+    /// - **VAD models** (e.g. Quail VAD): models trained specifically for voice activity
+    ///   detection. They output a probability of speech presence for each processed audio buffer
+    ///   (1.0 = certain speech, 0.0 = certain no speech). The probability is compared against the
+    ///   sensitivity threshold to decide whether speech is detected.
+    /// - **Energy-based VADs** of speech enhancement models (e.g. Quail, Rook): these models
+    ///   filter out background noise and enhance speech but do not explicitly output a VAD
+    ///   decision. The SDK derives one from the energy remaining in the signal after
+    ///   enhancement. The energy threshold is `10 ^ (-sensitivity)`, so higher sensitivity
+    ///   values require less energy in the signal, resulting in more aggressive speech
+    ///   detection.
     ///
-    /// **Formula:** Energy threshold = 10 ^ (-sensitivity)
+    /// A value above the threshold triggers a speech-detected decision.
     ///
-    /// **Default:** 6.0
+    /// **Range:**
+    /// - VAD models: 0.0 to 1.0
+    /// - Energy-based VADs: 1.0 to 15.0
+    ///
+    /// **Default:** model-specific
     Sensitivity,
     /// Controls for how long speech needs to be present in the audio signal before
     /// the VAD considers it speech.

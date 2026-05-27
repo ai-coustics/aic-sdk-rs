@@ -68,6 +68,10 @@ typedef enum AicErrorCode {
    */
   AIC_ERROR_CODE_LICENSE_EXPIRED = 52,
   /**
+   * Updating the token is only supported when both the original and new keys are JWT-form licenses.
+   */
+  AIC_ERROR_CODE_TOKEN_UPDATE_UNSUPPORTED = 53,
+  /**
    * The model file is invalid or corrupted. Verify the file is correct.
    */
   AIC_ERROR_CODE_MODEL_INVALID = 100,
@@ -152,17 +156,30 @@ typedef enum AicVadParameter {
    */
   AIC_VAD_PARAMETER_SPEECH_HOLD_DURATION = 0,
   /**
-   * Controls the sensitivity (energy threshold) of the VAD.
+   * Controls the sensitivity of the VAD.
    *
-   * This value is used by the VAD as the threshold a
-   * speech audio signal's energy has to exceed in order to be
-   * considered speech.
+   * There are two kinds of VADs offered by the SDK:
    *
-   * **Range:** 1.0 to 15.0
+   * - VAD models (e.g. Quail VAD): These are models specifically trained for voice activity detection.
+   *   They output a probability of speech presence for each processed audio buffer, 1.0 being the model
+   *   is certain speech is present and 0.0 being the model is certain speech is not present.
+   *   The probability is compared against the sensitivity threshold to determine if speech is detected.
    *
-   * **Formula:** Energy threshold = 10 ^ (-sensitivity)
+   * - Energy-based VAD of speech enhancement models (e.g. Quail, Rook): These models filter out
+   *   background noise and enhance speech, but they do not explicitly output a VAD decision.
+   *   To provide VAD functionality, the SDK determines whether of speech is present based on how much
+   *   energy is left in the signal after enhancement, since the model suppresses non-speech components.
+   *   For these models, the sensitivity parameter controls the energy threshold for detecting speech presence.
+   *   The formula for the energy threshold is `10 ^ (-sensitivity)`, so higher sensitivity values result in a
+   *   less energy required in the signal, therefore resulting in more aggressive speech detection.
    *
-   * **Default:** 6.0
+   * A value above the threshold will trigger a speech detected decision.
+   *
+   * **Range:**
+   *  - On VAD models: 0.0 to 1.0
+   *  - On energy-based VADs: 1.0 to 15.0
+   *
+   * **Default:** model-specific
    */
   AIC_VAD_PARAMETER_SENSITIVITY = 1,
   /**
@@ -200,6 +217,10 @@ typedef struct AicOtelConfig {
    * Optional session ID for telemetry. If NULL, a random session ID will be generated.
    */
   const char *session_id;
+  /**
+   * OTel metric export interval in milliseconds. 0 uses the default (60 000 ms).
+   */
+  uint32_t export_interval_ms;
 } AicOtelConfig;
 
 #ifdef __cplusplus
@@ -753,6 +774,42 @@ enum AicErrorCode aic_processor_context_get_parameter(const struct AicProcessorC
  */
 enum AicErrorCode aic_processor_context_get_output_delay(const struct AicProcessorContext *context,
                                                          size_t *delay);
+
+/**
+ * Replaces the bearer token on a running processor.
+ *
+ * Use this when your license key is a JWT and needs to be refreshed
+ * before it expires. Calling this with a renewed token lets you stay authenticated
+ * without tearing down and recreating the processor: audio processing continues
+ * uninterrupted, the context handle stays valid, and the new token is used for all
+ * subsequent authentication against the ai-coustics backend.
+ *
+ * In-place updates are only supported when both the originally configured key and
+ * the new token are JWTs. Other license types cannot be swapped in this way.
+ * If either side is unsupported, the call returns `AIC_ERROR_CODE_TOKEN_UPDATE_UNSUPPORTED`
+ * and the existing token stays in use.
+ *
+ * Safe to call concurrently with `aic_processor_process()` on the originating
+ * processor.
+ *
+ * # Parameters
+ * - `context`: Processor context instance. Must not be NULL.
+ * - `token`: NULL-terminated string containing the new JWT. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Token replaced successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` or `token` is NULL
+ * - `AIC_ERROR_CODE_LICENSE_INVALID`: New token could not be parsed
+ * - `AIC_ERROR_CODE_TOKEN_UPDATE_UNSUPPORTED`: The original or new key does not support in-place updates
+ *
+ * # Safety
+ * - This function allocates memory and performs network-free cryptographic work. Avoid calling it from real-time audio threads.
+ * - Thread-safe: Can be called from any thread.
+ * - The `context` pointer must have been created by `aic_processor_context_create`.
+ * - `token` must point to a valid null-terminated UTF-8 string.
+ */
+enum AicErrorCode aic_processor_context_update_bearer_token(const struct AicProcessorContext *context,
+                                                            const char *token);
 
 /**
  * Creates a VAD context handle for thread-safe control APIs.
