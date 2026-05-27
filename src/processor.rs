@@ -123,6 +123,38 @@ impl From<ProcessorParameter> for AicProcessorParameter::Type {
     }
 }
 
+/// OpenTelemetry configuration for a [`Processor`].
+///
+/// Pass to [`Processor::new_with_otel_config`] to control telemetry on a per-processor
+/// basis. When no [`OtelConfig`] is provided (e.g. when using [`Processor::new`]), telemetry
+/// is configured according to the runtime environment (e.g. the `AIC_SDK_OTEL_ENABLE`
+/// environment variable).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+pub struct OtelConfig {
+    /// Whether to enable OpenTelemetry telemetry.
+    ///
+    /// Overrides the `AIC_SDK_OTEL_ENABLE` environment variable.
+    pub enable: bool,
+    /// Optional session ID for telemetry. If `None`, a random session ID is generated.
+    pub session_id: Option<String>,
+}
+
+impl OtelConfig {
+    /// Returns an [`OtelConfig`] with telemetry enabled and no session ID set.
+    pub fn enabled() -> Self {
+        Self {
+            enable: true,
+            session_id: None,
+        }
+    }
+
+    /// Sets the session ID for telemetry.
+    pub fn with_session_id(mut self, session_id: impl Into<String>) -> Self {
+        self.session_id = Some(session_id.into());
+        self
+    }
+}
+
 pub struct ProcessorContext {
     /// Raw pointer to the C processor context structure
     inner: *mut AicProcessorContext,
@@ -325,8 +357,10 @@ unsafe impl Sync for ProcessorContext {}
 ///     ..ProcessorConfig::optimal(&model)
 /// };
 ///
-/// let mut processor = Processor::new(&model, &license_key).unwrap();
-/// processor.initialize(&config).unwrap();
+/// let mut processor = Processor::new(&model, &license_key)
+///     .unwrap()
+///     .with_config(&config)
+///     .unwrap();
 ///
 /// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
 /// processor.process_interleaved(&mut audio_buffer).unwrap();
@@ -365,6 +399,53 @@ impl<'a> Processor<'a> {
     /// let processor = Processor::new(&model, &license_key).unwrap();
     /// ```
     pub fn new(model: &Model<'a>, license_key: &str) -> Result<Self, AicError> {
+        Self::create(model, license_key, None)
+    }
+
+    /// Creates a new audio enhancement processor instance with explicit
+    /// OpenTelemetry configuration.
+    ///
+    /// This overrides the SDK's environment-based telemetry defaults (e.g.
+    /// `AIC_SDK_OTEL_ENABLE`) for this processor.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, OtelConfig, Processor};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// let otel = OtelConfig::enabled();
+    ///
+    /// let processor = Processor::new_with_otel_config(&model, &license_key, &otel).unwrap();
+    /// ```
+    pub fn new_with_otel_config(
+        model: &Model<'a>,
+        license_key: &str,
+        otel_config: &OtelConfig,
+    ) -> Result<Self, AicError> {
+        Self::create(model, license_key, Some(otel_config))
+    }
+
+    fn create(
+        model: &Model<'a>,
+        license_key: &str,
+        otel_config: Option<&OtelConfig>,
+    ) -> Result<Self, AicError> {
+        // Session ID must outlive the FFI call so its pointer stays valid.
+        let c_session_id = otel_config
+            .and_then(|o| o.session_id.as_deref())
+            .map(CString::new)
+            .transpose()
+            .map_err(|_| AicError::Internal)?;
+
+        let c_otel = otel_config.map(|o| AicOtelConfig {
+            enable: o.enable,
+            session_id: c_session_id.as_ref().map_or(ptr::null(), |s| s.as_ptr()),
+        });
+        let c_otel_ptr = c_otel
+            .as_ref()
+            .map_or(ptr::null(), |o| o as *const AicOtelConfig);
+
         SET_WRAPPER_ID.call_once(|| unsafe {
             // SAFETY:
             // - This FFI call has no safety requirements.
@@ -379,11 +460,14 @@ impl<'a> Processor<'a> {
         // - `processor_ptr` points to stack storage for output.
         // - `model` is a valid SDK model pointer for the duration of the call.
         // - `c_license_key` is a null-terminated CString.
+        // - `c_otel_ptr` is either null or points to a valid `AicOtelConfig` whose
+        //   `session_id` field (if non-null) outlives this call.
         let error_code = unsafe {
             aic_processor_create(
                 &mut processor_ptr,
                 model.as_const_ptr(),
                 c_license_key.as_ptr(),
+                c_otel_ptr,
             )
         };
 

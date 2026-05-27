@@ -191,6 +191,17 @@ typedef struct AicProcessorContext AicProcessorContext;
 
 typedef struct AicVadContext AicVadContext;
 
+typedef struct AicOtelConfig {
+  /**
+   * Whether to enable OpenTelemetry telemetry (overrides the `AIC_SDK_OTEL_ENABLE` environment variable).
+   */
+  bool enable;
+  /**
+   * Optional session ID for telemetry. If NULL, a random session ID will be generated.
+   */
+  const char *session_id;
+} AicOtelConfig;
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -415,6 +426,9 @@ enum AicErrorCode aic_model_get_optimal_num_frames(const struct AicModel *model,
  * - `processor`: Receives the handle to the newly created processor. Must not be NULL.
  * - `model`: Handle to the model instance to process. Must not be NULL.
  * - `license_key`: NULL-terminated string containing your license key. Must not be NULL.
+ * - `otel_config`: Optional pointer to OpenTelemetry configuration.
+ *    If non-NULL, telemetry will be sent according to the provided configuration.
+ *    Otherwise it will be configured according to the runtime environment.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Processor created successfully
@@ -428,7 +442,8 @@ enum AicErrorCode aic_model_get_optimal_num_frames(const struct AicModel *model,
  */
 enum AicErrorCode aic_processor_create(struct AicProcessor **processor,
                                        const struct AicModel *model,
-                                       const char *license_key);
+                                       const char *license_key,
+                                       const struct AicOtelConfig *otel_config);
 
 /**
  * Releases all resources associated with a processor instance.

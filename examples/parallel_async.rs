@@ -31,9 +31,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Build all processors up front
-    let processors = futures::future::try_join_all(
-        (0..NUM_PROCESSORS).map(|_| ProcessorAsync::with_config(&model, &license, &config)),
-    )
+    let processors = futures::future::try_join_all((0..NUM_PROCESSORS).map(|_| async {
+        ProcessorAsync::new(&model, &license)?
+            .with_config(&config)
+            .await
+    }))
     .await?;
 
     println!(

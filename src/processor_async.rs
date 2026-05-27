@@ -1,4 +1,6 @@
-use crate::{AicError, Model, Processor, ProcessorConfig, ProcessorContext, VadContext};
+use crate::{
+    AicError, Model, OtelConfig, Processor, ProcessorConfig, ProcessorContext, VadContext,
+};
 use async_lock::Mutex;
 use futures_channel::oneshot;
 use std::sync::{Arc, OnceLock};
@@ -44,8 +46,9 @@ fn get_global_thread_pool() -> &'static rayon::ThreadPool {
 ///     let model = Model::from_file("/path/to/model.aicmodel")?;
 ///     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 ///
-///     let processor = ProcessorAsync::new(&model, &license_key)?;
-///     processor.initialize(&config).await?;
+///     let processor = ProcessorAsync::new(&model, &license_key)?
+///         .with_config(&config)
+///         .await?;
 ///
 ///     let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
 ///     let audio = processor.process_interleaved(audio).await?;
@@ -67,18 +70,28 @@ impl ProcessorAsync {
         })
     }
 
-    /// Creates a new async processor and initializes it with the given configuration.
+    /// Creates a new async audio enhancement processor instance with explicit
+    /// OpenTelemetry configuration.
     ///
-    /// This is a convenience method combining [`ProcessorAsync::new`] and
-    /// [`ProcessorAsync::initialize`].
-    pub async fn with_config(
+    /// See [`Processor::new_with_otel_config`] for details.
+    pub fn new_with_otel_config(
         model: &Model<'static>,
         license_key: &str,
-        config: &ProcessorConfig,
+        otel_config: &OtelConfig,
     ) -> Result<Self, AicError> {
-        let this = Self::new(model, license_key)?;
-        this.initialize(config).await?;
-        Ok(this)
+        let processor = Processor::new_with_otel_config(model, license_key, otel_config)?;
+        Ok(Self {
+            inner: Arc::new(Mutex::new(processor)),
+        })
+    }
+
+    /// Initializes the async processor with the given configuration.
+    ///
+    /// This is a convenience method that calls [`ProcessorAsync::initialize`]
+    /// internally and returns `self`.
+    pub async fn with_config(self, config: &ProcessorConfig) -> Result<Self, AicError> {
+        self.initialize(config).await?;
+        Ok(self)
     }
 
     /// Initializes the processor with the given configuration.
