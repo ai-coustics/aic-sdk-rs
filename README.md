@@ -8,7 +8,7 @@ For comprehensive documentation, visit [docs.ai-coustics.com](https://docs.ai-co
 > This SDK requires a license key. Generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com).
 
 > [!WARNING]
-> You must use a Rust version different from `1.96.0-beta.5`, which was used to build the static libraries. A solution is currently in development.
+> You must use a Rust version different from `1.96.0-beta.7`, which was used to build the static libraries. A solution is currently in development.
 
 ## Installation
 
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get optimal configuration based on the selected model
     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
-    // Create a processor and initialize in one step
+    // Create a processor and initialize it
     let mut processor = Processor::new(&model, &license_key)?.with_config(&config)?;
 
     // Process audio (interleaved: channels × frames)
@@ -139,6 +139,20 @@ let mut processor = Processor::new(&model, &license_key)?;
 processor.initialize(&config)?;
 ```
 
+### OpenTelemetry
+
+By default, processor telemetry follows the SDK environment configuration, such as
+`AIC_SDK_OTEL_ENABLE`. Use `OtelConfig` when a single processor needs an explicit
+telemetry setting or session ID.
+
+```rust,ignore
+use aic_sdk::{OtelConfig, Processor};
+
+let otel = OtelConfig::with_session_id("session-1");
+let processor = Processor::with_otel_config(&model, &license_key, &otel)?
+    .with_config(&config)?;
+```
+
 ### Processing Audio
 
 ```rust,ignore
@@ -229,7 +243,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model = Model::from_file("path/to/model.aicmodel")?;
     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
 
-    let processor = ProcessorAsync::with_config(&model, &license_key, &config).await?;
+    let processor = ProcessorAsync::new(&model, &license_key)?
+        .with_config(&config)
+        .await?;
 
     // The async API takes ownership of the buffer and returns it back.
     let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];

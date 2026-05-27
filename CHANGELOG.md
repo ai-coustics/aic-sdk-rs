@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.18.0 - 2026-05-19
+## 0.18.0 - 2026-05-27
 
 ## New Features
 
@@ -18,12 +18,27 @@
   async fn main() -> Result<(), aic_sdk::AicError> {
       let model = Model::from_file("/path/to/model.aicmodel")?;
       let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-      let processor = ProcessorAsync::with_config(&model, "license", &config).await?;
+      let processor = ProcessorAsync::new(&model, "license")?
+          .with_config(&config)
+          .await?;
 
       let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
       let audio = processor.process_interleaved(audio).await?;
       Ok(())
   }
+  ```
+
+- Added `OtelConfig` and explicit OpenTelemetry constructors via `Processor::with_otel_config` / `ProcessorAsync::with_otel_config`. These override `AIC_SDK_OTEL_ENABLE` for a single processor.
+
+  ```rust,no_run
+  use aic_sdk::{Model, OtelConfig, Processor, ProcessorConfig};
+
+  let model = Model::from_file("/path/to/model.aicmodel")?;
+  let otel = OtelConfig::with_session_id("session-1");
+  let config = ProcessorConfig::optimal(&model);
+
+  let processor = Processor::with_otel_config(&model, "license", &otel)?
+      .with_config(&config)?;
   ```
 
 ## 0.17.1 - 2026-05-06
