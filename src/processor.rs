@@ -148,7 +148,7 @@ impl OtelConfig {
         }
     }
 
-    /// Returns an [`OtelConfig`] with telemetry enabled and no session ID set.
+    /// Returns an [`OtelConfig`] with telemetry enabled and a random session ID.
     pub fn enabled() -> Self {
         Self {
             enable: true,
