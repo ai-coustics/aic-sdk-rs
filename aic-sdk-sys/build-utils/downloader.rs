@@ -261,13 +261,17 @@ mod tests {
         const VERSION: &str = env!("CARGO_PKG_VERSION");
         let checksums = read_checksum_filenames();
 
-        for &(target, os) in TARGETS {
-            let name = artifact_file_name(target, os, VERSION);
-            assert!(
-                checksums.contains(&name),
-                "artifact '{name}' for target '{target}' not found in checksum.txt",
-            );
-        }
+        let missing: Vec<&str> = TARGETS
+            .iter()
+            .filter(|&&(target, os)| !checksums.contains(&artifact_file_name(target, os, VERSION)))
+            .map(|&(target, _)| target)
+            .collect();
+
+        assert!(
+            missing.is_empty(),
+            "checksum.txt is missing entries for: {}",
+            missing.join(", "),
+        );
     }
 
     #[test]
@@ -352,21 +356,4 @@ mod tests {
         assert_eq!(extract_version_from_filename("no-version.tar.gz"), None);
     }
 
-    #[test]
-    fn checksum_file_covers_all_known_targets() {
-        const VERSION: &str = env!("CARGO_PKG_VERSION");
-        let checksums = read_checksum_filenames();
-
-        let missing: Vec<&str> = TARGETS
-            .iter()
-            .filter(|&&(target, os)| !checksums.contains(&artifact_file_name(target, os, VERSION)))
-            .map(|&(target, _)| target)
-            .collect();
-
-        assert!(
-            missing.is_empty(),
-            "checksum.txt is missing entries for: {}",
-            missing.join(", "),
-        );
-    }
 }
