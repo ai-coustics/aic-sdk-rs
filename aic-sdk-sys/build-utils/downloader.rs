@@ -332,8 +332,6 @@ mod tests {
 
     #[test]
     fn extract_version_from_filename_android() {
-        // Regression: "android" starts with 'a', not a digit — the version "0.x.y"
-        // must be found correctly even when os component looks like a word.
         assert_eq!(
             extract_version_from_filename("aic-sdk-aarch64-linux-android-0.19.0.tar.gz"),
             Some("0.19.0".to_string()),
