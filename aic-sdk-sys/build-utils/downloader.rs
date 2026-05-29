@@ -32,24 +32,11 @@ impl Downloader {
 
     pub fn download(&self) -> PathBuf {
         let version = self.version.as_str();
-        let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
-        let vendor = std::env::var("CARGO_CFG_TARGET_VENDOR").unwrap();
-        let abi = std::env::var("CARGO_CFG_TARGET_ENV").unwrap();
-        let os = match std::env::var("CARGO_CFG_TARGET_OS").unwrap().as_str() {
-            "macos" => "darwin".to_string(),
-            os => os.to_string(),
-        };
+        let target = std::env::var("TARGET").unwrap();
+        let os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
 
-        let triplet = format!("{arch}-{vendor}-{os}");
-
-        let file_extension = if os == "windows" { "zip" } else { "tar.gz" };
-        let file_prefix = if vendor == "apple" {
-            format!("aic-sdk-{triplet}-{version}")
-        } else {
-            format!("aic-sdk-{triplet}-{abi}-{version}")
-        };
-
-        let file_name = format!("{file_prefix}.{file_extension}");
+        let file_name = artifact_file_name(&target, &os, version);
+        let file_prefix = format!("aic-sdk-{target}-{version}");
 
         let expected_hash = self
             .artifact_sha
@@ -68,7 +55,7 @@ impl Downloader {
 
         let extracted_path = self.output_path.join(&file_prefix);
 
-        if file_extension == "zip" {
+        if os == "windows" {
             extract_zip(&downloaded_file, &extracted_path);
         } else {
             extract_tgz(&downloaded_file, &extracted_path);
@@ -165,6 +152,11 @@ fn extract_version_from_filename(filename: &str) -> Option<String> {
     None
 }
 
+fn artifact_file_name(target: &str, os: &str, version: &str) -> String {
+    let ext = if os == "windows" { "zip" } else { "tar.gz" };
+    format!("aic-sdk-{target}-{version}.{ext}")
+}
+
 fn fetch_file(source_url: &str) -> Vec<u8> {
     ureq::get(source_url)
         .call()
@@ -230,5 +222,153 @@ fn extract_zip(buf: &[u8], output: &Path) {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // All supported targets paired with their CARGO_CFG_TARGET_OS value.
+    const TARGETS: &[(&str, &str)] = &[
+        ("aarch64-linux-android", "android"),
+        ("aarch64-unknown-linux-gnu", "linux"),
+        ("x86_64-unknown-linux-gnu", "linux"),
+        ("aarch64-apple-darwin", "macos"),
+        ("x86_64-apple-darwin", "macos"),
+        ("aarch64-apple-ios", "ios"),
+        ("aarch64-apple-ios-macabi", "ios"),
+        ("aarch64-apple-tvos", "tvos"),
+        ("aarch64-apple-tvos-sim", "tvos"),
+        ("aarch64-apple-visionos", "visionos"),
+        ("aarch64-apple-visionos-sim", "visionos"),
+        ("x86_64-apple-ios-macabi", "ios"),
+        ("aarch64-pc-windows-msvc", "windows"),
+        ("x86_64-pc-windows-msvc", "windows"),
+    ];
+
+    fn read_checksum_filenames() -> std::collections::HashSet<String> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("checksum.txt");
+        let content = std::fs::read_to_string(&path).expect("Failed to read checksum.txt");
+        content
+            .lines()
+            .filter_map(|line| line.split_whitespace().nth(1).map(str::to_owned))
+            .collect()
+    }
+
+    #[test]
+    fn artifact_file_name_all_targets() {
+        const VERSION: &str = env!("CARGO_PKG_VERSION");
+        let checksums = read_checksum_filenames();
+
+        for &(target, os) in TARGETS {
+            let name = artifact_file_name(target, os, VERSION);
+            assert!(
+                checksums.contains(&name),
+                "artifact '{name}' for target '{target}' not found in checksum.txt",
+            );
+        }
+    }
+
+    #[test]
+    fn non_windows_targets_use_tar_gz() {
+        for &(target, os) in TARGETS {
+            if os != "windows" {
+                let name = artifact_file_name(target, os, "0.0.0");
+                assert!(
+                    name.ends_with(".tar.gz"),
+                    "expected .tar.gz for target '{target}', got '{name}'",
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn windows_targets_use_zip() {
+        for &(target, os) in TARGETS {
+            if os == "windows" {
+                let name = artifact_file_name(target, os, "0.0.0");
+                assert!(
+                    name.ends_with(".zip"),
+                    "expected .zip for target '{target}', got '{name}'",
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn artifact_file_name_embeds_target_and_version() {
+        let name = artifact_file_name("aarch64-linux-android", "android", "1.2.3");
+        assert_eq!(name, "aic-sdk-aarch64-linux-android-1.2.3.tar.gz");
+
+        let name = artifact_file_name("x86_64-pc-windows-msvc", "windows", "1.2.3");
+        assert_eq!(name, "aic-sdk-x86_64-pc-windows-msvc-1.2.3.zip");
+
+        let name = artifact_file_name("aarch64-apple-ios-macabi", "ios", "1.2.3");
+        assert_eq!(name, "aic-sdk-aarch64-apple-ios-macabi-1.2.3.tar.gz");
+
+        let name = artifact_file_name("aarch64-apple-tvos-sim", "tvos", "1.2.3");
+        assert_eq!(name, "aic-sdk-aarch64-apple-tvos-sim-1.2.3.tar.gz");
+
+        let name = artifact_file_name("aarch64-apple-visionos-sim", "visionos", "1.2.3");
+        assert_eq!(name, "aic-sdk-aarch64-apple-visionos-sim-1.2.3.tar.gz");
+    }
+
+    #[test]
+    fn extract_version_from_filename_tar_gz() {
+        assert_eq!(
+            extract_version_from_filename("aic-sdk-x86_64-apple-darwin-0.11.0.tar.gz"),
+            Some("0.11.0".to_string()),
+        );
+    }
+
+    #[test]
+    fn extract_version_from_filename_zip() {
+        assert_eq!(
+            extract_version_from_filename("aic-sdk-aarch64-pc-windows-msvc-0.19.0.zip"),
+            Some("0.19.0".to_string()),
+        );
+    }
+
+    #[test]
+    fn extract_version_from_filename_android() {
+        // Regression: "android" starts with 'a', not a digit — the version "0.x.y"
+        // must be found correctly even when os component looks like a word.
+        assert_eq!(
+            extract_version_from_filename("aic-sdk-aarch64-linux-android-0.19.0.tar.gz"),
+            Some("0.19.0".to_string()),
+        );
+    }
+
+    #[test]
+    fn extract_version_from_filename_macabi() {
+        assert_eq!(
+            extract_version_from_filename("aic-sdk-aarch64-apple-ios-macabi-0.19.0.tar.gz"),
+            Some("0.19.0".to_string()),
+        );
+    }
+
+    #[test]
+    fn extract_version_from_filename_invalid() {
+        assert_eq!(extract_version_from_filename("invalid"), None);
+        assert_eq!(extract_version_from_filename("no-version.tar.gz"), None);
+    }
+
+    #[test]
+    fn checksum_file_covers_all_known_targets() {
+        const VERSION: &str = env!("CARGO_PKG_VERSION");
+        let checksums = read_checksum_filenames();
+
+        let missing: Vec<&str> = TARGETS
+            .iter()
+            .filter(|&&(target, os)| !checksums.contains(&artifact_file_name(target, os, VERSION)))
+            .map(|&(target, _)| target)
+            .collect();
+
+        assert!(
+            missing.is_empty(),
+            "checksum.txt is missing entries for: {}",
+            missing.join(", "),
+        );
     }
 }
