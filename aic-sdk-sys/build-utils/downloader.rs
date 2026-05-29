@@ -355,5 +355,4 @@ mod tests {
         assert_eq!(extract_version_from_filename("invalid"), None);
         assert_eq!(extract_version_from_filename("no-version.tar.gz"), None);
     }
-
 }
