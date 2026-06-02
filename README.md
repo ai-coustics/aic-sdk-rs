@@ -8,7 +8,7 @@ For comprehensive documentation, visit [docs.ai-coustics.com](https://docs.ai-co
 > This SDK requires a license key. Generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com).
 
 > [!WARNING]
-> The bundled libraries were built with Rust `1.97.0-beta.1`. Building your crate with that exact toolchain version fails to link, so use any other Rust version. This affects the default static linking only — the `dynamic-linking` and `runtime-linking` modes are unaffected (see [Linking the native SDK](#linking-the-native-sdk)).
+> The bundled libraries were built with Rust `1.97.0-beta.2`. Building your crate with that exact toolchain version fails to link, so use any other Rust version. This affects the default static linking only — the `dynamic-linking` and `runtime-linking` modes are unaffected (see [Linking the native SDK](#linking-the-native-sdk)).
 
 ## Installation
 

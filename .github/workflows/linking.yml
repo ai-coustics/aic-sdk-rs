@@ -40,7 +40,7 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             ext: zip
-            dynamic_link: false
+            dynamic_link: true
     defaults:
       run:
         # Use bash everywhere (available on Windows runners via Git Bash) so a single download
