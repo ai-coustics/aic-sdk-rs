@@ -16,13 +16,18 @@ env:
   AIC_SDK_LICENSE: ${{ secrets.AIC_SDK_LICENSE }}
 
 jobs:
-  # Exercises the two opt-in linking strategies against a real `libaic` on every platform.
-  # Running the `basic_usage` example touches almost the entire FFI surface (model, processor,
-  # all process layouts, processor/VAD contexts, bearer-token refresh), so it also guards the
+  # Exercises the opt-in linking strategies against a real `libaic` on every platform. Running
+  # the `basic_usage` example touches almost the entire FFI surface (model, processor, all
+  # process layouts, processor/VAD contexts, bearer-token refresh), so it also guards the
   # hand-maintained runtime symbol table in aic-sdk-sys against ABI drift. The default static
   # link is covered on all platforms by build.yml and tests.yml; this job adds the dynamic and
-  # runtime-loading paths, including the Windows import-lib (`aic.lib`) / runtime DLL (`aic.dll`)
-  # split that has no equivalent on Unix.
+  # runtime-loading paths.
+  #
+  # Compile-time `dynamic-linking` runs on Linux and macOS, whose SDK packages ship a shared
+  # library (`libaic.so` / `libaic.dylib`) to link against. The Windows package ships only the
+  # static `aic.lib` plus the runtime `aic.dll` — no DLL import library — so there is nothing to
+  # link `dynamic-linking` against there; Windows exercises `runtime-linking` only, which loads
+  # `aic.dll` by name at run time and needs no import library.
   linking:
     name: Dynamic & runtime linking (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -33,12 +38,15 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             ext: tar.gz
+            dynamic_link: true
           - os: macos-latest
             target: aarch64-apple-darwin
             ext: tar.gz
+            dynamic_link: true
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             ext: zip
+            dynamic_link: false
     defaults:
       run:
         # Use bash everywhere (available on Windows runners via Git Bash) so a single download
@@ -94,6 +102,7 @@ jobs:
           echo "$run_dir" >> "$GITHUB_PATH"
 
       - name: Compile-time dynamic linking
+        if: ${{ matrix.dynamic_link }}
         env:
           AIC_LIB_PATH: ${{ steps.sdk.outputs.lib_dir }}
           LD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
