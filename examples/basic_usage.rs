@@ -68,7 +68,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // for the hand-maintained runtime-linking symbol table).
     match proc_ctx.update_bearer_token(&license) {
         Ok(()) => println!("Bearer token updated"),
-        Err(e) => println!("Bearer token update returned (expected for non-JWT keys): {}", e),
+        Err(e) => println!(
+            "Bearer token update returned (expected for non-JWT keys): {}",
+            e
+        ),
     }
 
     //  Get VAD context for thread safe interaction with voice activity detection parameters
