@@ -58,13 +58,20 @@ fn main() {
         }
     };
 
-    let lib_name = "aic";
-
-    let link_kind = if dynamic_linking { "dylib" } else { "static" };
+    let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
 
     // Link with the curated library
     println!("cargo:rustc-link-search=native={}", lib_path.display());
-    println!("cargo:rustc-link-lib={link_kind}={lib_name}");
+    if dynamic_linking && target_env == "msvc" {
+        // The MSVC SDK package ships the DLL import library as `aic.dll.lib` next to the static
+        // `aic.lib`. A plain `dylib=aic` resolves to `aic.lib` (the static archive), which would
+        // be linked statically and miss its system dependencies. Name the import library
+        // verbatim so the linker binds against `aic.dll` instead.
+        println!("cargo:rustc-link-lib=dylib:+verbatim=aic.dll.lib");
+    } else {
+        let link_kind = if dynamic_linking { "dylib" } else { "static" };
+        println!("cargo:rustc-link-lib={link_kind}=aic");
+    }
 
     // The platform system libraries below are transitive dependencies of the *static* AIC
     // library and must be linked into the final binary. A shared `libaic` already records its

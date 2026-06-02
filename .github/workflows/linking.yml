@@ -22,12 +22,6 @@ jobs:
   # hand-maintained runtime symbol table in aic-sdk-sys against ABI drift. The default static
   # link is covered on all platforms by build.yml and tests.yml; this job adds the dynamic and
   # runtime-loading paths.
-  #
-  # Compile-time `dynamic-linking` runs on Linux and macOS, whose SDK packages ship a shared
-  # library (`libaic.so` / `libaic.dylib`) to link against. The Windows package ships only the
-  # static `aic.lib` plus the runtime `aic.dll` — no DLL import library — so there is nothing to
-  # link `dynamic-linking` against there; Windows exercises `runtime-linking` only, which loads
-  # `aic.dll` by name at run time and needs no import library.
   linking:
     name: Dynamic & runtime linking (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
