@@ -54,6 +54,8 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "ti
 async = ["dep:async-lock", "dep:futures-channel", "dep:rayon"]
 download-lib = ["aic-sdk-sys/download-lib"]
 download-model = ["dep:aic-model-downloader"]
+dynamic-linking = ["aic-sdk-sys/dynamic-linking"]
+runtime-linking = ["aic-sdk-sys/runtime-linking"]
 
 [package.metadata.docs.rs]
 all-features = true

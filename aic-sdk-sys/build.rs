@@ -21,6 +21,27 @@ fn main() {
         return;
     }
 
+    let runtime_linking = env::var("CARGO_FEATURE_RUNTIME_LINKING").is_ok();
+    let dynamic_linking = env::var("CARGO_FEATURE_DYNAMIC_LINKING").is_ok();
+
+    // `dynamic-linking` and `runtime-linking` select alternative linking strategies. Cargo
+    // features are additive, so enabling both (e.g. via `--all-features`) is possible; in that
+    // case runtime linking wins. Warn so the choice is not silently surprising.
+    if runtime_linking && dynamic_linking {
+        println!(
+            "cargo:warning=Both `dynamic-linking` and `runtime-linking` are enabled; using \
+             runtime linking. These features select alternative linking strategies and are not \
+             meant to be combined."
+        );
+    }
+
+    if runtime_linking {
+        // Runtime linking resolves symbols from a user-provided dynamic library path,
+        // so there is intentionally no build-time link step. If `dynamic-linking`
+        // is also enabled through additive Cargo features, runtime linking wins.
+        return;
+    }
+
     let lib_path = if let Ok(path) = env::var("AIC_LIB_PATH") {
         PathBuf::from(path)
     } else {
@@ -39,12 +60,18 @@ fn main() {
 
     let lib_name = "aic";
 
+    let link_kind = if dynamic_linking { "dylib" } else { "static" };
+
     // Link with the curated library
     println!("cargo:rustc-link-search=native={}", lib_path.display());
-    println!("cargo:rustc-link-lib=static={lib_name}");
+    println!("cargo:rustc-link-lib={link_kind}={lib_name}");
 
-    // Add platform-specific system libraries
-    add_platform_specific_libs();
+    // The platform system libraries below are transitive dependencies of the *static* AIC
+    // library and must be linked into the final binary. A shared `libaic` already records its
+    // own dependencies, so when linking dynamically we leave them out.
+    if !dynamic_linking {
+        add_platform_specific_libs();
+    }
 }
 
 fn add_platform_specific_libs() {
@@ -86,7 +113,7 @@ fn generate_bindings() {
     let header_path = manifest_dir.join("include").join("aic.h");
 
     // Generate bindings using bindgen
-    let bindings = bindgen::Builder::default()
+    let mut builder = bindgen::Builder::default()
         // The input header we would like to generate bindings for.
         .header(header_path.to_str().unwrap())
         // Tell cargo to invalidate the built crate whenever any of the
@@ -95,7 +122,16 @@ fn generate_bindings() {
         // Generate constified enums to avoid name repetition
         .constified_enum_module("AicErrorCode")
         .constified_enum_module("AicProcessorParameter")
-        .constified_enum_module("AicVadParameter")
+        .constified_enum_module("AicVadParameter");
+
+    if env::var("CARGO_FEATURE_RUNTIME_LINKING").is_ok() {
+        // The runtime-linking module provides Rust functions with these names
+        // that dispatch through libloading. Keep types/constants from bindgen,
+        // but omit build-linked extern function declarations to avoid conflicts.
+        builder = builder.blocklist_function("aic_.*");
+    }
+
+    let bindings = builder
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.

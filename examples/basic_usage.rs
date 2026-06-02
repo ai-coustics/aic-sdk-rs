@@ -63,6 +63,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => println!("Processor reset failed: {}", e),
     }
 
+    // Exercise the bearer-token refresh path. The license used here is not necessarily a JWT,
+    // so an error is acceptable. This call exists mainly to cover the FFI signature (relevant
+    // for the hand-maintained runtime-linking symbol table).
+    match proc_ctx.update_bearer_token(&license) {
+        Ok(()) => println!("Bearer token updated"),
+        Err(e) => println!("Bearer token update returned (expected for non-JWT keys): {}", e),
+    }
+
     //  Get VAD context for thread safe interaction with voice activity detection parameters
     let vad_ctx = processor.vad_context();
     vad_ctx.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;

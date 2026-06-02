@@ -1,0 +1,110 @@
+name: Linking Modes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  AIC_SDK_LICENSE: ${{ secrets.AIC_SDK_LICENSE }}
+
+jobs:
+  # Exercises the two opt-in linking strategies against a real `libaic` on every platform.
+  # Running the `basic_usage` example touches almost the entire FFI surface (model, processor,
+  # all process layouts, processor/VAD contexts, bearer-token refresh), so it also guards the
+  # hand-maintained runtime symbol table in aic-sdk-sys against ABI drift. The default static
+  # link is covered on all platforms by build.yml and tests.yml; this job adds the dynamic and
+  # runtime-loading paths, including the Windows import-lib (`aic.lib`) / runtime DLL (`aic.dll`)
+  # split that has no equivalent on Unix.
+  linking:
+    name: Dynamic & runtime linking (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ext: tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            ext: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: zip
+    defaults:
+      run:
+        # Use bash everywhere (available on Windows runners via Git Bash) so a single download
+        # script covers all platforms.
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.91.0
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Download AIC SDK
+        id: sdk
+        run: |
+          set -eu
+          # `grep -oE` (not -P) so this works with BSD grep on macOS too.
+          VERSION=$(grep "${{ matrix.target }}" aic-sdk-sys/checksum.txt \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          URL="https://github.com/ai-coustics/aic-sdk-c/releases/download/${VERSION}/aic-sdk-${{ matrix.target }}-${VERSION}.${{ matrix.ext }}"
+          echo "Downloading $URL"
+          curl -fsSL "$URL" -o "sdk.${{ matrix.ext }}"
+          mkdir -p "$PWD/aic-sdk"
+          if [ "${{ matrix.ext }}" = "zip" ]; then
+            # 7z is preinstalled on Windows runners; Git Bash `tar` cannot extract zip.
+            7z x "sdk.zip" -o"$PWD/aic-sdk" >/dev/null
+          else
+            tar -xzf "sdk.tar.gz" -C "$PWD/aic-sdk"
+          fi
+          echo "SDK layout:" && find "$PWD/aic-sdk" \( -name 'aic.*' -o -name 'libaic.*' \)
+
+          # The build linker needs the directory holding the link library (libaic.* on Unix,
+          # aic.lib on Windows); the runtime loader needs the directory holding the shared
+          # library (aic.dll on Windows, the same libaic.* file on Unix). Discover both rather
+          # than assuming a fixed layout.
+          link_lib=$(find "$PWD/aic-sdk" \( -name 'libaic.*' -o -name 'aic.lib' \) | head -1)
+          run_lib=$(find "$PWD/aic-sdk" \( -name 'libaic.so' -o -name 'libaic.dylib' -o -name 'aic.dll' \) | head -1)
+          if [ -z "$link_lib" ] || [ -z "$run_lib" ]; then
+            echo "Could not locate the AIC link/runtime library in the package" >&2
+            exit 1
+          fi
+          lib_dir=$(dirname "$link_lib")
+          run_dir=$(dirname "$run_lib")
+
+          if [ "${{ matrix.ext }}" = "zip" ]; then
+            # Emit native Windows paths so the MSVC linker (AIC_LIB_PATH) understands them.
+            lib_dir=$(cygpath -w "$lib_dir")
+            run_dir=$(cygpath -w "$run_dir")
+          fi
+
+          echo "lib_dir=$lib_dir" >> "$GITHUB_OUTPUT"
+          echo "run_dir=$run_dir" >> "$GITHUB_OUTPUT"
+          # Make the runtime library discoverable for the steps below. On Windows the loader
+          # searches PATH; on Unix PATH is harmless and the loader env vars below do the work.
+          echo "$run_dir" >> "$GITHUB_PATH"
+
+      - name: Compile-time dynamic linking
+        env:
+          AIC_LIB_PATH: ${{ steps.sdk.outputs.lib_dir }}
+          LD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
+          DYLD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
+        run: cargo run --example basic_usage --features "download-model dynamic-linking"
+
+      # runtime-linking loads `libaic` lazily by name on first use, so no build-time link step
+      # runs and the dynamic loader just needs to find the library (PATH / LD_LIBRARY_PATH /
+      # DYLD_LIBRARY_PATH set above).
+      - name: Runtime dynamic loading
+        env:
+          LD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
+          DYLD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
+        run: cargo run --example basic_usage --features "download-model runtime-linking"
