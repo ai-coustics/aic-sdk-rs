@@ -30,7 +30,7 @@ dependencies = [
 
 [[package]]
 name = "aic-model-downloader"
-version = "0.19.1"
+version = "0.19.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -41,7 +41,7 @@ dependencies = [
 
 [[package]]
 name = "aic-sdk"
-version = "0.19.1"
+version = "0.19.2"
 dependencies = [
  "aic-model-downloader",
  "aic-sdk-sys",
@@ -58,7 +58,7 @@ dependencies = [
 
 [[package]]
 name = "aic-sdk-sys"
-version = "0.19.1"
+version = "0.19.2"
 dependencies = [
  "bindgen",
  "flate2",
@@ -203,7 +203,7 @@ dependencies = [
 
 [[package]]
 name = "build-time-download"
-version = "0.19.1"
+version = "0.19.2"
 dependencies = [
  "aic-sdk",
 ]

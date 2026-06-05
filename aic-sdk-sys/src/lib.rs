@@ -175,7 +175,7 @@ mod runtime_linking {
 
     // This table mirrors the function declarations in `include/aic.h` (plus the headerless
     // `aic_set_sdk_wrapper_id`). It is maintained by hand because bindgen's generated `extern`
-    // declarations are blocklisted in this mode. Whenever `aic.h` changes, update the signatures
+    // declarations are blocklisted in the `runtime-linking` mode. Whenever `aic.h` changes, update the signatures
     // below to match — a wrong signature compiles but is undefined behavior at call time. The
     // `check-header` CI job fails when `aic.h` drifts from the SDK release, and the `linking` CI
     // job runs the `basic_usage` example against a real `libaic` to exercise these symbols.
