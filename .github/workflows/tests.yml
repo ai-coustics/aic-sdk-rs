@@ -31,4 +31,4 @@ jobs:
       # runtime linking modes are exercised separately in linking.yml.
       - name: Run Tests
         run: |
-          cargo test -p aic-sdk --locked --features "async download-lib download-model" -- --nocapture
+          cargo test --workspace --locked --features "async download-lib download-model" -- --nocapture
