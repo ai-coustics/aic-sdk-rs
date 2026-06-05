@@ -117,7 +117,10 @@ fn download_lib() -> PathBuf {
 
 fn generate_bindings() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let header_path = manifest_dir.join("include").join("aic.h");
+    let include_dir = manifest_dir.join("include");
+    // `wrapper.h` includes the vendored `aic.h` and adds the headerless `aic_set_sdk_wrapper_id`
+    // declaration, so all linking modes get it from bindgen instead of a hand-written extern.
+    let header_path = include_dir.join("wrapper.h");
 
     // Generate bindings using bindgen
     let mut builder = bindgen::Builder::default()
@@ -132,10 +135,17 @@ fn generate_bindings() {
         .constified_enum_module("AicVadParameter");
 
     if env::var("CARGO_FEATURE_RUNTIME_LINKING").is_ok() {
-        // The runtime-linking module provides Rust functions with these names
-        // that dispatch through libloading. Keep types/constants from bindgen,
-        // but omit build-linked extern function declarations to avoid conflicts.
-        builder = builder.blocklist_function("aic_.*");
+        // Instead of build-linked `extern` declarations, ask bindgen to emit a struct of
+        // libloading-backed function pointers (`struct AicLib`). The runtime-linking module wraps
+        // it with a global + thin free-function forwarders so the call shape matches the other
+        // linking modes. `dynamic_link_require_all` makes loading fail if any symbol is missing.
+        builder = builder
+            .dynamic_library_name("AicLib")
+            .dynamic_link_require_all(true)
+            // Without this, `require_all` tries to load every libc function the header pulls in
+            // transitively (atof, strtod, ...) from `libaic` and fails. Only the SDK's own
+            // `aic_*` symbols live in the library.
+            .allowlist_function("aic_.*");
     }
 
     let bindings = builder
