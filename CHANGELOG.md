@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.19.2 - 2026-06-05
+
+## New Features
+
+- Added two opt-in linking modes for the native AIC SDK, in addition to the default static linking. They are mutually exclusive; enabling both selects `runtime-linking`.
+
+  - `dynamic-linking` links a shared `libaic` (`libaic.so` / `libaic.dylib` / `aic.dll`) at build time.
+  - `runtime-linking` loads `libaic` lazily on first use through the OS dynamic loader, with no build-time link step.
+
+  Unlike the default static linking, both modes are unaffected by the Rust `1.97.0-beta.1` link issue. See the "Linking the native SDK" section in the README for how to make the library discoverable at run time.
+
+- Added `load_library` and `is_library_loaded` (with the `runtime-linking` feature) to load a specific `libaic` file before the first SDK call instead of relying on the platform default name, plus the `DynamicLoadingError` type returned on failure.
+
+  ```rust,ignore
+  // Optional: pick an exact file before the first SDK call.
+  unsafe { aic_sdk::load_library("/path/to/libaic.so")?; }
+  ```
+
 ## 0.19.0 - 2026-05-27
 
 ## New Features

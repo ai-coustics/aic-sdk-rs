@@ -454,7 +454,7 @@ enum AicErrorCode aic_model_get_optimal_num_frames(const struct AicModel *model,
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Processor created successfully
  * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `model` or `license_key` is NULL
- * - `AIC_ERROR_CODE_LICENSE_INVALID`: License key format is incorrect
+ * - `AIC_ERROR_CODE_LICENSE_FORMAT_INVALID`: License key format is incorrect
  * - `AIC_ERROR_CODE_LICENSE_VERSION_UNSUPPORTED`: License version is not compatible with the SDK version
  * - `AIC_ERROR_CODE_LICENSE_EXPIRED`: License key has expired
  *
@@ -786,8 +786,16 @@ enum AicErrorCode aic_processor_context_get_output_delay(const struct AicProcess
  *
  * In-place updates are only supported when both the originally configured key and
  * the new token are JWTs. Other license types cannot be swapped in this way.
- * If either side is unsupported, the call returns `AIC_ERROR_CODE_TOKEN_UPDATE_UNSUPPORTED`
- * and the existing token stays in use.
+ *
+ * On any error the call is a no-op: the previously active token remains in use and
+ * the telemetry session is unaffected (no backoff, no interruption to processing).
+ *
+ * On success the swap is applied immediately and is **not** gated on backend
+ * acceptance. The token is validated locally for format only; if the backend later
+ * rejects it (e.g. expired or revoked), the SDK retries it under backoff rather than
+ * rolling back to the prior token, and audio processing is eventually disabled if no
+ * accepted token arrives in time. Supplying a known-good token via this call during
+ * that window recovers the session.
  *
  * Safe to call concurrently with `aic_processor_process()` on the originating
  * processor.
@@ -799,8 +807,8 @@ enum AicErrorCode aic_processor_context_get_output_delay(const struct AicProcess
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Token replaced successfully
  * - `AIC_ERROR_CODE_NULL_POINTER`: `context` or `token` is NULL
- * - `AIC_ERROR_CODE_LICENSE_INVALID`: New token could not be parsed
- * - `AIC_ERROR_CODE_TOKEN_UPDATE_UNSUPPORTED`: The original or new key does not support in-place updates
+ * - `AIC_ERROR_CODE_LICENSE_FORMAT_INVALID`: New token could not be parsed; the existing token stays in use
+ * - `AIC_ERROR_CODE_TOKEN_UPDATE_UNSUPPORTED`: The original or new key does not support in-place updates; the existing token stays in use
  *
  * # Safety
  * - This function allocates memory and performs network-free cryptographic work. Avoid calling it from real-time audio threads.

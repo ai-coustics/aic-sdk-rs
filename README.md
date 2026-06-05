@@ -8,7 +8,7 @@ For comprehensive documentation, visit [docs.ai-coustics.com](https://docs.ai-co
 > This SDK requires a license key. Generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com).
 
 > [!WARNING]
-> You must use a Rust version different from `1.97.0-beta.1`, which was used to build the static libraries. A solution is currently in development.
+> The bundled libraries were built with Rust `1.97.0-beta.2`. Building your crate with that exact toolchain version fails to link, so use any other Rust version. This affects the default static linking only — the `dynamic-linking` and `runtime-linking` modes are unaffected (see [Linking the native SDK](#linking-the-native-sdk)).
 
 ## Installation
 
@@ -45,6 +45,41 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+```
+
+## Linking the native SDK
+
+By default, `aic-sdk-sys` links the native AIC SDK **statically**. Two opt-in features link a shared `libaic` instead. They are mutually exclusive; enabling both (e.g. via `--all-features`) selects `runtime-linking`.
+
+| Feature | Linking | How `libaic` is located |
+|---|---|---|
+| _(default)_ | static, at build time | `AIC_LIB_PATH` directory, or downloaded with `download-lib` |
+| `dynamic-linking` | dynamic, at build time | same to link; then OS loader search at run time |
+| `runtime-linking` | dynamic, lazy on first use | OS loader search by name, or `aic_sdk::load_library(path)` |
+
+In every mode, point the build at the SDK with `AIC_LIB_PATH=/path/to/aic-sdk/lib`, or enable `download-lib` to fetch it automatically:
+
+```bash
+AIC_SDK_LICENSE="…" cargo run --example basic_usage \
+  --features "dynamic-linking download-lib download-model"
+```
+
+> [!NOTE]
+> The `dynamic-linking` and `runtime-linking` modes are not affected by the toolchain link issue in the [warning above](#aic-sdk---rust-bindings-for-ai-coustics-sdk); it applies to default static linking only.
+
+### Finding the library at run time
+
+With `dynamic-linking` and `runtime-linking`, the OS dynamic loader must locate `libaic` when the program runs — `download-lib` only covers build time. Point the loader at the SDK `lib` directory, ship the library next to the binary, or install it system-wide:
+
+- **Linux:** `LD_LIBRARY_PATH=/path/to/aic-sdk/lib`, or an rpath (`RUSTFLAGS="-C link-arg=-Wl,-rpath,\$ORIGIN"` + ship `libaic.so` beside the binary).
+- **macOS:** `DYLD_LIBRARY_PATH`, `@rpath`/`@loader_path`, or a bundle layout.
+- **Windows:** put `aic.dll` next to the `.exe` or on `PATH` (the build-time import lib `aic.lib` and the runtime `aic.dll` may be in different directories).
+- **Android:** package `libaic.so` (arm64 only) into the APK under `lib/arm64-v8a/`.
+
+`runtime-linking` loads `libaic` automatically on the first SDK call, by platform default name (`libaic.so` / `libaic.dylib` / `aic.dll`). To choose an exact file, call `load_library` first; if the library can't be found, that first call panics with a descriptive message:
+
+```rust,ignore
+unsafe { aic_sdk::load_library("/path/to/libaic.so")?; } // optional override
 ```
 
 ## Usage

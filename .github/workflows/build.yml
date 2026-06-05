@@ -20,8 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.91.0
+      # `--all-features` is intentionally avoided here: it would enable `runtime-linking`,
+      # which changes the linking strategy and requires loading the library at runtime. The
+      # dedicated dynamic/runtime linking modes are covered by linking.yml.
       - name: Build and Run Examples
         run: |
-          cargo run --example basic_usage --all-features
+          cargo run --example basic_usage --features "download-lib download-model"
           cargo run --package build-time-download --features download-lib
-          cargo run --example parallel_async --all-features
+          cargo run --example parallel_async --features "async download-lib download-model"

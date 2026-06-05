@@ -3,6 +3,8 @@
 
 use aic_sdk_sys::{aic_get_compatible_model_version, aic_get_sdk_version, aic_set_sdk_wrapper_id};
 use std::ffi::CStr;
+#[cfg(feature = "runtime-linking")]
+use std::path::Path;
 
 mod error;
 mod model;
@@ -19,6 +21,34 @@ pub use processor::*;
 #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub use processor_async::*;
 pub use vad::*;
+
+#[cfg(feature = "runtime-linking")]
+#[cfg_attr(docsrs, doc(cfg(feature = "runtime-linking")))]
+pub use aic_sdk_sys::DynamicLoadingError;
+
+/// Loads the AIC dynamic library from `path` when the `runtime-linking` feature is enabled.
+///
+/// This is optional. With `runtime-linking`, the library is loaded automatically on first use
+/// from the platform default name (`libaic.so` / `libaic.dylib` / `aic.dll`) via the OS loader
+/// search path. Call this only to pick a specific file, and do so before the first SDK call.
+///
+/// # Safety
+///
+/// `path` must point to an AIC dynamic library that is ABI-compatible with this crate's bundled
+/// `aic.h` header. Loading an incompatible library can cause undefined behavior when SDK functions
+/// are called.
+#[cfg(feature = "runtime-linking")]
+#[cfg_attr(docsrs, doc(cfg(feature = "runtime-linking")))]
+pub unsafe fn load_library<P: AsRef<Path>>(path: P) -> Result<(), DynamicLoadingError> {
+    unsafe { aic_sdk_sys::load_library(path) }
+}
+
+/// Returns whether an AIC dynamic library has already been loaded.
+#[cfg(feature = "runtime-linking")]
+#[cfg_attr(docsrs, doc(cfg(feature = "runtime-linking")))]
+pub fn is_library_loaded() -> bool {
+    aic_sdk_sys::is_library_loaded()
+}
 
 /// Returns the version of the ai-coustics SDK library.
 ///

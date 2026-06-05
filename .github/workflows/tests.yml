@@ -26,6 +26,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      # `--all-features` is avoided on purpose: it would enable `runtime-linking`, so the test
+      # binaries would have to load `libaic` at runtime before any SDK call. The dynamic and
+      # runtime linking modes are exercised separately in linking.yml.
       - name: Run Tests
         run: |
-          cargo test -p aic-sdk --locked --all-features -- --nocapture
+          cargo test --workspace --locked --features "async download-lib download-model" -- --nocapture
