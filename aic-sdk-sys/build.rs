@@ -5,6 +5,9 @@ use std::path::PathBuf;
 #[path = "build-utils/downloader.rs"]
 mod downloader;
 
+#[path = "build-utils/runtime_linking.rs"]
+mod runtime_linking;
+
 fn main() {
     // Rerun the build script if the header file changes
     println!("cargo:rerun-if-changed=include/aic.h");
@@ -118,6 +121,7 @@ fn download_lib() -> PathBuf {
 fn generate_bindings() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let header_path = manifest_dir.join("include").join("aic.h");
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     // Generate bindings using bindgen
     let mut builder = bindgen::Builder::default()
@@ -132,6 +136,12 @@ fn generate_bindings() {
         .constified_enum_module("AicVadParameter");
 
     if env::var("CARGO_FEATURE_RUNTIME_LINKING").is_ok() {
+        let runtime_bindings = builder
+            .clone()
+            .generate()
+            .expect("Unable to generate runtime-linking symbols");
+        runtime_linking::generate(&runtime_bindings, &out_path.join("runtime_linking.rs"));
+
         // The runtime-linking module provides Rust functions with these names
         // that dispatch through libloading. Keep types/constants from bindgen,
         // but omit build-linked extern function declarations to avoid conflicts.
@@ -145,7 +155,6 @@ fn generate_bindings() {
         .expect("Unable to generate bindings");
 
     // Write the bindings to the $OUT_DIR/bindings.rs file.
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");

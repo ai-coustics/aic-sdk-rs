@@ -30,7 +30,9 @@ path = "build-utils/downloader.rs"
 [build-dependencies]
 bindgen = "0.72"
 flate2 = { version = "1.1", optional = true }
+quote = "1"
 sha2 = { workspace = true, optional = true }
+syn = { version = "2", features = ["full"] }
 tar = { version = "0.4", optional = true }
 ureq = { workspace = true, optional = true, features = ["rustls"] }
 zip = { version = "7.0", optional = true }
