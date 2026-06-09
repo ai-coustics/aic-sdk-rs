@@ -1,8 +1,14 @@
 # Changelog
 
+## 0.19.3 - 2026-06-09
+
+### Platform Support
+
+- Fixed a crash on Android during startup
+
 ## 0.19.2 - 2026-06-05
 
-## New Features
+### New Features
 
 - Added two opt-in linking modes for the native AIC SDK, in addition to the default static linking. They are mutually exclusive; enabling both selects `runtime-linking`.
 
@@ -20,7 +26,7 @@
 
 ## 0.19.0 - 2026-05-27
 
-## New Features
+### New Features
 
 - Added JWT bearer token refresh via `ProcessorContext::update_bearer_token`. When the processor was created with a JWT license, this swaps in a renewed token while audio processing continues uninterrupted.
 
@@ -50,13 +56,13 @@
   let processor = Processor::with_otel_config(&model, "license", &otel)?;
   ```
 
-## Breaking Changes
+### Breaking Changes
 
 - Compatible model file version was bumped to 4. Models built for earlier versions are no longer supported.
 
 ## 0.18.0 - 2026-05-27
 
-## New Features
+### New Features
 
 - Added `ProcessorAsync`, an async wrapper around `Processor` that offloads processing to a background thread pool, gated behind the new `async` feature. The implementation is runtime-agnostic and works on any executor (tokio, smol, async-std, ...).
 
@@ -97,35 +103,35 @@
 
 ## 0.17.1 - 2026-05-06
 
-## Improvements
+### Improvements
 
 - Increased maximum VAD speech hold duration from 100x to 300x the model's window size.
 
-## Bug Fixes
+### Bug Fixes
 
 - Removed zero-padding when the host frame size does not match the model frame size, which caused unexpected behavior for some models.
 
 ## 0.17.0 - 2026-04-23
 
-## New Features
+### New Features
 
 - Added support for Quail Voice Focus 2.1 models.
 
-## Breaking Changes
+### Breaking Changes
 
 - Quail Voice Focus 2.0 is no longer supported.
 - Compatible model file version was bumped to 3.
 
 ## 0.16.0 - 2026-04-16
 
-## New Features
+### New Features
 
 - This release adds an **experimental** feature to export real-time audio processing metrics via OpenTelemetry (OTel).
   The new feature is currently disabled by default and available for testing on early access only.
 
 ## 0.15.1 - 2026-03-17
 
-## Improvements
+### Improvements
 
 - Improved performance of telemetry when using multiple processors.
 
