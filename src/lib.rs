@@ -6,6 +6,7 @@ use std::ffi::CStr;
 #[cfg(feature = "runtime-linking")]
 use std::path::Path;
 
+mod analyzer;
 mod error;
 mod model;
 mod processor;
@@ -14,6 +15,7 @@ mod processor;
 mod processor_async;
 mod vad;
 
+pub use analyzer::*;
 pub use error::*;
 pub use model::*;
 pub use processor::*;

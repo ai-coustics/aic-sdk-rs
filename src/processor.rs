@@ -6,6 +6,14 @@ use std::{ffi::CString, marker::PhantomData, ptr, sync::Once};
 
 static SET_WRAPPER_ID: Once = Once::new();
 
+pub(crate) fn ensure_wrapper_id() {
+    SET_WRAPPER_ID.call_once(|| unsafe {
+        // SAFETY:
+        // - This FFI call has no safety requirements.
+        aic_set_sdk_wrapper_id(2);
+    });
+}
+
 /// Audio processing configuration passed to [`Processor::initialize`].
 ///
 /// Use [`ProcessorConfig::optimal`] as a starting point, then adjust fields
@@ -507,11 +515,7 @@ impl<'a> Processor<'a> {
             .as_ref()
             .map_or(ptr::null(), |o| o as *const AicOtelConfig);
 
-        SET_WRAPPER_ID.call_once(|| unsafe {
-            // SAFETY:
-            // - This FFI call has no safety requirements.
-            aic_set_sdk_wrapper_id(2);
-        });
+        ensure_wrapper_id();
 
         let mut processor_ptr: *mut AicProcessor = ptr::null_mut();
         let c_license_key =

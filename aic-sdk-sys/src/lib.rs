@@ -206,6 +206,16 @@ mod runtime_linking {
         fn aic_vad_context_is_speech_detected(context: *const AicVadContext, value: *mut bool) -> AicErrorCode::Type;
         fn aic_vad_context_set_parameter(context: *const AicVadContext, parameter: AicVadParameter::Type, value: c_float) -> AicErrorCode::Type;
         fn aic_vad_context_get_parameter(context: *const AicVadContext, parameter: AicVadParameter::Type, value: *mut c_float) -> AicErrorCode::Type;
+        fn aic_analyzer_pair_create(collector: *mut *mut AicCollector, analyzer: *mut *mut AicAnalyzer, model: *const AicModel, license_key: *const c_char, analysis_window_length_ms: usize) -> AicErrorCode::Type;
+        fn aic_collector_initialize(collector: *mut AicCollector, sample_rate: c_uint, num_channels: u16, num_frames: usize, allow_variable_frames: bool) -> AicErrorCode::Type;
+        fn aic_collector_buffer_planar(collector: *mut AicCollector, audio: *const *const c_float, num_channels: u16, num_frames: usize) -> AicErrorCode::Type;
+        fn aic_collector_buffer_interleaved(collector: *mut AicCollector, audio: *const c_float, num_channels: u16, num_frames: usize) -> AicErrorCode::Type;
+        fn aic_collector_buffer_sequential(collector: *mut AicCollector, audio: *const c_float, num_channels: u16, num_frames: usize) -> AicErrorCode::Type;
+        fn aic_analyzer_reset(analyzer: *const AicAnalyzer) -> AicErrorCode::Type;
+        fn aic_analyzer_analyze_buffered(analyzer: *mut AicAnalyzer, result: *mut AicAudioInsights) -> AicErrorCode::Type;
+        fn aic_analyzer_update_bearer_token(analyzer: *const AicAnalyzer, token: *const c_char) -> AicErrorCode::Type;
+        fn aic_collector_destroy(collector: *mut AicCollector);
+        fn aic_analyzer_destroy(analyzer: *mut AicAnalyzer);
         fn aic_set_sdk_wrapper_id(id: c_uint);
     }
 

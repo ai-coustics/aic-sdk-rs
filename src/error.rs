@@ -41,6 +41,8 @@ pub enum AicError {
     ModelInvalid,
     #[error("The model file version is not compatible with this SDK version.")]
     ModelVersionUnsupported,
+    #[error("The model type is not supported by this operation.")]
+    ModelTypeUnsupported,
     #[error("The path to the model file is invalid")]
     ModelFilePathInvalid,
     #[error(
@@ -77,6 +79,7 @@ impl From<AicErrorCode::Type> for AicError {
             AIC_ERROR_CODE_TOKEN_UPDATE_UNSUPPORTED => AicError::TokenUpdateUnsupported,
             AIC_ERROR_CODE_MODEL_INVALID => AicError::ModelInvalid,
             AIC_ERROR_CODE_MODEL_VERSION_UNSUPPORTED => AicError::ModelVersionUnsupported,
+            AIC_ERROR_CODE_MODEL_TYPE_UNSUPPORTED => AicError::ModelTypeUnsupported,
             AIC_ERROR_CODE_MODEL_FILE_PATH_INVALID => AicError::ModelFilePathInvalid,
             AIC_ERROR_CODE_FILE_SYSTEM_ERROR => AicError::FileSystemError,
             AIC_ERROR_CODE_MODEL_DATA_UNALIGNED => AicError::ModelDataUnaligned,
