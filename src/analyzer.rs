@@ -50,7 +50,7 @@ impl From<AicAudioInsights> for AudioInsights {
 /// are independent and may be destroyed in any order.
 pub struct AnalyzerPair<'a> {
     /// Buffers audio for later analysis.
-    pub collector: Collector<'a>,
+    pub collector: Collector,
     /// Analyzes the audio buffered by the collector.
     pub analyzer: Analyzer<'a>,
 }
@@ -123,27 +123,24 @@ impl<'a> AnalyzerPair<'a> {
     }
 
     /// Splits this pair into independently owned collector and analyzer handles.
-    pub fn into_parts(self) -> (Collector<'a>, Analyzer<'a>) {
+    pub fn into_parts(self) -> (Collector, Analyzer<'a>) {
         (self.collector, self.analyzer)
     }
 }
 
 /// Buffers audio for later non-real-time analysis.
-pub struct Collector<'a> {
+pub struct Collector {
     /// Raw pointer to the C collector structure.
     inner: *mut AicCollector,
     /// Configured number of channels.
     num_channels: Option<u16>,
-    /// Marker to tie the collector to the lifetime of the model's weights.
-    marker: PhantomData<&'a [u8]>,
 }
 
-impl<'a> Collector<'a> {
+impl Collector {
     pub(crate) fn new(collector_ptr: *mut AicCollector) -> Self {
         Self {
             inner: collector_ptr,
             num_channels: None,
-            marker: PhantomData,
         }
     }
 
@@ -259,7 +256,7 @@ impl<'a> Collector<'a> {
     }
 }
 
-impl<'a> Drop for Collector<'a> {
+impl Drop for Collector {
     fn drop(&mut self) {
         if !self.inner.is_null() {
             // SAFETY:
@@ -269,8 +266,16 @@ impl<'a> Drop for Collector<'a> {
     }
 }
 
-unsafe impl<'a> Send for Collector<'a> {}
-unsafe impl<'a> Sync for Collector<'a> {}
+// SAFETY: Everything in Collector is Send, with the exception of the inner raw pointer.
+// The Collector only uses the raw pointer according to the safety contracts of the
+// unsafe APIs that require the pointer, and the Collector does not expose access to the
+// raw pointer in any of its methods. Therefore, it safe to implement Send for Collector.
+unsafe impl Send for Collector {}
+
+// SAFETY: Collector does not expose any interior mutability, and all unsafe APIs that make use of
+// the inner raw pointer are only used in methods that take &mut self, which upholds the thread safety
+// contracts required by the unsafe APIs. Therefore, it is safe to implement Sync for Collector.
+unsafe impl Sync for Collector {}
 
 /// Runs non-real-time analysis over audio buffered by a [`Collector`].
 pub struct Analyzer<'a> {
@@ -346,5 +351,13 @@ impl<'a> Drop for Analyzer<'a> {
     }
 }
 
+// SAFETY: Everything in Analyzer is Send, with the exception of the inner raw pointer.
+// The Analyzer only uses the raw pointer according to the safety contracts of the
+// unsafe APIs that require the pointer, and the Analyzer does not expose access to the
+// raw pointer in any of its methods. Therefore, it safe to implement Send for Analyzer.
 unsafe impl<'a> Send for Analyzer<'a> {}
+
+// SAFETY: Analyzer does not expose any interior mutability, and all unsafe APIs that make use of
+// the inner raw pointer are only used in methods that take &mut self, which upholds the thread safety
+// contracts required by the unsafe APIs. Therefore, it is safe to implement Sync for Analyzer.
 unsafe impl<'a> Sync for Analyzer<'a> {}
