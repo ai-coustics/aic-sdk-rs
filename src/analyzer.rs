@@ -76,7 +76,7 @@ impl From<AicAnalysisResult> for AnalysisResult {
 ///
 /// The collector retains a span of audio determined by the analysis model. As more samples
 /// get collected, old audio is discarded.
-/// 
+///
 /// # Arguments
 ///
 /// * `model` - The loaded model instance
@@ -133,7 +133,7 @@ pub fn new_analysis_pair<'a>(
 }
 
 /// Buffers audio for later analysis.
-/// 
+///
 /// The collector is designed to be placed in the audio thread,
 /// buffering audio chunks for the [`Analyzer`] to analyze later.
 pub struct Collector {
@@ -422,7 +422,7 @@ unsafe impl Send for Collector {}
 unsafe impl Sync for Collector {}
 
 /// Runs an analysis model over the audio buffered by a [`Collector`].
-/// 
+///
 /// The analyzer is designed to be run in a non-audio thread. Analysis models are computationally expensive
 /// and cannot run in the audio thread. The analyzer has access to the audio buffered by the
 /// collector, and it can access it safely across threads.
@@ -459,7 +459,7 @@ impl<'a> Analyzer<'a> {
     /// Returns `Ok(())` on success or an [`AicError`] if the reset fails.
     ///
     /// # Safety
-    /// 
+    ///
     /// Real-time safe. Can be called from audio processing threads.
     ///
     /// # Example
@@ -489,13 +489,13 @@ impl<'a> Analyzer<'a> {
     /// # Note
     /// When buffering, all channels are mixed down to mono. To analyze channels
     /// independently, create separate analyzer pairs.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns an [`AnalysisResult`] if successful, otherwise an [`AicError`].
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// This function is not real-time safe. Avoid calling it from audio threads.
     pub fn analyze_buffered(&mut self) -> Result<AnalysisResult, AicError> {
         let mut result = AicAnalysisResult {
