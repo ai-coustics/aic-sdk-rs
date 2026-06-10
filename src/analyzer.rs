@@ -245,6 +245,7 @@ impl Collector {
     /// let audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
     /// collector.buffer_planar(&audio).unwrap();
     /// ```
+    #[allow(clippy::doc_overindented_list_items)]
     pub fn buffer_planar<V: AsRef<[f32]>>(&mut self, audio: &[V]) -> Result<(), AicError> {
         const MAX_CHANNELS: u16 = 16;
 
@@ -321,6 +322,7 @@ impl Collector {
     /// let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
     /// collector.buffer_interleaved(&audio).unwrap();
     /// ```
+    #[allow(clippy::doc_overindented_list_items)]
     pub fn buffer_interleaved(&mut self, audio: &[f32]) -> Result<(), AicError> {
         let Some(num_channels) = self.num_channels else {
             return Err(AicError::ProcessorNotInitialized);
@@ -378,6 +380,7 @@ impl Collector {
     /// let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
     /// collector.buffer_sequential(&audio).unwrap();
     /// ```
+    #[allow(clippy::doc_overindented_list_items)]
     pub fn buffer_sequential(&mut self, audio: &[f32]) -> Result<(), AicError> {
         let Some(num_channels) = self.num_channels else {
             return Err(AicError::ProcessorNotInitialized);
