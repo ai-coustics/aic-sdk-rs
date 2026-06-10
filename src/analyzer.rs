@@ -132,7 +132,10 @@ pub fn new_analysis_pair<'a>(
     Ok((collector, analyzer))
 }
 
-/// Buffers audio for later non-real-time analysis.
+/// Buffers audio for later analysis.
+/// 
+/// The collector is designed to be placed in the audio thread,
+/// buffering audio chunks for the [`Analyzer`] to analyze later.
 pub struct Collector {
     /// Raw pointer to the C collector structure.
     inner: *mut AicCollector,
@@ -418,7 +421,11 @@ unsafe impl Send for Collector {}
 // contracts required by the unsafe APIs. Therefore, it is safe to implement Sync for Collector.
 unsafe impl Sync for Collector {}
 
-/// Runs non-real-time analysis over audio buffered by a [`Collector`].
+/// Runs an analysis model over the audio buffered by a [`Collector`].
+/// 
+/// The analyzer is designed to be run in a non-audio thread. Analysis models are computationally expensive
+/// and cannot run in the audio thread. The analyzer has access to the audio buffered by the
+/// collector, and it can access it safely across threads.
 pub struct Analyzer<'a> {
     /// Raw pointer to the C analyzer structure.
     inner: *mut AicAnalyzer,
