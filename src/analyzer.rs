@@ -8,7 +8,7 @@ use std::{ffi::CString, marker::PhantomData, ptr};
 ///
 /// Scores are in the range `0.0..=1.0`. For all fields except
 /// [`speaker_loudness`](Self::speaker_loudness), lower values indicate less problematic audio.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AnalysisResult {
     /// Headline audio score.
     ///
