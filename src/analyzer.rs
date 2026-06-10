@@ -88,8 +88,8 @@ impl From<AicAnalysisResult> for AnalysisResult {
 /// ```rust,no_run
 /// # use aic_sdk::Model;
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-/// let model = Model::from_file("/path/to/model.aicmodel")?;
-/// let (mut collector, mut analyzer) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+/// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+/// let (mut collector, mut analyzer) = aic_sdk::new_analysis_pair(&model, &license_key).unwrap();
 /// ```
 pub fn new_analysis_pair<'a>(
     model: &Model<'a>,
@@ -177,8 +177,8 @@ impl Collector {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model);
     /// collector.initialize(&config).unwrap();
     /// ```
@@ -238,8 +238,8 @@ impl Collector {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
     /// collector.initialize(&config).unwrap();
     /// let audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
@@ -315,8 +315,8 @@ impl Collector {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
     /// collector.initialize(&config).unwrap();
     /// let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
@@ -373,8 +373,8 @@ impl Collector {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key).unwrap();
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
     /// collector.initialize(&config).unwrap();
     /// let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
@@ -470,8 +470,8 @@ impl<'a> Analyzer<'a> {
     /// ```rust,no_run
     /// # use aic_sdk::Model;
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let (_, mut analyzer) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let (_, mut analyzer) = aic_sdk::new_analysis_pair(&model, &license_key).unwrap();
     /// analyzer.reset().unwrap();
     /// ```
     pub fn reset(&self) -> Result<(), AicError> {
@@ -548,8 +548,8 @@ impl<'a> Analyzer<'a> {
     /// ```rust,no_run
     /// # use aic_sdk::Model;
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let (_, analyzer) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let (_, analyzer) = aic_sdk::new_analysis_pair(&model, &license_key).unwrap();
     /// let renewed_jwt = String::from("<JWT_BEARER_TOKEN>");
     /// analyzer.update_bearer_token(&renewed_jwt).unwrap();
     /// ```
