@@ -2,7 +2,8 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use aic_sdk_sys::{aic_get_compatible_model_version, aic_get_sdk_version, aic_set_sdk_wrapper_id};
-use std::ffi::CStr;
+use std::{ffi::CStr, sync::Once};
+
 #[cfg(feature = "runtime-linking")]
 use std::path::Path;
 
@@ -27,6 +28,17 @@ pub use vad::*;
 #[cfg(feature = "runtime-linking")]
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime-linking")))]
 pub use aic_sdk_sys::DynamicLoadingError;
+
+static SET_WRAPPER_ID: Once = Once::new();
+
+/// Sets the SDK wrapper ID.
+pub(crate) fn set_wrapper_id() {
+    SET_WRAPPER_ID.call_once(|| unsafe {
+        // SAFETY:
+        // - This FFI call has no safety requirements.
+        aic_set_sdk_wrapper_id(2);
+    });
+}
 
 /// Loads the AIC dynamic library from `path` when the `runtime-linking` feature is enabled.
 ///

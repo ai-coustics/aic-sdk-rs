@@ -83,7 +83,8 @@ impl<'a> AnalyzerPair<'a> {
         license_key: &str,
         analysis_window_length_ms: usize,
     ) -> Result<Self, AicError> {
-        crate::processor::ensure_wrapper_id();
+        // Set the wrapper ID as soon as the user attempts to instantiate an analyzer
+        crate::set_wrapper_id();
 
         let mut collector_ptr: *mut AicCollector = ptr::null_mut();
         let mut analyzer_ptr: *mut AicAnalyzer = ptr::null_mut();

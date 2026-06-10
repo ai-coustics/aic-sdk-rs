@@ -2,17 +2,7 @@ use crate::{error::*, model::Model};
 
 use aic_sdk_sys::{AicProcessorParameter::*, *};
 
-use std::{ffi::CString, marker::PhantomData, ptr, sync::Once};
-
-static SET_WRAPPER_ID: Once = Once::new();
-
-pub(crate) fn ensure_wrapper_id() {
-    SET_WRAPPER_ID.call_once(|| unsafe {
-        // SAFETY:
-        // - This FFI call has no safety requirements.
-        aic_set_sdk_wrapper_id(2);
-    });
-}
+use std::{ffi::CString, marker::PhantomData, ptr};
 
 /// Audio processing configuration passed to [`Processor::initialize`].
 ///
@@ -499,6 +489,9 @@ impl<'a> Processor<'a> {
         license_key: &str,
         otel_config: Option<&OtelConfig>,
     ) -> Result<Self, AicError> {
+        // Set the wrapper ID as soon as the user attempts to instantiate a processor
+        crate::set_wrapper_id();
+
         // Session ID must outlive the FFI call so its pointer stays valid.
         let c_session_id = otel_config
             .and_then(|o| o.session_id.as_deref())
@@ -514,8 +507,6 @@ impl<'a> Processor<'a> {
         let c_otel_ptr = c_otel
             .as_ref()
             .map_or(ptr::null(), |o| o as *const AicOtelConfig);
-
-        ensure_wrapper_id();
 
         let mut processor_ptr: *mut AicProcessor = ptr::null_mut();
         let c_license_key =
