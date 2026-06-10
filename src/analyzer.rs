@@ -43,89 +43,68 @@ impl From<AicAudioInsights> for AudioInsights {
     }
 }
 
-/// A collector/analyzer pair for non-real-time audio analysis.
+/// Creates a collector/analyzer pair.
 ///
-/// The [`Collector`] is intended for buffering audio from the audio thread, while
-/// the [`Analyzer`] can run the more expensive analysis work elsewhere. The two handles
-/// are independent and may be destroyed in any order.
-pub struct AnalyzerPair<'a> {
-    /// Buffers audio for later analysis.
-    pub collector: Collector,
-    /// Analyzes the audio buffered by the collector.
-    pub analyzer: Analyzer<'a>,
-}
+/// `analysis_window_length_ms` controls how much recent audio the collector retains
+/// for each analysis run. The accepted range is model-specific.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// # use aic_sdk::{AnalyzerPair, Model, ProcessorConfig};
+/// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+/// let model = Model::from_file("/path/to/analysis-model.aicmodel")?;
+/// let config = ProcessorConfig::optimal(&model);
+/// let mut pair = AnalyzerPair::new(&model, &license_key, 30_000)?;
+///
+/// pair.collector.initialize(&config)?;
+/// let audio = vec![0.0f32; config.num_frames];
+/// pair.collector.buffer_interleaved(&audio)?;
+///
+/// let insights = pair.analyzer.analyze_buffered()?;
+/// println!("Tyto score: {}", insights.tyto_score);
+/// # Ok::<(), aic_sdk::AicError>(())
+/// ```
+pub fn new_analysis_pair<'a>(
+    model: &Model<'a>,
+    license_key: &str,
+) -> Result<(Collector, Analyzer<'a>), AicError> {
+    // Set the wrapper ID as soon as the user attempts to instantiate an analyzer
+    crate::set_wrapper_id();
 
-impl<'a> AnalyzerPair<'a> {
-    /// Creates a collector/analyzer pair.
-    ///
-    /// `analysis_window_length_ms` controls how much recent audio the collector retains
-    /// for each analysis run. The accepted range is model-specific.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use aic_sdk::{AnalyzerPair, Model, ProcessorConfig};
-    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// let model = Model::from_file("/path/to/analysis-model.aicmodel")?;
-    /// let config = ProcessorConfig::optimal(&model);
-    /// let mut pair = AnalyzerPair::new(&model, &license_key, 30_000)?;
-    ///
-    /// pair.collector.initialize(&config)?;
-    /// let audio = vec![0.0f32; config.num_frames];
-    /// pair.collector.buffer_interleaved(&audio)?;
-    ///
-    /// let insights = pair.analyzer.analyze_buffered()?;
-    /// println!("Tyto score: {}", insights.tyto_score);
-    /// # Ok::<(), aic_sdk::AicError>(())
-    /// ```
-    pub fn new(
-        model: &Model<'a>,
-        license_key: &str,
-        analysis_window_length_ms: usize,
-    ) -> Result<Self, AicError> {
-        // Set the wrapper ID as soon as the user attempts to instantiate an analyzer
-        crate::set_wrapper_id();
+    let mut collector_ptr: *mut AicCollector = ptr::null_mut();
+    let mut analyzer_ptr: *mut AicAnalyzer = ptr::null_mut();
+    let c_license_key = CString::new(license_key).map_err(|_| AicError::LicenseFormatInvalid)?;
 
-        let mut collector_ptr: *mut AicCollector = ptr::null_mut();
-        let mut analyzer_ptr: *mut AicAnalyzer = ptr::null_mut();
-        let c_license_key =
-            CString::new(license_key).map_err(|_| AicError::LicenseFormatInvalid)?;
+    // SAFETY:
+    // - `collector_ptr` and `analyzer_ptr` point to stack storage for output.
+    // - `model` is a valid SDK model pointer for the duration of the call.
+    // - `c_license_key` is a null-terminated CString.
+    let error_code = unsafe {
+        aic_analyzer_pair_create(
+            &mut collector_ptr,
+            &mut analyzer_ptr,
+            model.as_const_ptr(),
+            c_license_key.as_ptr(),
+            0,
+        )
+    };
 
-        // SAFETY:
-        // - `collector_ptr` and `analyzer_ptr` point to stack storage for output.
-        // - `model` is a valid SDK model pointer for the duration of the call.
-        // - `c_license_key` is a null-terminated CString.
-        let error_code = unsafe {
-            aic_analyzer_pair_create(
-                &mut collector_ptr,
-                &mut analyzer_ptr,
-                model.as_const_ptr(),
-                c_license_key.as_ptr(),
-                analysis_window_length_ms,
-            )
-        };
+    handle_error(error_code)?;
 
-        handle_error(error_code)?;
+    assert!(
+        !collector_ptr.is_null(),
+        "C library returned success but null collector pointer"
+    );
+    assert!(
+        !analyzer_ptr.is_null(),
+        "C library returned success but null analyzer pointer"
+    );
 
-        assert!(
-            !collector_ptr.is_null(),
-            "C library returned success but null collector pointer"
-        );
-        assert!(
-            !analyzer_ptr.is_null(),
-            "C library returned success but null analyzer pointer"
-        );
+    let collector = Collector::new(collector_ptr);
+    let analyzer = Analyzer::new(analyzer_ptr, model);
 
-        Ok(Self {
-            collector: Collector::new(collector_ptr),
-            analyzer: Analyzer::new(analyzer_ptr),
-        })
-    }
-
-    /// Splits this pair into independently owned collector and analyzer handles.
-    pub fn into_parts(self) -> (Collector, Analyzer<'a>) {
-        (self.collector, self.analyzer)
-    }
+    Ok((collector, analyzer))
 }
 
 /// Buffers audio for later non-real-time analysis.
@@ -286,7 +265,7 @@ pub struct Analyzer<'a> {
 }
 
 impl<'a> Analyzer<'a> {
-    pub(crate) fn new(analyzer_ptr: *mut AicAnalyzer) -> Self {
+    pub(crate) fn new(analyzer_ptr: *mut AicAnalyzer, _model: &Model<'a>) -> Self {
         Self {
             inner: analyzer_ptr,
             marker: PhantomData,
