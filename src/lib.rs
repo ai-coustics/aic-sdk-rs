@@ -9,6 +9,7 @@ use std::path::Path;
 
 mod analyzer;
 mod error;
+mod file_analyzer;
 mod model;
 mod processor;
 #[cfg(feature = "async")]
@@ -18,6 +19,7 @@ mod vad;
 
 pub use analyzer::*;
 pub use error::*;
+pub use file_analyzer::*;
 pub use model::*;
 pub use processor::*;
 #[cfg(feature = "async")]
