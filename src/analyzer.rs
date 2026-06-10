@@ -13,19 +13,41 @@ pub struct AudioInsights {
     /// Headline audio score.
     ///
     /// Predicts likelihood of failure of downstream models including speech-to-text,
-    /// voice activity detection, turn-taking, or speech-to-speech models.
+    /// voice activity detection or turn-taking or speech-to-speech models.
+    /// Lower indicates less problematic audio.
+    ///
+    /// **Range:** 0.0 to 1.0
     pub tyto_score: f32,
     /// Measure of speaker distance and reverberance.
+    /// Lower indicates less problematic audio.
+    ///
+    /// **Range:** 0.0 to 1.0
     pub speaker_reverb: f32,
     /// Measure of speaker loudness.
+    ///
+    /// **Range:** 0.0 to 1.0
     pub speaker_loudness: f32,
     /// Measure of interference from additional speakers present in audio.
+    /// Lower indicates less problematic audio.
+    ///
+    /// **Range:** 0.0 to 1.0
     pub interfering_speech: f32,
-    /// Measure of interfering speech content from media devices.
+    /// Measure of interfering speech content from media devices,
+    /// e.g. from TVs, radios, phones or else.
+    /// Lower indicates less problematic audio.
+    ///
+    /// **Range:** 0.0 to 1.0
     pub media_speech: f32,
     /// Measure of ambient or environmental noise.
+    /// Lower indicates less problematic audio.
+    ///
+    /// **Range:** 0.0 to 1.0
     pub noise: f32,
-    /// Measure of audio dropouts or discontinuities in the stream.
+    /// Measure of audio dropouts or discontinuities in the stream,
+    /// e.g. from packet loss, frame erasure, jitter or CPU overload.
+    /// Lower indicates less problematic audio.
+    ///
+    /// **Range:** 0.0 to 1.0
     pub packet_loss: f32,
 }
 
@@ -43,27 +65,31 @@ impl From<AicAudioInsights> for AudioInsights {
     }
 }
 
-/// Creates a collector/analyzer pair.
+/// Creates a collector/analyzer pair for non-real-time analysis.
 ///
-/// `analysis_window_length_ms` controls how much recent audio the collector retains
-/// for each analysis run. The accepted range is model-specific.
+/// The collector is designed to be placed in the audio thread, buffering audio chunks for
+/// later analysis.
+///
+/// The analyzer is designed to be run separately. Analysis models are computationally expensive
+/// and cannot run in the audio thread. The analyzer has access to the audio buffered by the
+/// collector, and it can access it safely across threads.
+///
+/// The collector retains a span of audio determined by the analysis model. As more samples
+/// get collected, old audio is discarded.
+/// 
+/// # Arguments
+///
+/// * `model` - The loaded model instance
+/// * `license_key` - license key for the ai-coustics SDK
+///   (generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com/))
 ///
 /// # Example
 ///
 /// ```rust,no_run
-/// # use aic_sdk::{AnalyzerPair, Model, ProcessorConfig};
-/// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-/// let model = Model::from_file("/path/to/analysis-model.aicmodel")?;
-/// let config = ProcessorConfig::optimal(&model);
-/// let mut pair = AnalyzerPair::new(&model, &license_key, 30_000)?;
-///
-/// pair.collector.initialize(&config)?;
-/// let audio = vec![0.0f32; config.num_frames];
-/// pair.collector.buffer_interleaved(&audio)?;
-///
-/// let insights = pair.analyzer.analyze_buffered()?;
-/// println!("Tyto score: {}", insights.tyto_score);
-/// # Ok::<(), aic_sdk::AicError>(())
+/// # use aic_sdk::Model;
+/// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+/// let model = Model::from_file("/path/to/model.aicmodel")?;
+/// let (mut collector, mut analyzer) = aic_sdk::new_analysis_pair(&model, &license_key)?;
 /// ```
 pub fn new_analysis_pair<'a>(
     model: &Model<'a>,
@@ -86,7 +112,6 @@ pub fn new_analysis_pair<'a>(
             &mut analyzer_ptr,
             model.as_const_ptr(),
             c_license_key.as_ptr(),
-            0,
         )
     };
 
@@ -123,9 +148,37 @@ impl Collector {
         }
     }
 
-    /// Initializes the collector with the given audio configuration.
+    /// Configures the collector for specific audio settings.
     ///
-    /// This must be called before buffering audio.
+    /// This function must be called before buffering any audio.
+    /// For the lowest delay use the sample rate and frame size returned by
+    /// [`Model::optimal_sample_rate`] and [`Model::optimal_num_frames`].
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Audio buffering configuration
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an `AicError` if initialization fails.
+    ///
+    /// # Warning
+    /// Do not call from audio processing threads as this allocates memory.
+    ///
+    /// # Note
+    /// All channels are mixed to mono for buffering. To buffer channels
+    /// independently, create separate [`Collector`] instances.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, ProcessorConfig};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// let config = ProcessorConfig::optimal(&model);
+    /// collector.initialize(&config).unwrap();
+    /// ```
     pub fn initialize(&mut self, config: &ProcessorConfig) -> Result<(), AicError> {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live collector.
@@ -144,13 +197,51 @@ impl Collector {
         Ok(())
     }
 
-    /// Initializes the collector and returns it.
-    pub fn with_config(mut self, config: &ProcessorConfig) -> Result<Self, AicError> {
-        self.initialize(config)?;
-        Ok(self)
-    }
-
-    /// Buffers audio with separate read-only buffers for each channel.
+    /// Buffers audio with separate buffers for each channel (planar layout).
+    ///
+    /// **Memory Layout:**
+    /// - Separate buffer for each channel
+    /// - Each buffer contains `num_frames` floats
+    /// - Maximum of 16 channels supported
+    /// - Example for 2 channels, 4 frames:
+    ///   ```text
+    ///   audio[0] -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3]
+    ///   audio[1] -> [ch1_f0, ch1_f1, ch1_f2, ch1_f3]
+    ///   ```
+    ///
+    /// The function accepts any type of collection of `f32` values that implements `as_mut`, e.g.:
+    /// - `[vec![0.0; 128]; 2]`
+    /// - `[[0.0; 128]; 2]`
+    /// - `[&mut ch1, &mut ch2]`
+    ///
+    /// # Arguments
+    ///
+    /// * `audio` - Array of mutable channel buffer slices to be buffered.
+    ///             Each channel buffer must be exactly of size `num_frames`,
+    ///             or if `allow_variable_frames` was enabled, less than the initialization value.
+    ///
+    /// # Notes
+    ///
+    /// - All channels are mixed to mono for buffering. To buffer channels
+    ///   independently, create separate [`Collector`] instances.
+    /// - Maximum supported number of channels is 16. Exceeding this will return an error.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an [`AicError`] if buffering fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, ProcessorConfig};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+    /// collector.initialize(&config).unwrap();
+    /// let audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
+    /// collector.buffer_planar(&audio).unwrap();
+    /// ```
     pub fn buffer_planar<V: AsRef<[f32]>>(&mut self, audio: &[V]) -> Result<(), AicError> {
         const MAX_CHANNELS: u16 = 16;
 
@@ -191,6 +282,42 @@ impl Collector {
     }
 
     /// Buffers audio with interleaved channel data.
+    ///
+    /// **Memory Layout:**
+    /// - Single contiguous buffer with samples alternating between channels
+    /// - Buffer size: `num_channels` * `num_frames` floats
+    /// - Example for 2 channels, 4 frames:
+    ///   ```text
+    ///   audio -> [ch0_f0, ch1_f0, ch0_f1, ch1_f1, ch0_f2, ch1_f2, ch0_f3, ch1_f3]
+    ///   ```
+    ///
+    /// # Arguments
+    ///
+    /// * `audio` - Interleaved audio buffer to be buffered.
+    ///             Must be exactly of size `num_channels` * `num_frames`,
+    ///             or if `allow_variable_frames` was enabled, less than the initialization value per channel.
+    ///
+    /// # Note
+    ///
+    /// All channels are mixed to mono for buffering. To buffer channels
+    /// independently, create separate [`Collector`] instances.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an [`AicError`] if buffering fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, ProcessorConfig};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+    /// collector.initialize(&config).unwrap();
+    /// let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
+    /// collector.buffer_interleaved(&audio).unwrap();
+    /// ```
     pub fn buffer_interleaved(&mut self, audio: &[f32]) -> Result<(), AicError> {
         let Some(num_channels) = self.num_channels else {
             return Err(AicError::ProcessorNotInitialized);
@@ -213,6 +340,41 @@ impl Collector {
     }
 
     /// Buffers audio with sequential channel data.
+    ///
+    /// **Memory Layout:**
+    /// - Single contiguous buffer with all samples for each channel stored sequentially
+    /// - Buffer size: `num_channels` * `num_frames` floats
+    /// - Example for 2 channels, 4 frames:
+    ///   ```text
+    ///   audio -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3, ch1_f0, ch1_f1, ch1_f2, ch1_f3]
+    ///   ```
+    ///
+    /// # Arguments
+    ///
+    /// * `audio` - Sequential audio buffer to be buffered.
+    ///             Must be exactly of size `num_channels` * `num_frames`,
+    ///             or if `allow_variable_frames` was enabled, less than the initialization value per channel.
+    /// # Note
+    ///
+    /// All channels are mixed to mono for buffering. To buffer channels
+    /// independently, create separate [`Collector`] instances.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an [`AicError`] if buffering fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, ProcessorConfig};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+    /// collector.initialize(&config).unwrap();
+    /// let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
+    /// collector.buffer_sequential(&audio).unwrap();
+    /// ```
     pub fn buffer_sequential(&mut self, audio: &[f32]) -> Result<(), AicError> {
         let Some(num_channels) = self.num_channels else {
             return Err(AicError::ProcessorNotInitialized);
