@@ -234,7 +234,7 @@ typedef struct AicOtelConfig {
 /**
  * The result of analyzing a signal with an [`AicAnalyzer`].
  */
-typedef struct AicAudioInsights {
+typedef struct AicAnalysisResult {
   /**
    * Headline audio score.
    *
@@ -244,7 +244,7 @@ typedef struct AicAudioInsights {
    *
    * **Range:** 0.0 to 1.0
    */
-  float tyto_score;
+  float risk_score;
   /**
    * Measure of speaker distance and reverberance.
    * Lower indicates less problematic audio.
@@ -288,7 +288,7 @@ typedef struct AicAudioInsights {
    * **Range:** 0.0 to 1.0
    */
   float packet_loss;
-} AicAudioInsights;
+} AicAnalysisResult;
 
 #ifdef __cplusplus
 extern "C" {
@@ -1024,9 +1024,8 @@ enum AicErrorCode aic_vad_context_get_parameter(const struct AicVadContext *cont
  * and cannot run in the audio thread. The analyzer has access to the audio buffered by the
  * collector, and it can access it safely across threads.
  *
- * The collector retains a maximum span of audio, as specified by `analysis_window_length_ms`.
- * As more samples get collected, old audio is discarded. This value has to be within the
- * expected window length range of the given model.
+ * The collector retains a span of audio determined by the analysis model. As more samples
+ * get collected, old audio is discarded.
  *
  * # Notes
  * The collector/analyzer pointers must not be aliased. Most APIs require exclusive access to
@@ -1040,12 +1039,10 @@ enum AicErrorCode aic_vad_context_get_parameter(const struct AicVadContext *cont
  * - `analyzer`: Out-pointer that receives the created analyzer handle. Must not be NULL.
  * - `model`: Model to analyze with. Must not be NULL.
  * - `license_key`: Null-terminated license key. Must not be NULL.
- * - `analysis_window_length_ms`: Requested analysis window length in milliseconds.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Collector and analyzer created
  * - `AIC_ERROR_CODE_NULL_POINTER`: `collector`, `analyzer`, `model`, or `license_key` is NULL
- * - `AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE`: `analysis_window_length_ms` is outside the model limits
  * - `AIC_ERROR_CODE_MODEL_TYPE_UNSUPPORTED`: `model` is not an analysis model
  * - license/model errors as for `aic_processor_create`
  *
@@ -1056,8 +1053,7 @@ enum AicErrorCode aic_vad_context_get_parameter(const struct AicVadContext *cont
 enum AicErrorCode aic_analyzer_pair_create(struct AicCollector **collector,
                                            struct AicAnalyzer **analyzer,
                                            const struct AicModel *model,
-                                           const char *license_key,
-                                           size_t analysis_window_length_ms);
+                                           const char *license_key);
 
 /**
  * Configures the collector for a specific audio format.
@@ -1230,7 +1226,7 @@ enum AicErrorCode aic_analyzer_reset(const struct AicAnalyzer *analyzer);
  * Analyze the buffered signal.
  *
  * The analyzer runs a forward-pass of the analysis model with a fixed length of audio,
- * as specified in the `analysis_window_length_ms` parameter of `aic_analyzer_pair_create`.
+ * determined by the model.
  *
  * If this function is called before the collector has buffered that length of audio,
  * the analyzer will run the analysis with silence (zeros) in the tail of the input.
@@ -1253,7 +1249,7 @@ enum AicErrorCode aic_analyzer_reset(const struct AicAnalyzer *analyzer);
  * - This function is not thread-safe. Do not call it from multiple threads.
  */
 enum AicErrorCode aic_analyzer_analyze_buffered(struct AicAnalyzer *analyzer,
-                                                struct AicAudioInsights *result);
+                                                struct AicAnalysisResult *result);
 
 /**
  * Replaces the bearer token on a running analyzer.
