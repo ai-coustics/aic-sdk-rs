@@ -585,3 +585,339 @@ unsafe impl<'a> Send for Analyzer<'a> {}
 // the inner raw pointer are only used in methods that take &mut self, which upholds the thread safety
 // contracts required by the unsafe APIs. Therefore, it is safe to implement Sync for Analyzer.
 unsafe impl<'a> Sync for Analyzer<'a> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+        sync::{Mutex, OnceLock},
+    };
+
+    fn download_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
+        let entries = fs::read_dir(target_dir).ok()?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|name| name.contains("tyto_l_16khz") && name.ends_with(".aicmodel"))
+                .unwrap_or(false)
+                && path.is_file()
+            {
+                return Some(path);
+            }
+        }
+        None
+    }
+
+    /// Downloads the default test model `tyto-l-16khz` into the crate's `target/` directory.
+    /// Returns the path to the downloaded model file.
+    fn get_tyto_l_16khz() -> Result<PathBuf, AicError> {
+        let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
+
+        if let Some(existing) = find_existing_model(&target_dir) {
+            return Ok(existing);
+        }
+
+        let _guard = download_lock().lock().unwrap();
+        if let Some(existing) = find_existing_model(&target_dir) {
+            return Ok(existing);
+        }
+
+        if cfg!(feature = "download-model") {
+            Model::download("tyto-l-16khz", target_dir)
+        } else {
+            panic!(
+                "Model `tyto-l-16khz` not found in {} and `download-model` feature is disabled",
+                target_dir.display()
+            );
+        }
+    }
+
+    fn load_test_model() -> Result<(Model<'static>, String), AicError> {
+        let license_key = std::env::var("AIC_SDK_LICENSE")
+            .expect("AIC_SDK_LICENSE environment variable must be set for tests");
+
+        let model_path = get_tyto_l_16khz()?;
+        let model = Model::from_file(&model_path)?;
+
+        Ok((model, license_key))
+    }
+
+    fn new_test_analysis_pair(
+        model: &Model<'static>,
+        license_key: &str,
+    ) -> (Collector, Analyzer<'static>) {
+        new_analysis_pair(model, license_key)
+            .expect("tyto-l-16khz should create a collector/analyzer pair")
+    }
+
+    fn assert_score_range(result: &AnalysisResult) {
+        assert!((0.0..=1.0).contains(&result.risk_score));
+        assert!((0.0..=1.0).contains(&result.speaker_reverb));
+        assert!((0.0..=1.0).contains(&result.speaker_loudness));
+        assert!((0.0..=1.0).contains(&result.interfering_speech));
+        assert!((0.0..=1.0).contains(&result.media_speech));
+        assert!((0.0..=1.0).contains(&result.noise));
+        assert!((0.0..=1.0).contains(&result.packet_loss));
+    }
+
+    #[test]
+    fn analysis_result_maps_all_ffi_fields() {
+        let ffi_result = AicAnalysisResult {
+            risk_score: 0.1,
+            speaker_reverb: 0.2,
+            speaker_loudness: 0.3,
+            interfering_speech: 0.4,
+            media_speech: 0.5,
+            noise: 0.6,
+            packet_loss: 0.7,
+        };
+
+        assert_eq!(
+            AnalysisResult::from(ffi_result),
+            AnalysisResult {
+                risk_score: 0.1,
+                speaker_reverb: 0.2,
+                speaker_loudness: 0.3,
+                interfering_speech: 0.4,
+                media_speech: 0.5,
+                noise: 0.6,
+                packet_loss: 0.7,
+            }
+        );
+    }
+
+    #[test]
+    fn collector_rejects_buffering_before_initialize() {
+        let mut collector = Collector {
+            inner: ptr::null_mut(),
+            num_channels: None,
+        };
+
+        let planar = [vec![0.0f32; 4]];
+        let contiguous = vec![0.0f32; 4];
+
+        assert_eq!(
+            collector.buffer_planar(&planar),
+            Err(AicError::ProcessorNotInitialized)
+        );
+        assert_eq!(
+            collector.buffer_interleaved(&contiguous),
+            Err(AicError::ProcessorNotInitialized)
+        );
+        assert_eq!(
+            collector.buffer_sequential(&contiguous),
+            Err(AicError::ProcessorNotInitialized)
+        );
+    }
+
+    #[test]
+    fn collector_validates_planar_layout_before_ffi() {
+        let mut collector = Collector {
+            inner: ptr::null_mut(),
+            num_channels: Some(2),
+        };
+
+        let wrong_channel_count = [vec![0.0f32; 4]];
+        assert_eq!(
+            collector.buffer_planar(&wrong_channel_count),
+            Err(AicError::AudioConfigMismatch)
+        );
+
+        let mismatched_frames = [vec![0.0f32; 4], vec![0.0f32; 3]];
+        assert_eq!(
+            collector.buffer_planar(&mismatched_frames),
+            Err(AicError::AudioConfigMismatch)
+        );
+
+        collector.num_channels = Some(17);
+        let too_many_channels = vec![vec![0.0f32; 4]; 17];
+        assert_eq!(
+            collector.buffer_planar(&too_many_channels),
+            Err(AicError::AudioConfigUnsupported)
+        );
+    }
+
+    #[test]
+    fn collector_validates_contiguous_layout_before_ffi() {
+        let mut collector = Collector {
+            inner: ptr::null_mut(),
+            num_channels: Some(2),
+        };
+        let not_divisible_by_channels = vec![0.0f32; 3];
+
+        assert_eq!(
+            collector.buffer_interleaved(&not_divisible_by_channels),
+            Err(AicError::AudioConfigMismatch)
+        );
+        assert_eq!(
+            collector.buffer_sequential(&not_divisible_by_channels),
+            Err(AicError::AudioConfigMismatch)
+        );
+    }
+
+    #[test]
+    fn new_analysis_pair_rejects_license_key_with_nul() {
+        let (model, _) = load_test_model().unwrap();
+
+        let result = new_analysis_pair(&model, "invalid\0license");
+
+        assert!(matches!(result, Err(AicError::LicenseFormatInvalid)));
+    }
+
+    #[test]
+    fn collector_buffers_all_layouts_and_analyzer_returns_scores() {
+        let (model, license_key) = load_test_model().unwrap();
+        let (mut collector, mut analyzer) = new_test_analysis_pair(&model, &license_key);
+        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+        collector.initialize(&config).unwrap();
+
+        let mut left = vec![0.0f32; config.num_frames];
+        let mut right = vec![0.0f32; config.num_frames];
+        let planar = [left.as_mut_slice(), right.as_mut_slice()];
+        collector.buffer_planar(&planar).unwrap();
+
+        let num_channels = config.num_channels as usize;
+        let contiguous = vec![0.0f32; num_channels * config.num_frames];
+        collector.buffer_interleaved(&contiguous).unwrap();
+        collector.buffer_sequential(&contiguous).unwrap();
+
+        let result = analyzer.analyze_buffered().unwrap();
+        assert_score_range(&result);
+    }
+
+    #[test]
+    fn collector_buffers_variable_frames_when_enabled() {
+        let (model, license_key) = load_test_model().unwrap();
+        let (mut collector, _analyzer) = new_test_analysis_pair(&model, &license_key);
+        let config = ProcessorConfig::optimal(&model)
+            .with_num_channels(2)
+            .with_allow_variable_frames(true);
+        collector.initialize(&config).unwrap();
+
+        let num_channels = config.num_channels as usize;
+        let full = vec![0.0f32; num_channels * config.num_frames];
+        collector.buffer_interleaved(&full).unwrap();
+        collector.buffer_sequential(&full).unwrap();
+
+        let short = vec![0.0f32; num_channels * 20];
+        collector.buffer_interleaved(&short).unwrap();
+        collector.buffer_sequential(&short).unwrap();
+
+        let left = vec![0.0f32; 20];
+        let right = vec![0.0f32; 20];
+        let planar = [left.as_slice(), right.as_slice()];
+        collector.buffer_planar(&planar).unwrap();
+    }
+
+    #[test]
+    fn collector_rejects_variable_frames_when_disabled() {
+        let (model, license_key) = load_test_model().unwrap();
+        let (mut collector, _analyzer) = new_test_analysis_pair(&model, &license_key);
+        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+        collector.initialize(&config).unwrap();
+
+        let num_channels = config.num_channels as usize;
+        let full = vec![0.0f32; num_channels * config.num_frames];
+        collector.buffer_interleaved(&full).unwrap();
+        collector.buffer_sequential(&full).unwrap();
+
+        let short = vec![0.0f32; num_channels * 20];
+        assert_eq!(
+            collector.buffer_interleaved(&short),
+            Err(AicError::AudioConfigMismatch)
+        );
+        assert_eq!(
+            collector.buffer_sequential(&short),
+            Err(AicError::AudioConfigMismatch)
+        );
+
+        let left = vec![0.0f32; 20];
+        let right = vec![0.0f32; 20];
+        let planar = [left.as_slice(), right.as_slice()];
+        assert_eq!(
+            collector.buffer_planar(&planar),
+            Err(AicError::AudioConfigMismatch)
+        );
+    }
+
+    #[test]
+    fn analyzer_reset_keeps_collector_initialized() {
+        let (model, license_key) = load_test_model().unwrap();
+        let (mut collector, mut analyzer) = new_test_analysis_pair(&model, &license_key);
+        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+        collector.initialize(&config).unwrap();
+
+        analyzer.reset().unwrap();
+
+        let num_channels = config.num_channels as usize;
+        let audio = vec![0.0f32; num_channels * config.num_frames];
+        collector.buffer_interleaved(&audio).unwrap();
+
+        let result = analyzer.analyze_buffered().unwrap();
+        assert_score_range(&result);
+    }
+
+    #[test]
+    fn model_can_be_dropped_after_creating_analysis_pair() {
+        let (model, license_key) = load_test_model().unwrap();
+        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+        let (mut collector, mut analyzer) = new_test_analysis_pair(&model, &license_key);
+        drop(model); // The SDK keeps the model data alive for analyzer instances created from files.
+
+        collector.initialize(&config).unwrap();
+
+        let num_channels = config.num_channels as usize;
+        let audio = vec![0.0f32; num_channels * config.num_frames];
+        collector.buffer_interleaved(&audio).unwrap();
+
+        let result = analyzer.analyze_buffered().unwrap();
+        assert_score_range(&result);
+    }
+
+    #[test]
+    fn collector_and_analyzer_are_send_and_sync() {
+        // Compile-time check that Collector and Analyzer can cross thread boundaries.
+        fn assert_send<T: Send>() {}
+        fn assert_sync<T: Sync>() {}
+
+        assert_send::<Collector>();
+        assert_sync::<Collector>();
+        assert_send::<Analyzer>();
+        assert_sync::<Analyzer>();
+    }
+}
+
+#[doc(hidden)]
+mod _compile_fail_tests {
+    //! Compile-fail regression: an `Analyzer`'s model buffer must not be dropped before the analyzer.
+    //!
+    //! ```rust,compile_fail
+    //! use aic_sdk::{Model, ProcessorConfig, new_analysis_pair};
+    //!
+    //! fn main() {
+    //!     let buffer = vec![0u8; 64];
+    //!     let model = Model::from_buffer(&buffer).unwrap();
+    //!     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+    //!
+    //!     let (mut collector, mut analyzer) = new_analysis_pair(&model, "license").unwrap();
+    //!     collector.initialize(&config).unwrap();
+    //!
+    //!     drop(model); // Model can be dropped without issues
+    //!
+    //!     drop(buffer); // This should fail to compile
+    //!
+    //!     let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
+    //!     collector.buffer_interleaved(&audio).unwrap();
+    //!     analyzer.analyze_buffered().unwrap();
+    //! }
+    //! ```
+}
