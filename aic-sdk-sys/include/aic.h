@@ -1205,9 +1205,9 @@ enum AicErrorCode aic_collector_buffer_sequential(struct AicCollector *collector
  * Call this when the audio stream is interrupted or when seeking
  * to prevent mispredictions from previous audio content.
  *
- * This operates on the analyzer.
+ * This operates on both the analyzer and its collector.
  *
- * The analyzer stays initialized to the configured settings.
+ * The collector stays initialized to the configured settings.
  *
  * # Parameters
  * - `analyzer`: Analyzer instance to reset. Must not be NULL.

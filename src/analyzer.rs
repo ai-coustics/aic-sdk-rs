@@ -450,9 +450,9 @@ impl<'a> Analyzer<'a> {
     /// Call this when the audio stream is interrupted or when seeking
     /// to prevent mispredictions from previous audio content.
     ///
-    /// This operates on the analyzer.
+    /// This operates on both the analyzer and its collector.
     ///
-    /// The analyzer stays initialized to the configured settings.
+    /// The [`Collector`] stays initialized to the configured settings.
     ///
     /// # Returns
     ///

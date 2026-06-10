@@ -197,7 +197,7 @@ impl ProcessorContext {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `AicError` if the parameter cannot be set.
+    /// Returns `Ok(())` on success or an [`AicError`] if the parameter cannot be set.
     ///
     /// # Example
     ///
@@ -228,7 +228,7 @@ impl ProcessorContext {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(value)` containing the current parameter value, or an `AicError` if the query fails.
+    /// Returns `Ok(value)` containing the current parameter value, or an [`AicError`] if the query fails.
     ///
     /// # Example
     ///
@@ -316,7 +316,7 @@ impl ProcessorContext {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `AicError` if the reset fails.
+    /// Returns `Ok(())` on success or an [`AicError`] if the reset fails.
     ///
     /// # Safety
     /// 
@@ -355,7 +355,7 @@ impl ProcessorContext {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `AicError` if the update fails.
+    /// Returns `Ok(())` on success or an [`AicError`] if the update fails.
     ///
     /// # Safety
     /// 
@@ -447,7 +447,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns a `Result` containing the new `Processor` instance or an `AicError` if creation fails.
+    /// Returns a `Result` containing the new `Processor` instance or an [`AicError`] if creation fails.
     ///
     /// # Example
     ///
@@ -556,7 +556,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(Self)` with the initialized processor, or an `AicError` if initialization fails.
+    /// Returns `Ok(Self)` with the initialized processor, or an [`AicError`] if initialization fails.
     ///
     /// # Example
     ///
@@ -655,7 +655,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `AicError` if initialization fails.
+    /// Returns `Ok(())` on success or an [`AicError`] if initialization fails.
     ///
     /// # Warning
     /// Do not call from audio processing threads as this allocates memory.
@@ -725,7 +725,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `AicError` if processing fails.
+    /// Returns `Ok(())` on success or an [`AicError`] if processing fails.
     /// 
     /// # Safety
     /// 
@@ -809,7 +809,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `AicError` if processing fails.
+    /// Returns `Ok(())` on success or an [`AicError`] if processing fails.
     /// 
     /// # Safety
     /// 
@@ -878,7 +878,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `AicError` if processing fails.
+    /// Returns `Ok(())` on success or an [`AicError`] if processing fails.
     /// 
     /// # Safety
     /// 
