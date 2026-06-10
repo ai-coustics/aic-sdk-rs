@@ -318,7 +318,8 @@ impl ProcessorContext {
     ///
     /// Returns `Ok(())` on success or an `AicError` if the reset fails.
     ///
-    /// # Thread Safety
+    /// # Safety
+    /// 
     /// Real-time safe. Can be called from audio processing threads.
     ///
     /// # Example
@@ -356,9 +357,10 @@ impl ProcessorContext {
     ///
     /// Returns `Ok(())` on success or an `AicError` if the update fails.
     ///
-    /// # Warning
-    /// This allocates memory and performs cryptographic work.
-    /// Avoid calling it from real-time audio threads.
+    /// # Safety
+    /// 
+    /// This function is not real-time safe. It locks a mutex and allocates memory.
+    /// Avoid calling it from audio threads.
     ///
     /// # Example
     ///
@@ -724,6 +726,10 @@ impl<'a> Processor<'a> {
     /// # Returns
     ///
     /// Returns `Ok(())` on success or an `AicError` if processing fails.
+    /// 
+    /// # Safety
+    /// 
+    /// Real-time safe. Can be called from audio processing threads.
     ///
     /// # Example
     ///
@@ -804,6 +810,10 @@ impl<'a> Processor<'a> {
     /// # Returns
     ///
     /// Returns `Ok(())` on success or an `AicError` if processing fails.
+    /// 
+    /// # Safety
+    /// 
+    /// Real-time safe. Can be called from audio processing threads.
     ///
     /// # Example
     ///
@@ -869,6 +879,10 @@ impl<'a> Processor<'a> {
     /// # Returns
     ///
     /// Returns `Ok(())` on success or an `AicError` if processing fails.
+    /// 
+    /// # Safety
+    /// 
+    /// Real-time safe. Can be called from audio processing threads.
     ///
     /// # Example
     ///

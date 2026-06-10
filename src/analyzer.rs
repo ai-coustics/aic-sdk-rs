@@ -9,7 +9,7 @@ use std::{ffi::CString, marker::PhantomData, ptr};
 /// Scores are in the range `0.0..=1.0`. For all fields except
 /// [`speaker_loudness`](Self::speaker_loudness), lower values indicate less problematic audio.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AudioInsights {
+pub struct AnalysisResult {
     /// Headline audio score.
     ///
     /// Predicts likelihood of failure of downstream models including speech-to-text,
@@ -17,7 +17,7 @@ pub struct AudioInsights {
     /// Lower indicates less problematic audio.
     ///
     /// **Range:** 0.0 to 1.0
-    pub tyto_score: f32,
+    pub risk_score: f32,
     /// Measure of speaker distance and reverberance.
     /// Lower indicates less problematic audio.
     ///
@@ -51,16 +51,16 @@ pub struct AudioInsights {
     pub packet_loss: f32,
 }
 
-impl From<AicAudioInsights> for AudioInsights {
-    fn from(insights: AicAudioInsights) -> Self {
+impl From<AicAnalysisResult> for AnalysisResult {
+    fn from(value: AicAnalysisResult) -> Self {
         Self {
-            tyto_score: insights.tyto_score,
-            speaker_reverb: insights.speaker_reverb,
-            speaker_loudness: insights.speaker_loudness,
-            interfering_speech: insights.interfering_speech,
-            media_speech: insights.media_speech,
-            noise: insights.noise,
-            packet_loss: insights.packet_loss,
+            risk_score: value.risk_score,
+            speaker_reverb: value.speaker_reverb,
+            speaker_loudness: value.speaker_loudness,
+            interfering_speech: value.interfering_speech,
+            media_speech: value.media_speech,
+            noise: value.noise,
+            packet_loss: value.packet_loss,
         }
     }
 }
@@ -438,7 +438,32 @@ impl<'a> Analyzer<'a> {
         self.inner as *const AicAnalyzer
     }
 
-    /// Clears the analyzer's internal state.
+    /// Clears all internal state and buffers.
+    ///
+    /// Call this when the audio stream is interrupted or when seeking
+    /// to prevent mispredictions from previous audio content.
+    ///
+    /// This operates on the analyzer.
+    ///
+    /// The analyzer stays initialized to the configured settings.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an [`AicError`] if the reset fails.
+    ///
+    /// # Safety
+    /// 
+    /// Real-time safe. Can be called from audio processing threads.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::Model;
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let (_, mut analyzer) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// analyzer.reset().unwrap();
+    /// ```
     pub fn reset(&self) -> Result<(), AicError> {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live analyzer.
@@ -446,10 +471,28 @@ impl<'a> Analyzer<'a> {
         handle_error(error_code)
     }
 
-    /// Analyzes the audio currently buffered by the paired collector.
-    pub fn analyze_buffered(&mut self) -> Result<AudioInsights, AicError> {
-        let mut insights = AicAudioInsights {
-            tyto_score: 0.0,
+    /// Analyze the buffered signal.
+    ///
+    /// The analyzer runs a forward-pass of the analysis model with a fixed length of audio,
+    /// determined by the model.
+    ///
+    /// If this function is called before the collector has buffered that length of audio,
+    /// the analyzer will run the analysis with silence (zeros) in the tail of the input.
+    ///
+    /// # Note
+    /// When buffering, all channels are mixed down to mono. To analyze channels
+    /// independently, create separate analyzer pairs.
+    /// 
+    /// # Returns
+    /// 
+    /// Returns an [`AnalysisResult`] if successful, otherwise an [`AicError`].
+    /// 
+    /// # Safety
+    /// 
+    /// This function is not real-time safe. Avoid calling it from audio threads.
+    pub fn analyze_buffered(&mut self) -> Result<AnalysisResult, AicError> {
+        let mut result = AicAnalysisResult {
+            risk_score: 0.0,
             speaker_reverb: 0.0,
             speaker_loudness: 0.0,
             interfering_speech: 0.0,
@@ -460,16 +503,46 @@ impl<'a> Analyzer<'a> {
 
         // SAFETY:
         // - `self.inner` is a valid pointer to a live analyzer.
-        // - `insights` points to stack storage for output.
-        let error_code = unsafe { aic_analyzer_analyze_buffered(self.inner, &mut insights) };
+        // - `result` points to stack storage for output.
+        let error_code = unsafe { aic_analyzer_analyze_buffered(self.inner, &mut result) };
         handle_error(error_code)?;
 
-        Ok(insights.into())
+        Ok(result.into())
     }
 
-    /// Replaces the bearer token on the running analyzer.
+    /// Replaces the bearer token on the analyzer.
     ///
     /// Use this when your license key is a JWT and needs to be refreshed before it expires.
+    /// Audio processing continues uninterrupted, the context handle stays valid, and the new
+    /// token is used for all subsequent authentication against the ai-coustics backend.
+    ///
+    /// In-place updates are only supported when both the originally configured key and the
+    /// new token are JWTs. If either side is not, the call returns
+    /// [`AicError::TokenUpdateUnsupported`] and the existing token stays in use.
+    ///
+    /// # Arguments
+    ///
+    /// * `token` - The new JWT to install.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an `AicError` if the update fails.
+    ///
+    /// # Safety
+    ///
+    /// This function is not real-time safe. It locks a mutex and allocates memory.
+    /// Avoid calling it from audio threads.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::Model;
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let (_, analyzer) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// let renewed_jwt = String::from("<JWT_BEARER_TOKEN>");
+    /// analyzer.update_bearer_token(&renewed_jwt).unwrap();
+    /// ```
     pub fn update_bearer_token(&self, token: &str) -> Result<(), AicError> {
         let c_token = CString::new(token).map_err(|_| AicError::LicenseFormatInvalid)?;
 
