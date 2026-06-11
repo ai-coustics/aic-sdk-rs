@@ -38,6 +38,7 @@ pub(crate) fn set_wrapper_id() {
     SET_WRAPPER_ID.call_once(|| unsafe {
         // SAFETY:
         // - This FFI call has no safety requirements.
+        // - This function can be called from any thread; `Once` serializes this wrapper's call.
         aic_set_sdk_wrapper_id(2);
     });
 }
@@ -85,6 +86,7 @@ pub fn get_sdk_version() -> &'static str {
     // SAFETY:
     // - FFI call returns a pointer to a static C string owned by the SDK.
     // - The pointer can never be null, so no check is necessary.
+    // - This function can be called from any thread.
     let version_ptr = unsafe { aic_get_sdk_version() };
 
     // SAFETY:
@@ -96,6 +98,7 @@ pub fn get_sdk_version() -> &'static str {
 pub fn get_compatible_model_version() -> u32 {
     // SAFETY:
     // - FFI call takes no arguments and returns a plain integer.
+    // - This function can be called from any thread.
     unsafe { aic_get_compatible_model_version() }
 }
 
@@ -107,5 +110,6 @@ pub fn get_compatible_model_version() -> u32 {
 pub unsafe fn set_sdk_id(id: u32) {
     // SAFETY:
     // - This FFI call has no safety requirements.
+    // - This function can be called from any thread.
     unsafe { aic_set_sdk_wrapper_id(id) }
 }

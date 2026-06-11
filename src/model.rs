@@ -93,6 +93,8 @@ impl<'a> Model<'a> {
         // SAFETY:
         // - `model_ptr` points to stack memory we own.
         // - `c_path` is a valid, null-terminated string.
+        // - This function is not thread-safe, but the output pointer and path
+        //   buffer are local to this call and not shared with other threads.
         let error_code = unsafe { aic_model_create_from_file(&mut model_ptr, c_path.as_ptr()) };
 
         handle_error(error_code)?;
@@ -138,6 +140,8 @@ impl<'a> Model<'a> {
         // SAFETY:
         // - `buffer` is a valid slice and immutable for `'a`.
         // - The SDK only reads from `buffer` for the lifetime of the model.
+        // - This function is not thread-safe, but the output pointer is local to
+        //   this call and no model handle exists until it returns.
         let error_code =
             unsafe { aic_model_create_from_buffer(&mut model_ptr, buffer.as_ptr(), buffer.len()) };
 
@@ -157,7 +161,11 @@ impl<'a> Model<'a> {
 
     /// Returns the model identifier string.
     pub fn id(&self) -> &str {
-        // SAFETY: `self` owns a valid model pointer created by the SDK.
+        // SAFETY:
+        // - `self` owns a valid model pointer created by the SDK.
+        // - The returned pointer is only used while `self` keeps the model alive.
+        // - This function is not thread-safe with concurrent destruction, which
+        //   Rust prevents while `&self` is live.
         let id_ptr = unsafe { aic_model_get_id(self.as_const_ptr()) };
         if id_ptr.is_null() {
             return "unknown";
@@ -213,6 +221,7 @@ impl<'a> Model<'a> {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live model.
         // - `sample_rate` points to stack storage for output.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code =
             unsafe { aic_model_get_optimal_sample_rate(self.as_const_ptr(), &mut sample_rate) };
 
@@ -267,6 +276,7 @@ impl<'a> Model<'a> {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live model.
         // - `num_frames` points to stack storage for output.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code = unsafe {
             aic_model_get_optimal_num_frames(self.as_const_ptr(), sample_rate, &mut num_frames)
         };
@@ -327,6 +337,8 @@ impl<'a> Drop for Model<'a> {
         if !self.ptr.is_null() {
             // SAFETY:
             // - `self.ptr` was allocated by the SDK and is still owned by this wrapper.
+            // - This function is not thread-safe with concurrent model use, but
+            //   `drop` has exclusive access to `self`.
             unsafe { aic_model_destroy(self.ptr) };
         }
     }

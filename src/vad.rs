@@ -127,6 +127,7 @@ impl VadContext {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live VAD context.
         // - `value` points to stack storage for output.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code =
             unsafe { aic_vad_context_is_speech_detected(self.as_const_ptr(), &mut value) };
 
@@ -161,6 +162,7 @@ impl VadContext {
     pub fn set_parameter(&self, parameter: VadParameter, value: f32) -> Result<(), AicError> {
         // SAFETY:
         // - `self.as_const_ptr()` is a live VAD context pointer.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code =
             unsafe { aic_vad_context_set_parameter(self.as_const_ptr(), parameter.into(), value) };
         handle_error(error_code)
@@ -193,6 +195,7 @@ impl VadContext {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live VAD context.
         // - `value` points to stack storage for output.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code = unsafe {
             aic_vad_context_get_parameter(self.as_const_ptr(), parameter.into(), &mut value)
         };
@@ -206,6 +209,8 @@ impl Drop for VadContext {
         if !self.inner.is_null() {
             // SAFETY:
             // - `self.inner` was allocated by the SDK and is still owned by this wrapper.
+            // - This function can be called from any thread; `drop` has exclusive
+            //   access to this VAD context handle.
             unsafe { aic_vad_context_destroy(self.inner) };
         }
     }

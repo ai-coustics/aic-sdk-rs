@@ -215,6 +215,7 @@ impl ProcessorContext {
     pub fn set_parameter(&self, parameter: ProcessorParameter, value: f32) -> Result<(), AicError> {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor context.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code = unsafe {
             aic_processor_context_set_parameter(self.as_const_ptr(), parameter.into(), value)
         };
@@ -250,6 +251,7 @@ impl ProcessorContext {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         // - `value` points to stack storage for output.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code = unsafe {
             aic_processor_context_get_parameter(self.as_const_ptr(), parameter.into(), &mut value)
         };
@@ -306,6 +308,7 @@ impl ProcessorContext {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         // - `delay` points to stack storage for output.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code =
             unsafe { aic_processor_context_get_output_delay(self.as_const_ptr(), &mut delay) };
 
@@ -349,6 +352,7 @@ impl ProcessorContext {
     pub fn reset(&self) -> Result<(), AicError> {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor context.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code = unsafe { aic_processor_context_reset(self.as_const_ptr()) };
         handle_error(error_code)
     }
@@ -393,6 +397,7 @@ impl ProcessorContext {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         // - `c_token` is a null-terminated CString that outlives the call.
+        // - This function can be called from any thread.
         let error_code = unsafe {
             aic_processor_context_update_bearer_token(self.as_const_ptr(), c_token.as_ptr())
         };
@@ -405,6 +410,8 @@ impl Drop for ProcessorContext {
         if !self.inner.is_null() {
             // SAFETY:
             // - `self.inner` was allocated by the SDK and is still owned by this wrapper.
+            // - This function can be called from any thread; `drop` has exclusive
+            //   access to this context handle.
             unsafe { aic_processor_context_destroy(self.inner) };
         }
     }
@@ -536,6 +543,8 @@ impl<'a> Processor<'a> {
         // - `c_license_key` is a null-terminated CString.
         // - `c_otel_ptr` is either null or points to a valid `AicOtelConfig` whose
         //   `session_id` field (if non-null) outlives this call.
+        // - This function is not thread-safe, but the output pointer is local to
+        //   this call and no processor handle exists until it returns.
         let error_code = unsafe {
             aic_processor_create(
                 &mut processor_ptr,
@@ -613,6 +622,7 @@ impl<'a> Processor<'a> {
         // SAFETY:
         // - `processor_context` is valid output storage.
         // - `self.as_const_ptr()` is a live processor pointer.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code =
             unsafe { aic_processor_context_create(&mut processor_context, self.as_const_ptr()) };
 
@@ -647,6 +657,8 @@ impl<'a> Processor<'a> {
         // SAFETY:
         // - `vad_ptr` is valid output storage.
         // - `self.as_const_ptr()` is a live processor pointer.
+        // - This function can be called from any thread and may run while the
+        //   processor is in use, so we only borrow `&self`.
         let error_code = unsafe { aic_vad_context_create(&mut vad_ptr, self.as_const_ptr()) };
 
         // This should never fail
@@ -696,6 +708,7 @@ impl<'a> Processor<'a> {
     pub fn initialize(&mut self, config: &ProcessorConfig) -> Result<(), AicError> {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
+        // - This function is not thread-safe, so we borrow `&mut self`.
         let error_code = unsafe {
             aic_processor_initialize(
                 self.inner,
@@ -797,6 +810,7 @@ impl<'a> Processor<'a> {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
         // - `audio_ptrs` holds `num_channels` valid, writable pointers with `num_frames` samples each.
+        // - This function is not thread-safe, so we borrow `&mut self`.
         let error_code = unsafe {
             aic_processor_process_planar(self.inner, audio_ptrs.as_ptr(), num_channels, num_frames)
         };
@@ -863,6 +877,7 @@ impl<'a> Processor<'a> {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
         // - `audio` points to a contiguous f32 slice of length `num_channels * num_frames`.
+        // - This function is not thread-safe, so we borrow `&mut self`.
         let error_code = unsafe {
             aic_processor_process_interleaved(
                 self.inner,
@@ -933,6 +948,7 @@ impl<'a> Processor<'a> {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live, initialized processor.
         // - `audio` points to a contiguous f32 slice of length `num_channels * num_frames`.
+        // - This function is not thread-safe, so we borrow `&mut self`.
         let error_code = unsafe {
             aic_processor_process_sequential(
                 self.inner,
@@ -955,6 +971,8 @@ impl<'a> Drop for Processor<'a> {
         if !self.inner.is_null() {
             // SAFETY:
             // - `self.inner` was allocated by the SDK and is still owned by this wrapper.
+            // - This function is not thread-safe with concurrent processor use, but
+            //   `drop` has exclusive access to `self`.
             unsafe { aic_processor_destroy(self.inner) };
         }
     }

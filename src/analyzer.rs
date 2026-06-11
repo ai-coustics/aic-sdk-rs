@@ -107,6 +107,8 @@ pub fn analyzer_pair<'a>(
     // - `collector_ptr` and `analyzer_ptr` point to stack storage for output.
     // - `model` is a valid SDK model pointer for the duration of the call.
     // - `c_license_key` is a null-terminated CString.
+    // - This function is not thread-safe, but the output pointers are local to
+    //   this call and neither handle exists until it returns.
     let error_code = unsafe {
         aic_analyzer_pair_create(
             &mut collector_ptr,
@@ -187,6 +189,7 @@ impl Collector {
     pub fn initialize(&mut self, config: &ProcessorConfig) -> Result<(), AicError> {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live collector.
+        // - This function is not thread-safe, so we borrow `&mut self`.
         let error_code = unsafe {
             aic_collector_initialize(
                 self.inner,
@@ -281,6 +284,7 @@ impl Collector {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live collector.
         // - `audio_ptrs` holds `num_channels` valid readable pointers with `num_frames` samples each.
+        // - This function is not thread-safe, so we borrow `&mut self`.
         let error_code = unsafe {
             aic_collector_buffer_planar(self.inner, audio_ptrs.as_ptr(), num_channels, num_frames)
         };
@@ -341,6 +345,7 @@ impl Collector {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live collector.
         // - `audio` points to a contiguous f32 slice of length `num_channels * num_frames`.
+        // - This function is not thread-safe, so we borrow `&mut self`.
         let error_code = unsafe {
             aic_collector_buffer_interleaved(self.inner, audio.as_ptr(), num_channels, num_frames)
         };
@@ -400,7 +405,7 @@ impl Collector {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live collector.
         // - `audio` points to a contiguous f32 slice of length `num_channels * num_frames`.
-        
+        // - This function is not thread-safe, so we borrow `&mut self`.
         let error_code = unsafe {
             aic_collector_buffer_sequential(self.inner, audio.as_ptr(), num_channels, num_frames)
         };
@@ -414,6 +419,8 @@ impl Drop for Collector {
         if !self.inner.is_null() {
             // SAFETY:
             // - `self.inner` was allocated by the SDK and is still owned by this wrapper.
+            // - This function is not thread-safe with concurrent collector use,
+            //   but `drop` has exclusive access to `self`.
             unsafe { aic_collector_destroy(self.inner) };
         }
     }
@@ -484,6 +491,7 @@ impl<'a> Analyzer<'a> {
     pub fn reset(&self) -> Result<(), AicError> {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live analyzer.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code = unsafe { aic_analyzer_reset(self.as_const_ptr()) };
         handle_error(error_code)
     }
@@ -521,6 +529,7 @@ impl<'a> Analyzer<'a> {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live analyzer.
         // - `result` points to stack storage for output.
+        // - This function is not thread-safe, so we borrow `&mut self`.
         let error_code = unsafe { aic_analyzer_analyze_buffered(self.inner, &mut result) };
         handle_error(error_code)?;
 
@@ -567,6 +576,8 @@ impl<'a> Analyzer<'a> {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live analyzer.
         // - `c_token` is a null-terminated CString that outlives the call.
+        // - This function can run concurrently with collector buffering; Rust
+        //   prevents concurrent analyze or destroy on the same analyzer handle.
         let error_code =
             unsafe { aic_analyzer_update_bearer_token(self.as_const_ptr(), c_token.as_ptr()) };
         handle_error(error_code)
@@ -578,6 +589,8 @@ impl<'a> Drop for Analyzer<'a> {
         if !self.inner.is_null() {
             // SAFETY:
             // - `self.inner` was allocated by the SDK and is still owned by this wrapper.
+            // - This function is not thread-safe with concurrent analyzer use,
+            //   but `drop` has exclusive access to `self`.
             unsafe { aic_analyzer_destroy(self.inner) };
         }
     }
