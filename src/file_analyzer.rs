@@ -77,7 +77,7 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
     /// * `audio` - Mono audio samples to analyze
     /// * `sample_rate` - Sample rate of `audio` in Hz
     /// * `step_samples` - Number of samples to advance between analysis results. Defaults to
-    /// the model's window size (no overlap in analysis windows) if `None`.
+    ///   the model's window size (no overlap in analysis windows) if `None`.
     ///
     /// # Returns
     ///
