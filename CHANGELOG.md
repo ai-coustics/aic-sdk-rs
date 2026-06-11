@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.20.0 - 2026-06-11
+
+### New Features
+
+This release includes several new APIs for running our newest audio intelligence model, *Tyto*.
+
+The new APIs introduce two new concepts: The `Collector` and the `Analyzer`.
+ - The `Collector` is designed to be placed in the audio thread, buffering audio chunks for later analysis.
+ - The `Analyzer` is designed to be run separately. Analysis models are computationally expensive and cannot run in the audio thread. The analyzer has access to the audio buffered by the collector, and it can access it safely across threads.
+
+Initialize the `Collector` with the same configuration as your existing `Processor` and you can
+call the `Collector::buffer_*` APIs in the same manner as the `Processor::process_*` APIs.
+
+Call `Analyzer::analyze_buffered` in a separate thread to obtain an analysis of the latest audio buffered by the `Collector`.
+
 ## 0.19.3 - 2026-06-09
 
 ### Platform Support

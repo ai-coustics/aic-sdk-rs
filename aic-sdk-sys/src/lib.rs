@@ -44,7 +44,6 @@ mod runtime_linking {
     use super::*;
     use libloading::Library;
     use std::{
-        ffi::{c_char, c_float, c_uint},
         fmt,
         path::{Path, PathBuf},
         sync::OnceLock,
@@ -173,41 +172,9 @@ mod runtime_linking {
         };
     }
 
-    // This table mirrors the function declarations in `include/aic.h` (plus the headerless
-    // `aic_set_sdk_wrapper_id`). It is maintained by hand because bindgen's generated `extern`
-    // declarations are blocklisted in the `runtime-linking` mode. Whenever `aic.h` changes, update the signatures
-    // below to match — a wrong signature compiles but is undefined behavior at call time. The
-    // `check-header` CI job fails when `aic.h` drifts from the SDK release, and the `linking` CI
-    // job runs the `basic_usage` example against a real `libaic` to exercise these symbols.
-    aic_symbols! {
-        fn aic_get_sdk_version() -> *const c_char;
-        fn aic_get_compatible_model_version() -> c_uint;
-        fn aic_model_create_from_file(model: *mut *mut AicModel, file_path: *const c_char) -> AicErrorCode::Type;
-        fn aic_model_create_from_buffer(model: *mut *mut AicModel, buffer: *const u8, buffer_len: usize) -> AicErrorCode::Type;
-        fn aic_model_destroy(model: *mut AicModel);
-        fn aic_model_get_id(model: *const AicModel) -> *const c_char;
-        fn aic_model_get_optimal_sample_rate(model: *const AicModel, sample_rate: *mut c_uint) -> AicErrorCode::Type;
-        fn aic_model_get_optimal_num_frames(model: *const AicModel, sample_rate: c_uint, num_frames: *mut usize) -> AicErrorCode::Type;
-        fn aic_processor_create(processor: *mut *mut AicProcessor, model: *const AicModel, license_key: *const c_char, otel_config: *const AicOtelConfig) -> AicErrorCode::Type;
-        fn aic_processor_destroy(processor: *mut AicProcessor);
-        fn aic_processor_initialize(processor: *mut AicProcessor, sample_rate: c_uint, num_channels: u16, num_frames: usize, allow_variable_frames: bool) -> AicErrorCode::Type;
-        fn aic_processor_process_planar(processor: *mut AicProcessor, audio: *const *mut c_float, num_channels: u16, num_frames: usize) -> AicErrorCode::Type;
-        fn aic_processor_process_interleaved(processor: *mut AicProcessor, audio: *mut c_float, num_channels: u16, num_frames: usize) -> AicErrorCode::Type;
-        fn aic_processor_process_sequential(processor: *mut AicProcessor, audio: *mut c_float, num_channels: u16, num_frames: usize) -> AicErrorCode::Type;
-        fn aic_processor_context_create(context: *mut *mut AicProcessorContext, processor: *const AicProcessor) -> AicErrorCode::Type;
-        fn aic_processor_context_destroy(context: *mut AicProcessorContext);
-        fn aic_processor_context_reset(context: *const AicProcessorContext) -> AicErrorCode::Type;
-        fn aic_processor_context_set_parameter(context: *const AicProcessorContext, parameter: AicProcessorParameter::Type, value: c_float) -> AicErrorCode::Type;
-        fn aic_processor_context_get_parameter(context: *const AicProcessorContext, parameter: AicProcessorParameter::Type, value: *mut c_float) -> AicErrorCode::Type;
-        fn aic_processor_context_get_output_delay(context: *const AicProcessorContext, delay: *mut usize) -> AicErrorCode::Type;
-        fn aic_processor_context_update_bearer_token(context: *const AicProcessorContext, token: *const c_char) -> AicErrorCode::Type;
-        fn aic_vad_context_create(context: *mut *mut AicVadContext, processor: *const AicProcessor) -> AicErrorCode::Type;
-        fn aic_vad_context_destroy(context: *mut AicVadContext);
-        fn aic_vad_context_is_speech_detected(context: *const AicVadContext, value: *mut bool) -> AicErrorCode::Type;
-        fn aic_vad_context_set_parameter(context: *const AicVadContext, parameter: AicVadParameter::Type, value: c_float) -> AicErrorCode::Type;
-        fn aic_vad_context_get_parameter(context: *const AicVadContext, parameter: AicVadParameter::Type, value: *mut c_float) -> AicErrorCode::Type;
-        fn aic_set_sdk_wrapper_id(id: c_uint);
-    }
+    // This file contains an automatically generated file with the following code:
+    // `aic_symbols! { list of fn declarations }`
+    include!(concat!(env!("OUT_DIR"), "/runtime_symbols.rs"));
 
     /// Loads the AIC dynamic library from an explicit `path`.
     ///

@@ -2,9 +2,7 @@ use crate::{error::*, model::Model};
 
 use aic_sdk_sys::{AicProcessorParameter::*, *};
 
-use std::{ffi::CString, marker::PhantomData, ptr, sync::Once};
-
-static SET_WRAPPER_ID: Once = Once::new();
+use std::{ffi::CString, marker::PhantomData, ptr};
 
 /// Audio processing configuration passed to [`Processor::initialize`].
 ///
@@ -32,11 +30,12 @@ impl ProcessorConfig {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, ProcessorConfig, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let processor = Processor::new(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model)
     ///     .with_num_channels(2)
     ///     .with_allow_variable_frames(true);
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     ///
     /// If you need to configure a non-optimal sample rate or number of frames,
@@ -44,13 +43,14 @@ impl ProcessorConfig {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// let config = ProcessorConfig {
     ///     num_channels: 2,
     ///     sample_rate: 44100,
     ///     num_frames: model.optimal_num_frames(44100),
     ///     allow_variable_frames: true,
     /// };
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn optimal(model: &Model) -> Self {
         let sample_rate = model.optimal_sample_rate();
@@ -199,21 +199,23 @@ impl ProcessorContext {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `AicError` if the parameter cannot be set.
+    /// Returns `Ok(())` on success or an [`AicError`] if the parameter cannot be set.
     ///
     /// # Example
     ///
     /// ```rust,no_run
     /// # use aic_sdk::{Model, ProcessorParameter, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let processor = Processor::new(&model, &license_key)?;
     /// # let proc_ctx = processor.processor_context();
-    /// proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.8).unwrap();
+    /// proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.8)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn set_parameter(&self, parameter: ProcessorParameter, value: f32) -> Result<(), AicError> {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor context.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code = unsafe {
             aic_processor_context_set_parameter(self.as_const_ptr(), parameter.into(), value)
         };
@@ -230,24 +232,26 @@ impl ProcessorContext {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(value)` containing the current parameter value, or an `AicError` if the query fails.
+    /// Returns `Ok(value)` containing the current parameter value, or an [`AicError`] if the query fails.
     ///
     /// # Example
     ///
     /// ```rust,no_run
     /// # use aic_sdk::{Model, ProcessorParameter, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let processor = Processor::new(&model, &license_key)?;
     /// # let processor_context = processor.processor_context();
-    /// let enhancement_level = processor_context.parameter(ProcessorParameter::EnhancementLevel).unwrap();
+    /// let enhancement_level = processor_context.parameter(ProcessorParameter::EnhancementLevel)?;
     /// println!("Current enhancement level: {enhancement_level}");
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn parameter(&self, parameter: ProcessorParameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         // - `value` points to stack storage for output.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code = unsafe {
             aic_processor_context_get_parameter(self.as_const_ptr(), parameter.into(), &mut value)
         };
@@ -261,6 +265,14 @@ impl ProcessorContext {
     /// which includes both algorithmic processing delay and any buffering overhead.
     /// Use this value to synchronize enhanced audio with other streams or to implement
     /// delay compensation in your application.
+    ///
+    /// **Enhancement vs. VAD models:**
+    /// - For an enhancement model this is the latency of the enhanced audio: the number of
+    ///   samples by which the processed output lags behind the input.
+    /// - For a dedicated VAD model, the audio buffer is input-only and passes through unchanged.
+    ///   This delay is the VAD prediction latency: how many samples a speech decision from
+    ///   [`VadContext::is_speech_detected`](crate::VadContext::is_speech_detected) lags behind
+    ///   the input it describes. Use this value to line up VAD decisions with the input timeline.
     ///
     /// **Delay behavior:**
     /// - **Before initialization:** Returns the base processing delay using the model's
@@ -284,17 +296,19 @@ impl ProcessorContext {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let processor = Processor::new(&model, &license_key)?;
     /// # let processor_context = processor.processor_context();
     /// let delay = processor_context.output_delay();
     /// println!("Output delay: {} samples", delay);
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn output_delay(&self) -> usize {
         let mut delay: usize = 0;
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         // - `delay` points to stack storage for output.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code =
             unsafe { aic_processor_context_get_output_delay(self.as_const_ptr(), &mut delay) };
 
@@ -318,9 +332,10 @@ impl ProcessorContext {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `AicError` if the reset fails.
+    /// Returns `Ok(())` on success or an [`AicError`] if the reset fails.
     ///
-    /// # Thread Safety
+    /// # Real-time safety
+    ///
     /// Real-time safe. Can be called from audio processing threads.
     ///
     /// # Example
@@ -328,14 +343,16 @@ impl ProcessorContext {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let processor = Processor::new(&model, &license_key)?;
     /// # let processor_context = processor.processor_context();
-    /// processor_context.reset().unwrap();
+    /// processor_context.reset()?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn reset(&self) -> Result<(), AicError> {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor context.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code = unsafe { aic_processor_context_reset(self.as_const_ptr()) };
         handle_error(error_code)
     }
@@ -356,28 +373,31 @@ impl ProcessorContext {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `AicError` if the update fails.
+    /// Returns `Ok(())` on success or an [`AicError`] if the update fails.
     ///
-    /// # Warning
-    /// This allocates memory and performs cryptographic work.
-    /// Avoid calling it from real-time audio threads.
+    /// # Real-time safety
+    ///
+    /// This function is not real-time safe. It locks a mutex and allocates memory.
+    /// Avoid calling it from audio threads.
     ///
     /// # Example
     ///
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// let processor = Processor::new(&model, &license_key)?;
     /// let processor_context = processor.processor_context();
     /// let renewed_jwt = String::from("<JWT_BEARER_TOKEN>");
-    /// processor_context.update_bearer_token(&renewed_jwt).unwrap();
+    /// processor_context.update_bearer_token(&renewed_jwt)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn update_bearer_token(&self, token: &str) -> Result<(), AicError> {
         let c_token = CString::new(token).map_err(|_| AicError::LicenseFormatInvalid)?;
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         // - `c_token` is a null-terminated CString that outlives the call.
+        // - This function can be called from any thread.
         let error_code = unsafe {
             aic_processor_context_update_bearer_token(self.as_const_ptr(), c_token.as_ptr())
         };
@@ -390,6 +410,8 @@ impl Drop for ProcessorContext {
         if !self.inner.is_null() {
             // SAFETY:
             // - `self.inner` was allocated by the SDK and is still owned by this wrapper.
+            // - This function can be called from any thread; `drop` has exclusive
+            //   access to this context handle.
             unsafe { aic_processor_context_destroy(self.inner) };
         }
     }
@@ -411,7 +433,7 @@ unsafe impl Sync for ProcessorContext {}
 /// use aic_sdk::{Model, ProcessorConfig, Processor};
 ///
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-/// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+/// let model = Model::from_file("/path/to/model.aicmodel")?;
 /// let config = ProcessorConfig {
 ///     num_channels: 2,
 ///     num_frames: 1024,
@@ -447,15 +469,16 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns a `Result` containing the new `Processor` instance or an `AicError` if creation fails.
+    /// Returns a `Result` containing the new `Processor` instance or an [`AicError`] if creation fails.
     ///
     /// # Example
     ///
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// let processor = Processor::new(&model, &license_key).unwrap();
+    /// let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// let processor = Processor::new(&model, &license_key)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn new(model: &Model<'a>, license_key: &str) -> Result<Self, AicError> {
         Self::create(model, license_key, None)
@@ -491,6 +514,9 @@ impl<'a> Processor<'a> {
         license_key: &str,
         otel_config: Option<&OtelConfig>,
     ) -> Result<Self, AicError> {
+        // Set the wrapper ID as soon as the user attempts to instantiate a processor
+        crate::set_wrapper_id();
+
         // Session ID must outlive the FFI call so its pointer stays valid.
         let c_session_id = otel_config
             .and_then(|o| o.session_id.as_deref())
@@ -507,12 +533,6 @@ impl<'a> Processor<'a> {
             .as_ref()
             .map_or(ptr::null(), |o| o as *const AicOtelConfig);
 
-        SET_WRAPPER_ID.call_once(|| unsafe {
-            // SAFETY:
-            // - This FFI call has no safety requirements.
-            aic_set_sdk_wrapper_id(2);
-        });
-
         let mut processor_ptr: *mut AicProcessor = ptr::null_mut();
         let c_license_key =
             CString::new(license_key).map_err(|_| AicError::LicenseFormatInvalid)?;
@@ -523,6 +543,8 @@ impl<'a> Processor<'a> {
         // - `c_license_key` is a null-terminated CString.
         // - `c_otel_ptr` is either null or points to a valid `AicOtelConfig` whose
         //   `session_id` field (if non-null) outlives this call.
+        // - This function is not thread-safe, but the output pointer is local to
+        //   this call and no processor handle exists until it returns.
         let error_code = unsafe {
             aic_processor_create(
                 &mut processor_ptr,
@@ -559,7 +581,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(Self)` with the initialized processor, or an `AicError` if initialization fails.
+    /// Returns `Ok(Self)` with the initialized processor, or an [`AicError`] if initialization fails.
     ///
     /// # Example
     ///
@@ -573,7 +595,7 @@ impl<'a> Processor<'a> {
     ///
     /// // Processor is ready to use - no need to call initialize()
     /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
-    /// processor.process_interleaved(&mut audio).unwrap();
+    /// processor.process_interleaved(&mut audio)?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn with_config(mut self, config: &ProcessorConfig) -> Result<Self, AicError> {
@@ -589,9 +611,10 @@ impl<'a> Processor<'a> {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// let processor = Processor::new(&model, &license_key).unwrap();
+    /// let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// let processor = Processor::new(&model, &license_key)?;
     /// let processor_context = processor.processor_context();
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn processor_context(&self) -> ProcessorContext {
         let mut processor_context: *mut AicProcessorContext = ptr::null_mut();
@@ -599,6 +622,7 @@ impl<'a> Processor<'a> {
         // SAFETY:
         // - `processor_context` is valid output storage.
         // - `self.as_const_ptr()` is a live processor pointer.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code =
             unsafe { aic_processor_context_create(&mut processor_context, self.as_const_ptr()) };
 
@@ -622,9 +646,10 @@ impl<'a> Processor<'a> {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// let processor = Processor::new(&model, &license_key).unwrap();
+    /// let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// let processor = Processor::new(&model, &license_key)?;
     /// let vad = processor.vad_context();
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn vad_context(&self) -> crate::VadContext {
         let mut vad_ptr: *mut AicVadContext = ptr::null_mut();
@@ -632,6 +657,8 @@ impl<'a> Processor<'a> {
         // SAFETY:
         // - `vad_ptr` is valid output storage.
         // - `self.as_const_ptr()` is a live processor pointer.
+        // - This function can be called from any thread and may run while the
+        //   processor is in use, so we only borrow `&self`.
         let error_code = unsafe { aic_vad_context_create(&mut vad_ptr, self.as_const_ptr()) };
 
         // This should never fail
@@ -658,7 +685,7 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `AicError` if initialization fails.
+    /// Returns `Ok(())` on success or an [`AicError`] if initialization fails.
     ///
     /// # Warning
     /// Do not call from audio processing threads as this allocates memory.
@@ -672,14 +699,16 @@ impl<'a> Processor<'a> {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let mut processor = Processor::new(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model);
-    /// processor.initialize(&config).unwrap();
+    /// processor.initialize(&config)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn initialize(&mut self, config: &ProcessorConfig) -> Result<(), AicError> {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
+        // - This function is not thread-safe, so we borrow `&mut self`.
         let error_code = unsafe {
             aic_processor_initialize(
                 self.inner,
@@ -728,19 +757,24 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `AicError` if processing fails.
+    /// Returns `Ok(())` on success or an [`AicError`] if processing fails.
+    ///
+    /// # Real-time safety
+    ///
+    /// Real-time safe. Can be called from audio processing threads.
     ///
     /// # Example
     ///
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let mut processor = Processor::new(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-    /// processor.initialize(&config).unwrap();
+    /// processor.initialize(&config)?;
     /// let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
-    /// processor.process_planar(&mut audio).unwrap();
+    /// processor.process_planar(&mut audio)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
     pub fn process_planar<V: AsMut<[f32]>>(&mut self, audio: &mut [V]) -> Result<(), AicError> {
@@ -776,6 +810,7 @@ impl<'a> Processor<'a> {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
         // - `audio_ptrs` holds `num_channels` valid, writable pointers with `num_frames` samples each.
+        // - This function is not thread-safe, so we borrow `&mut self`.
         let error_code = unsafe {
             aic_processor_process_planar(self.inner, audio_ptrs.as_ptr(), num_channels, num_frames)
         };
@@ -808,19 +843,24 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `AicError` if processing fails.
+    /// Returns `Ok(())` on success or an [`AicError`] if processing fails.
+    ///
+    /// # Real-time safety
+    ///
+    /// Real-time safe. Can be called from audio processing threads.
     ///
     /// # Example
     ///
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let mut processor = Processor::new(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-    /// processor.initialize(&config).unwrap();
+    /// processor.initialize(&config)?;
     /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
-    /// processor.process_interleaved(&mut audio).unwrap();
+    /// processor.process_interleaved(&mut audio)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
     pub fn process_interleaved(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
@@ -837,6 +877,7 @@ impl<'a> Processor<'a> {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
         // - `audio` points to a contiguous f32 slice of length `num_channels * num_frames`.
+        // - This function is not thread-safe, so we borrow `&mut self`.
         let error_code = unsafe {
             aic_processor_process_interleaved(
                 self.inner,
@@ -873,19 +914,24 @@ impl<'a> Processor<'a> {
     ///
     /// # Returns
     ///
-    /// Returns `Ok(())` on success or an `AicError` if processing fails.
+    /// Returns `Ok(())` on success or an [`AicError`] if processing fails.
+    ///
+    /// # Real-time safety
+    ///
+    /// Real-time safe. Can be called from audio processing threads.
     ///
     /// # Example
     ///
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let mut processor = Processor::new(&model, &license_key).unwrap();
-    /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);;
-    /// processor.initialize(&config).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let mut processor = Processor::new(&model, &license_key)?;
+    /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+    /// processor.initialize(&config)?;
     /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
-    /// processor.process_sequential(&mut audio).unwrap();
+    /// processor.process_sequential(&mut audio)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
     pub fn process_sequential(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
@@ -902,6 +948,7 @@ impl<'a> Processor<'a> {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live, initialized processor.
         // - `audio` points to a contiguous f32 slice of length `num_channels * num_frames`.
+        // - This function is not thread-safe, so we borrow `&mut self`.
         let error_code = unsafe {
             aic_processor_process_sequential(
                 self.inner,
@@ -924,6 +971,8 @@ impl<'a> Drop for Processor<'a> {
         if !self.inner.is_null() {
             // SAFETY:
             // - `self.inner` was allocated by the SDK and is still owned by this wrapper.
+            // - This function is not thread-safe with concurrent processor use, but
+            //   `drop` has exclusive access to `self`.
             unsafe { aic_processor_destroy(self.inner) };
         }
     }

@@ -91,9 +91,10 @@ impl From<VadParameter> for AicVadParameter::Type {
 /// use aic_sdk::{Model, Processor};
 ///
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-/// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-/// let processor = Processor::new(&model, &license_key).unwrap();
+/// let model = Model::from_file("/path/to/model.aicmodel")?;
+/// let processor = Processor::new(&model, &license_key)?;
 /// let vad = processor.vad_context();
+/// # Ok::<(), aic_sdk::AicError>(())
 /// ```
 pub struct VadContext {
     /// Raw pointer to the C VAD structure
@@ -114,7 +115,11 @@ impl VadContext {
     ///
     /// **Important:**
     /// - The latency of the VAD prediction is equal to
-    ///   the backing processor's processing latency.
+    ///   the backing processor's processing latency, reported by
+    ///   [`ProcessorContext::output_delay`](crate::ProcessorContext::output_delay).
+    ///   The prediction lags its input by that many samples even for a dedicated VAD model
+    ///   whose audio buffer passes through untouched. Align speech decisions to the input timeline
+    ///   using that delay.
     /// - If the backing processor stops being processed,
     ///   the VAD will not update its speech detection prediction.
     pub fn is_speech_detected(&self) -> bool {
@@ -122,6 +127,7 @@ impl VadContext {
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live VAD context.
         // - `value` points to stack storage for output.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code =
             unsafe { aic_vad_context_is_speech_detected(self.as_const_ptr(), &mut value) };
 
@@ -146,15 +152,17 @@ impl VadContext {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let processor = Processor::new(&model, &license_key)?;
     /// # let vad = processor.vad_context();
-    /// vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08).unwrap();
-    /// vad.set_parameter(VadParameter::Sensitivity, 5.0).unwrap();
+    /// vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
+    /// vad.set_parameter(VadParameter::Sensitivity, 5.0)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn set_parameter(&self, parameter: VadParameter, value: f32) -> Result<(), AicError> {
         // SAFETY:
         // - `self.as_const_ptr()` is a live VAD context pointer.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code =
             unsafe { aic_vad_context_set_parameter(self.as_const_ptr(), parameter.into(), value) };
         handle_error(error_code)
@@ -175,17 +183,19 @@ impl VadContext {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let processor = Processor::new(&model, &license_key)?;
     /// # let vad = processor.vad_context();
-    /// let sensitivity = vad.parameter(VadParameter::Sensitivity).unwrap();
+    /// let sensitivity = vad.parameter(VadParameter::Sensitivity)?;
     /// println!("Current sensitivity: {sensitivity}");
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn parameter(&self, parameter: VadParameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live VAD context.
         // - `value` points to stack storage for output.
+        // - This function can be called from any thread, so we only borrow `&self`.
         let error_code = unsafe {
             aic_vad_context_get_parameter(self.as_const_ptr(), parameter.into(), &mut value)
         };
@@ -199,6 +209,8 @@ impl Drop for VadContext {
         if !self.inner.is_null() {
             // SAFETY:
             // - `self.inner` was allocated by the SDK and is still owned by this wrapper.
+            // - This function can be called from any thread; `drop` has exclusive
+            //   access to this VAD context handle.
             unsafe { aic_vad_context_destroy(self.inner) };
         }
     }

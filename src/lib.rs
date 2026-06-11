@@ -2,11 +2,14 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use aic_sdk_sys::{aic_get_compatible_model_version, aic_get_sdk_version, aic_set_sdk_wrapper_id};
-use std::ffi::CStr;
+use std::{ffi::CStr, sync::Once};
+
 #[cfg(feature = "runtime-linking")]
 use std::path::Path;
 
+mod analyzer;
 mod error;
+mod file_analyzer;
 mod model;
 mod processor;
 #[cfg(feature = "async")]
@@ -14,7 +17,9 @@ mod processor;
 mod processor_async;
 mod vad;
 
+pub use analyzer::*;
 pub use error::*;
+pub use file_analyzer::*;
 pub use model::*;
 pub use processor::*;
 #[cfg(feature = "async")]
@@ -25,6 +30,18 @@ pub use vad::*;
 #[cfg(feature = "runtime-linking")]
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime-linking")))]
 pub use aic_sdk_sys::DynamicLoadingError;
+
+static SET_WRAPPER_ID: Once = Once::new();
+
+/// Sets the SDK wrapper ID.
+pub(crate) fn set_wrapper_id() {
+    SET_WRAPPER_ID.call_once(|| unsafe {
+        // SAFETY:
+        // - This FFI call has no safety requirements.
+        // - This function can be called from any thread; `Once` serializes this wrapper's call.
+        aic_set_sdk_wrapper_id(2);
+    });
+}
 
 /// Loads the AIC dynamic library from `path` when the `runtime-linking` feature is enabled.
 ///
@@ -69,6 +86,7 @@ pub fn get_sdk_version() -> &'static str {
     // SAFETY:
     // - FFI call returns a pointer to a static C string owned by the SDK.
     // - The pointer can never be null, so no check is necessary.
+    // - This function can be called from any thread.
     let version_ptr = unsafe { aic_get_sdk_version() };
 
     // SAFETY:
@@ -80,6 +98,7 @@ pub fn get_sdk_version() -> &'static str {
 pub fn get_compatible_model_version() -> u32 {
     // SAFETY:
     // - FFI call takes no arguments and returns a plain integer.
+    // - This function can be called from any thread.
     unsafe { aic_get_compatible_model_version() }
 }
 
@@ -91,5 +110,6 @@ pub fn get_compatible_model_version() -> u32 {
 pub unsafe fn set_sdk_id(id: u32) {
     // SAFETY:
     // - This FFI call has no safety requirements.
+    // - This function can be called from any thread.
     unsafe { aic_set_sdk_wrapper_id(id) }
 }

@@ -257,6 +257,28 @@ if vad_ctx.is_speech_detected() {
 }
 ```
 
+### Working with the Analyzer
+
+Instantiate an analyzer pair:
+```rust,ignore
+let (mut collector, mut analyzer) = aic_sdk::analyzer_pair(&model, &license_key)?;
+```
+
+Initialize the collector, similar to the processor initialization
+```rust,ignore
+let config = ProcessorConfig::optimal(&model);
+collector.initialize(&config)?;
+```
+
+Buffer the audio using the `Collector::buffer_*` APIs. They mirror the `Processor::process_*` APIs.
+See the `Processing Audio` section for more details.
+
+Analyze the buffered audio in a separate thread:
+```rust,ignore
+let result = analyzer.analyze_buffered()?;
+println!("Risk score: {}", result.risk_score);
+```
+
 ### Async Processing
 
 Enable the `async` feature to use [`ProcessorAsync`], which offloads
