@@ -461,7 +461,7 @@ impl<'a> Analyzer<'a> {
     ///
     /// Returns `Ok(())` on success or an [`AicError`] if the reset fails.
     ///
-    /// # Safety
+    /// # Real-time safety
     ///
     /// Real-time safe. Can be called from audio processing threads.
     ///
@@ -498,7 +498,7 @@ impl<'a> Analyzer<'a> {
     ///
     /// Returns an [`AnalysisResult`] if successful, otherwise an [`AicError`].
     ///
-    /// # Safety
+    /// # Real-time safety
     ///
     /// This function is not real-time safe. Avoid calling it from audio threads.
     pub fn analyze_buffered(&mut self) -> Result<AnalysisResult, AicError> {
@@ -539,7 +539,7 @@ impl<'a> Analyzer<'a> {
     ///
     /// Returns `Ok(())` on success or an `AicError` if the update fails.
     ///
-    /// # Safety
+    /// # Real-time safety
     ///
     /// This function is not real-time safe. It locks a mutex and allocates memory.
     /// Avoid calling it from audio threads.

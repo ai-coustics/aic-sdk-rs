@@ -84,7 +84,7 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
     /// Returns a list of [`AnalysisResult`] values, or an [`AicError`] if initialization,
     /// buffering, or analysis fails.
     ///
-    /// # Safety
+    /// # Real-time safety
     ///
     /// This function is not real-time safe. Avoid calling it from audio threads.
     pub fn analyze(
