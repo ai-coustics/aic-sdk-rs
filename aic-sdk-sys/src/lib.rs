@@ -174,7 +174,7 @@ mod runtime_linking {
 
     // This file contains an automatically generated file with the following code:
     // `aic_symbols! { list of fn declarations }`
-    include!(concat!(env!("OUT_DIR"), "/runtime_linking.rs"));
+    include!(concat!(env!("OUT_DIR"), "/runtime_symbols.rs"));
 
     /// Loads the AIC dynamic library from an explicit `path`.
     ///

@@ -140,7 +140,7 @@ fn generate_bindings() {
             .clone()
             .generate()
             .expect("Unable to generate runtime-linking symbols");
-        runtime_linking::generate(&runtime_bindings, &out_path.join("runtime_linking.rs"));
+        runtime_linking::generate(&runtime_bindings, &out_path.join("runtime_symbols.rs"));
 
         // The runtime-linking module provides Rust functions with these names
         // that dispatch through libloading. Keep types/constants from bindgen,
