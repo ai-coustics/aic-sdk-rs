@@ -72,6 +72,11 @@ path = "examples/benchmark.rs"
 required-features = ["download-model"]
 
 [[example]]
+name = "analyze_file"
+path = "examples/analyze_file.rs"
+required-features = ["download-model"]
+
+[[example]]
 name = "parallel_async"
 path = "examples/parallel_async.rs"
 required-features = ["async", "download-model"]
