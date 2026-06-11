@@ -33,7 +33,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         STEP_SECONDS,
     );
 
-    let results = analyzer.analyze(&audio.samples, audio.sample_rate, None)?;
+    let step_samples = audio.sample_rate as usize * STEP_SECONDS;
+
+    let results = analyzer.analyze(&audio.samples, audio.sample_rate, Some(step_samples))?;
 
     println!();
     println!(" time | risk  | reverb | loud  | intf  | media | noise | loss");
