@@ -400,6 +400,7 @@ impl Collector {
         // SAFETY:
         // - `self.inner` is a valid pointer to a live collector.
         // - `audio` points to a contiguous f32 slice of length `num_channels * num_frames`.
+        
         let error_code = unsafe {
             aic_collector_buffer_sequential(self.inner, audio.as_ptr(), num_channels, num_frames)
         };
@@ -423,6 +424,11 @@ impl Drop for Collector {
 // unsafe APIs that require the pointer, and the Collector does not expose access to the
 // raw pointer in any of its methods. Therefore, it safe to implement Send for Collector.
 unsafe impl Send for Collector {}
+
+// SAFETY: Collector does not expose any interior mutability, and all unsafe APIs that make use of
+// the inner raw pointer uphold the thread safety contracts required by the unsafe APIs.
+// Therefore, it is safe to implement Sync for Collector.
+unsafe impl Sync for Collector {}
 
 /// Runs an analysis model over the audio buffered by a [`Collector`].
 ///
@@ -582,6 +588,11 @@ impl<'a> Drop for Analyzer<'a> {
 // unsafe APIs that require the pointer, and the Analyzer does not expose access to the
 // raw pointer in any of its methods. Therefore, it safe to implement Send for Analyzer.
 unsafe impl<'a> Send for Analyzer<'a> {}
+
+// SAFETY: Analyzer does not expose any interior mutability, and all unsafe APIs that make use of
+// the inner raw pointer uphold the thread safety contracts required by the unsafe APIs.
+// Therefore, it is safe to implement Sync for Analyzer.
+unsafe impl<'a> Sync for Analyzer<'a> {}
 
 #[cfg(test)]
 mod tests {
@@ -881,12 +892,15 @@ mod tests {
     }
 
     #[test]
-    fn collector_and_analyzer_are_send() {
+    fn collector_and_analyzer_are_send_and_sync() {
         // Compile-time check that Collector and Analyzer can cross thread boundaries.
         fn assert_send<T: Send>() {}
+        fn assert_sync<T: Send>() {}
 
         assert_send::<Collector>();
+        assert_sync::<Collector>();
         assert_send::<Analyzer>();
+        assert_sync::<Analyzer>();
     }
 }
 
