@@ -91,9 +91,10 @@ impl From<VadParameter> for AicVadParameter::Type {
 /// use aic_sdk::{Model, Processor};
 ///
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-/// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-/// let processor = Processor::new(&model, &license_key).unwrap();
+/// let model = Model::from_file("/path/to/model.aicmodel")?;
+/// let processor = Processor::new(&model, &license_key)?;
 /// let vad = processor.vad_context();
+/// # Ok::<(), aic_sdk::AicError>(())
 /// ```
 pub struct VadContext {
     /// Raw pointer to the C VAD structure
@@ -146,11 +147,12 @@ impl VadContext {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let processor = Processor::new(&model, &license_key)?;
     /// # let vad = processor.vad_context();
-    /// vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08).unwrap();
-    /// vad.set_parameter(VadParameter::Sensitivity, 5.0).unwrap();
+    /// vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
+    /// vad.set_parameter(VadParameter::Sensitivity, 5.0)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn set_parameter(&self, parameter: VadParameter, value: f32) -> Result<(), AicError> {
         // SAFETY:
@@ -175,11 +177,12 @@ impl VadContext {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let processor = Processor::new(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let processor = Processor::new(&model, &license_key)?;
     /// # let vad = processor.vad_context();
-    /// let sensitivity = vad.parameter(VadParameter::Sensitivity).unwrap();
+    /// let sensitivity = vad.parameter(VadParameter::Sensitivity)?;
     /// println!("Current sensitivity: {sensitivity}");
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn parameter(&self, parameter: VadParameter) -> Result<f32, AicError> {
         let mut value: f32 = 0.0;

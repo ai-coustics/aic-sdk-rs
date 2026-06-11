@@ -88,8 +88,9 @@ impl From<AicAnalysisResult> for AnalysisResult {
 /// ```rust,no_run
 /// # use aic_sdk::Model;
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-/// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-/// let (mut collector, mut analyzer) = aic_sdk::new_analysis_pair(&model, &license_key).unwrap();
+/// let model = Model::from_file("/path/to/model.aicmodel")?;
+/// let (mut collector, mut analyzer) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+/// # Ok::<(), aic_sdk::AicError>(())
 /// ```
 pub fn new_analysis_pair<'a>(
     model: &Model<'a>,
@@ -177,10 +178,11 @@ impl Collector {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model);
-    /// collector.initialize(&config).unwrap();
+    /// collector.initialize(&config)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn initialize(&mut self, config: &ProcessorConfig) -> Result<(), AicError> {
         // SAFETY:
@@ -238,12 +240,13 @@ impl Collector {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-    /// collector.initialize(&config).unwrap();
+    /// collector.initialize(&config)?;
     /// let audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
-    /// collector.buffer_planar(&audio).unwrap();
+    /// collector.buffer_planar(&audio)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
     pub fn buffer_planar<V: AsRef<[f32]>>(&mut self, audio: &[V]) -> Result<(), AicError> {
@@ -315,12 +318,13 @@ impl Collector {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-    /// collector.initialize(&config).unwrap();
+    /// collector.initialize(&config)?;
     /// let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
-    /// collector.buffer_interleaved(&audio).unwrap();
+    /// collector.buffer_interleaved(&audio)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
     pub fn buffer_interleaved(&mut self, audio: &[f32]) -> Result<(), AicError> {
@@ -373,12 +377,13 @@ impl Collector {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-    /// collector.initialize(&config).unwrap();
+    /// collector.initialize(&config)?;
     /// let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
-    /// collector.buffer_sequential(&audio).unwrap();
+    /// collector.buffer_sequential(&audio)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     #[allow(clippy::doc_overindented_list_items)]
     pub fn buffer_sequential(&mut self, audio: &[f32]) -> Result<(), AicError> {
@@ -470,9 +475,10 @@ impl<'a> Analyzer<'a> {
     /// ```rust,no_run
     /// # use aic_sdk::Model;
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let (_, mut analyzer) = aic_sdk::new_analysis_pair(&model, &license_key).unwrap();
-    /// analyzer.reset().unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let (_, mut analyzer) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// analyzer.reset()?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn reset(&self) -> Result<(), AicError> {
         // SAFETY:
@@ -548,10 +554,11 @@ impl<'a> Analyzer<'a> {
     /// ```rust,no_run
     /// # use aic_sdk::Model;
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// # let (_, analyzer) = aic_sdk::new_analysis_pair(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let (_, analyzer) = aic_sdk::new_analysis_pair(&model, &license_key)?;
     /// let renewed_jwt = String::from("<JWT_BEARER_TOKEN>");
-    /// analyzer.update_bearer_token(&renewed_jwt).unwrap();
+    /// analyzer.update_bearer_token(&renewed_jwt)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn update_bearer_token(&self, token: &str) -> Result<(), AicError> {
         let c_token = CString::new(token).map_err(|_| AicError::LicenseFormatInvalid)?;

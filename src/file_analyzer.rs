@@ -43,13 +43,14 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
     /// ```rust,no_run
     /// # use aic_sdk::{FileAnalyzer, Model};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
-    /// let mut analyzer = FileAnalyzer::new(&model, &license_key).unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// let mut analyzer = FileAnalyzer::new(&model, &license_key)?;
     ///
     /// let sample_rate = 16_000;
     /// let step_samples = 1600;
     /// let audio = vec![0.0f32; step_samples];
-    /// let results = analyzer.analyze(&audio, sample_rate, step_samples).unwrap();
+    /// let results = analyzer.analyze(&audio, sample_rate, step_samples)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn new(model: &'model Model<'a>, license_key: &str) -> Result<Self, AicError> {
         let (collector, analyzer) = new_analysis_pair(model, license_key)?;

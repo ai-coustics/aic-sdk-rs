@@ -25,12 +25,13 @@ use std::{
 /// ```rust,no_run
 /// # use aic_sdk::{Model, ProcessorConfig, Processor};
 /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-/// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+/// let model = Model::from_file("/path/to/model.aicmodel")?;
 /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-/// let mut processor = Processor::new(&model, &license_key).unwrap();
-/// processor.initialize(&config).unwrap();
+/// let mut processor = Processor::new(&model, &license_key)?;
+/// processor.initialize(&config)?;
 /// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
-/// processor.process_interleaved(&mut audio_buffer).unwrap();
+/// processor.process_interleaved(&mut audio_buffer)?;
+/// # Ok::<(), aic_sdk::AicError>(())
 /// ```
 ///
 /// # Multi-threaded Example
@@ -38,7 +39,7 @@ use std::{
 /// ```rust,no_run
 /// # use aic_sdk::{Model, ProcessorConfig, Processor};
 /// # use std::{thread, sync::Arc};
-/// let model = Arc::new(Model::from_file("/path/to/model.aicmodel").unwrap());
+/// let model = Arc::new(Model::from_file("/path/to/model.aicmodel")?);
 ///
 /// // Spawn multiple threads, each with its own processor but sharing the same model
 /// let handles: Vec<_> = (0..4)
@@ -55,6 +56,7 @@ use std::{
 /// for handle in handles {
 ///     handle.join().unwrap();
 /// }
+/// # Ok::<(), aic_sdk::AicError>(())
 /// ```
 pub struct Model<'a> {
     /// Raw pointer to the C model structure
@@ -81,7 +83,8 @@ impl<'a> Model<'a> {
     ///
     /// ```rust,no_run
     /// # use aic_sdk::Model;
-    /// let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Model<'static>, AicError> {
         let mut model_ptr: *mut AicModel = ptr::null_mut();
@@ -126,7 +129,8 @@ impl<'a> Model<'a> {
     /// ```rust,ignore
     /// # use aic_sdk::{include_model, Model};
     /// static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
-    /// let model = Model::from_buffer(MODEL).unwrap();
+    /// let model = Model::from_buffer(MODEL)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn from_buffer(buffer: &'a [u8]) -> Result<Self, AicError> {
         let mut model_ptr: *mut AicModel = ptr::null_mut();
@@ -199,9 +203,10 @@ impl<'a> Model<'a> {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// let optimal_sample_rate = model.optimal_sample_rate();
     /// println!("Optimal sample rate: {optimal_sample_rate} Hz");
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn optimal_sample_rate(&self) -> u32 {
         let mut sample_rate: u32 = 0;
@@ -251,10 +256,11 @@ impl<'a> Model<'a> {
     /// ```rust,no_run
     /// # use aic_sdk::{Model, Processor};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// # let sample_rate = model.optimal_sample_rate();
     /// let optimal_frames = model.optimal_num_frames(sample_rate);
     /// println!("Optimal frame count: {optimal_frames}");
+    /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn optimal_num_frames(&self, sample_rate: u32) -> usize {
         let mut num_frames: usize = 0;
@@ -348,7 +354,8 @@ unsafe impl<'a> Sync for Model<'a> {}
 /// # use aic_sdk::{include_model, Model};
 ///
 /// static MODEL: &'static [u8] = include_model!("/path/to/model.aicmodel");
-/// let model = Model::from_buffer(MODEL).unwrap();
+/// let model = Model::from_buffer(MODEL)?;
+/// # Ok::<(), aic_sdk::AicError>(())
 /// ```
 #[macro_export]
 macro_rules! include_model {
