@@ -145,7 +145,7 @@ pub struct Collector {
 }
 
 impl Collector {
-    pub(crate) fn new(collector_ptr: *mut AicCollector) -> Self {
+    fn new(collector_ptr: *mut AicCollector) -> Self {
         Self {
             inner: collector_ptr,
             num_channels: None,
