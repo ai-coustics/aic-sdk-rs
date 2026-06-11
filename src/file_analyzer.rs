@@ -1,6 +1,4 @@
-use crate::{
-    AicError, AnalysisResult, Analyzer, Collector, Model, ProcessorConfig, new_analysis_pair,
-};
+use crate::{AicError, AnalysisResult, Analyzer, Collector, Model, ProcessorConfig, analyzer_pair};
 
 /// Analyzes complete mono audio buffers.
 ///
@@ -11,7 +9,7 @@ use crate::{
 /// optimal frame size. It analyzes independent five-second windows, advancing the start of each
 /// window by `step_samples`.
 ///
-/// For streaming or multi-channel analysis, use [`new_analysis_pair`] directly.
+/// For streaming or multi-channel analysis, use [`analyzer_pair`] directly.
 pub struct FileAnalyzer<'model, 'a> {
     model: &'model Model<'a>,
     collector: Collector,
@@ -52,7 +50,7 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn new(model: &'model Model<'a>, license_key: &str) -> Result<Self, AicError> {
-        let (collector, analyzer) = new_analysis_pair(model, license_key)?;
+        let (collector, analyzer) = analyzer_pair(model, license_key)?;
 
         Ok(Self {
             model,

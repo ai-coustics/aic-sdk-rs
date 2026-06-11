@@ -89,10 +89,10 @@ impl From<AicAnalysisResult> for AnalysisResult {
 /// # use aic_sdk::Model;
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/model.aicmodel")?;
-/// let (mut collector, mut analyzer) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+/// let (mut collector, mut analyzer) = aic_sdk::analyzer_pair(&model, &license_key)?;
 /// # Ok::<(), aic_sdk::AicError>(())
 /// ```
-pub fn new_analysis_pair<'a>(
+pub fn analyzer_pair<'a>(
     model: &Model<'a>,
     license_key: &str,
 ) -> Result<(Collector, Analyzer<'a>), AicError> {
@@ -179,7 +179,7 @@ impl Collector {
     /// # use aic_sdk::{Model, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// # let (mut collector, _) = aic_sdk::analyzer_pair(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model);
     /// collector.initialize(&config)?;
     /// # Ok::<(), aic_sdk::AicError>(())
@@ -241,7 +241,7 @@ impl Collector {
     /// # use aic_sdk::{Model, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// # let (mut collector, _) = aic_sdk::analyzer_pair(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
     /// collector.initialize(&config)?;
     /// let audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
@@ -319,7 +319,7 @@ impl Collector {
     /// # use aic_sdk::{Model, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// # let (mut collector, _) = aic_sdk::analyzer_pair(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
     /// collector.initialize(&config)?;
     /// let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
@@ -378,7 +378,7 @@ impl Collector {
     /// # use aic_sdk::{Model, ProcessorConfig};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let (mut collector, _) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// # let (mut collector, _) = aic_sdk::analyzer_pair(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
     /// collector.initialize(&config)?;
     /// let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
@@ -471,7 +471,7 @@ impl<'a> Analyzer<'a> {
     /// # use aic_sdk::Model;
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let (_, mut analyzer) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// # let (_, mut analyzer) = aic_sdk::analyzer_pair(&model, &license_key)?;
     /// analyzer.reset()?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
@@ -550,7 +550,7 @@ impl<'a> Analyzer<'a> {
     /// # use aic_sdk::Model;
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let (_, analyzer) = aic_sdk::new_analysis_pair(&model, &license_key)?;
+    /// # let (_, analyzer) = aic_sdk::analyzer_pair(&model, &license_key)?;
     /// let renewed_jwt = String::from("<JWT_BEARER_TOKEN>");
     /// analyzer.update_bearer_token(&renewed_jwt)?;
     /// # Ok::<(), aic_sdk::AicError>(())
@@ -648,11 +648,11 @@ mod tests {
         Ok((model, license_key))
     }
 
-    fn new_test_analysis_pair(
+    fn test_analyzer_pair(
         model: &Model<'static>,
         license_key: &str,
     ) -> (Collector, Analyzer<'static>) {
-        new_analysis_pair(model, license_key)
+        analyzer_pair(model, license_key)
             .expect("tyto-l-16khz should create a collector/analyzer pair")
     }
 
@@ -762,10 +762,10 @@ mod tests {
     }
 
     #[test]
-    fn new_analysis_pair_rejects_license_key_with_nul() {
+    fn analyzer_pair_rejects_license_key_with_nul() {
         let (model, _) = load_test_model().unwrap();
 
-        let result = new_analysis_pair(&model, "invalid\0license");
+        let result = analyzer_pair(&model, "invalid\0license");
 
         assert!(matches!(result, Err(AicError::LicenseFormatInvalid)));
     }
@@ -773,7 +773,7 @@ mod tests {
     #[test]
     fn collector_buffers_all_layouts_and_analyzer_returns_scores() {
         let (model, license_key) = load_test_model().unwrap();
-        let (mut collector, mut analyzer) = new_test_analysis_pair(&model, &license_key);
+        let (mut collector, mut analyzer) = test_analyzer_pair(&model, &license_key);
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
         collector.initialize(&config).unwrap();
 
@@ -794,7 +794,7 @@ mod tests {
     #[test]
     fn collector_buffers_variable_frames_when_enabled() {
         let (model, license_key) = load_test_model().unwrap();
-        let (mut collector, _analyzer) = new_test_analysis_pair(&model, &license_key);
+        let (mut collector, _analyzer) = test_analyzer_pair(&model, &license_key);
         let config = ProcessorConfig::optimal(&model)
             .with_num_channels(2)
             .with_allow_variable_frames(true);
@@ -818,7 +818,7 @@ mod tests {
     #[test]
     fn collector_rejects_variable_frames_when_disabled() {
         let (model, license_key) = load_test_model().unwrap();
-        let (mut collector, _analyzer) = new_test_analysis_pair(&model, &license_key);
+        let (mut collector, _analyzer) = test_analyzer_pair(&model, &license_key);
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
         collector.initialize(&config).unwrap();
 
@@ -849,7 +849,7 @@ mod tests {
     #[test]
     fn analyzer_reset_keeps_collector_initialized() {
         let (model, license_key) = load_test_model().unwrap();
-        let (mut collector, mut analyzer) = new_test_analysis_pair(&model, &license_key);
+        let (mut collector, mut analyzer) = test_analyzer_pair(&model, &license_key);
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
         collector.initialize(&config).unwrap();
 
@@ -864,10 +864,10 @@ mod tests {
     }
 
     #[test]
-    fn model_can_be_dropped_after_creating_analysis_pair() {
+    fn model_can_be_dropped_after_creating_analyzer_pair() {
         let (model, license_key) = load_test_model().unwrap();
         let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-        let (mut collector, mut analyzer) = new_test_analysis_pair(&model, &license_key);
+        let (mut collector, mut analyzer) = test_analyzer_pair(&model, &license_key);
         drop(model); // The SDK keeps the model data alive for analyzer instances created from files.
 
         collector.initialize(&config).unwrap();
@@ -895,14 +895,14 @@ mod _compile_fail_tests {
     //! Compile-fail regression: an `Analyzer`'s model buffer must not be dropped before the analyzer.
     //!
     //! ```rust,compile_fail
-    //! use aic_sdk::{Model, ProcessorConfig, new_analysis_pair};
+    //! use aic_sdk::{Model, ProcessorConfig, analyzer_pair};
     //!
     //! fn main() {
     //!     let buffer = vec![0u8; 64];
     //!     let model = Model::from_buffer(&buffer).unwrap();
     //!     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
     //!
-    //!     let (mut collector, mut analyzer) = new_analysis_pair(&model, "license").unwrap();
+    //!     let (mut collector, mut analyzer) = analyzer_pair(&model, "license").unwrap();
     //!     collector.initialize(&config).unwrap();
     //!
     //!     drop(model); // Model can be dropped without issues
