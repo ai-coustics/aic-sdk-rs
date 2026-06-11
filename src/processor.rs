@@ -904,7 +904,7 @@ impl<'a> Processor<'a> {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// # let mut processor = Processor::new(&model, &license_key)?;
-    /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);;
+    /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
     /// processor.initialize(&config)?;
     /// let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
     /// processor.process_sequential(&mut audio)?;
