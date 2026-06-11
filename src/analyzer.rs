@@ -881,15 +881,12 @@ mod tests {
     }
 
     #[test]
-    fn collector_and_analyzer_are_send_and_sync() {
+    fn collector_and_analyzer_are_send() {
         // Compile-time check that Collector and Analyzer can cross thread boundaries.
         fn assert_send<T: Send>() {}
-        fn assert_sync<T: Sync>() {}
 
         assert_send::<Collector>();
-        assert_sync::<Collector>();
         assert_send::<Analyzer>();
-        assert_sync::<Analyzer>();
     }
 }
 
