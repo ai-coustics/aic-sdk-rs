@@ -115,7 +115,11 @@ impl VadContext {
     ///
     /// **Important:**
     /// - The latency of the VAD prediction is equal to
-    ///   the backing processor's processing latency.
+    ///   the backing processor's processing latency, reported by
+    ///   [`ProcessorContext::output_delay`](crate::ProcessorContext::output_delay).
+    ///   The prediction lags its input by that many samples even for a dedicated VAD model
+    ///   whose audio buffer passes through untouched. Align speech decisions to the input timeline
+    ///   using that delay.
     /// - If the backing processor stops being processed,
     ///   the VAD will not update its speech detection prediction.
     pub fn is_speech_detected(&self) -> bool {

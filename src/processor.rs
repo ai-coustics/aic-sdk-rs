@@ -264,6 +264,14 @@ impl ProcessorContext {
     /// Use this value to synchronize enhanced audio with other streams or to implement
     /// delay compensation in your application.
     ///
+    /// **Enhancement vs. VAD models:**
+    /// - For an enhancement model this is the latency of the enhanced audio: the number of
+    ///   samples by which the processed output lags behind the input.
+    /// - For a dedicated VAD model, the audio buffer is input-only and passes through unchanged.
+    ///   This delay is the VAD prediction latency: how many samples a speech decision from
+    ///   [`VadContext::is_speech_detected`](crate::VadContext::is_speech_detected) lags behind
+    ///   the input it describes. Use this value to line up VAD decisions with the input timeline.
+    ///
     /// **Delay behavior:**
     /// - **Before initialization:** Returns the base processing delay using the model's
     ///   optimal frame size at its native sample rate
