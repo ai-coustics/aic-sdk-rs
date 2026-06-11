@@ -47,9 +47,8 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
     /// let mut analyzer = FileAnalyzer::new(&model, &license_key)?;
     ///
     /// let sample_rate = 16_000;
-    /// let step_samples = 1600;
-    /// let audio = vec![0.0f32; step_samples];
-    /// let results = analyzer.analyze(&audio, sample_rate, step_samples)?;
+    /// let audio = vec![0.0f32; 8000];
+    /// let results = analyzer.analyze(&audio, sample_rate, None)?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn new(model: &'model Model<'a>, license_key: &str) -> Result<Self, AicError> {
@@ -79,7 +78,8 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
     ///
     /// * `audio` - Mono audio samples to analyze
     /// * `sample_rate` - Sample rate of `audio` in Hz
-    /// * `step_samples` - Number of samples to advance between analysis results
+    /// * `step_samples` - Number of samples to advance between analysis results. Defaults to
+    /// the model's window size (no overlap in analysis windows) if `None`.
     ///
     /// # Returns
     ///
@@ -93,9 +93,9 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
         &mut self,
         audio: &[f32],
         sample_rate: u32,
-        step_samples: usize,
+        step_samples: Option<usize>,
     ) -> Result<Vec<AnalysisResult>, AicError> {
-        if sample_rate == 0 || step_samples == 0 {
+        if sample_rate == 0 {
             return Err(AicError::AudioConfigUnsupported);
         }
 
@@ -106,6 +106,11 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
         else {
             return Err(AicError::AudioConfigUnsupported);
         };
+
+        let step_samples = step_samples.unwrap_or(analysis_window_samples);
+        if step_samples == 0 {
+            return Err(AicError::AudioConfigUnsupported);
+        }
 
         // The collector only emits fresh spectrogram frames at the model's hop size. Feeding any
         // other frame size would add buffering inside the collector and shift the analysis timing.
@@ -342,11 +347,11 @@ mod tests {
         let audio = [0.0f32; 16];
 
         assert_eq!(
-            analyzer.analyze(&audio, 0, 160),
+            analyzer.analyze(&audio, 0, Some(160)),
             Err(AicError::AudioConfigUnsupported)
         );
         assert_eq!(
-            analyzer.analyze(&audio, 16_000, 0),
+            analyzer.analyze(&audio, 16_000, Some(0)),
             Err(AicError::AudioConfigUnsupported)
         );
     }
@@ -359,7 +364,9 @@ mod tests {
         let step_samples = model.optimal_num_frames(sample_rate);
         let audio = vec![0.0f32; sample_rate as usize];
 
-        let results = analyzer.analyze(&audio, sample_rate, step_samples).unwrap();
+        let results = analyzer
+            .analyze(&audio, sample_rate, Some(step_samples))
+            .unwrap();
 
         assert_eq!(results.len(), 1);
         assert_all_scores_in_range(&results);
@@ -374,9 +381,25 @@ mod tests {
         let window_samples = sample_rate as usize * FileAnalyzer::ANALYSIS_WINDOW_SECONDS;
         let audio = vec![0.0f32; window_samples];
 
-        let results = analyzer.analyze(&audio, sample_rate, step_samples).unwrap();
+        let results = analyzer
+            .analyze(&audio, sample_rate, Some(step_samples))
+            .unwrap();
 
         assert_eq!(results.len(), 1);
+        assert_all_scores_in_range(&results);
+    }
+
+    #[test]
+    fn analyze_defaults_step_to_analysis_window_size() {
+        let (model, license_key) = load_test_model().unwrap();
+        let mut analyzer = FileAnalyzer::new(&model, &license_key).unwrap();
+        let sample_rate = model.optimal_sample_rate();
+        let window_samples = sample_rate as usize * FileAnalyzer::ANALYSIS_WINDOW_SECONDS;
+        let audio = vec![0.0f32; window_samples * 2];
+
+        let results = analyzer.analyze(&audio, sample_rate, None).unwrap();
+
+        assert_eq!(results.len(), 2);
         assert_all_scores_in_range(&results);
     }
 
@@ -389,7 +412,9 @@ mod tests {
         let window_samples = sample_rate as usize * FileAnalyzer::ANALYSIS_WINDOW_SECONDS;
         let audio = vec![0.0f32; window_samples + 2 * step_samples];
 
-        let results = analyzer.analyze(&audio, sample_rate, step_samples).unwrap();
+        let results = analyzer
+            .analyze(&audio, sample_rate, Some(step_samples))
+            .unwrap();
 
         assert_eq!(results.len(), 3);
         assert_all_scores_in_range(&results);
@@ -404,7 +429,9 @@ mod tests {
         let window_samples = sample_rate as usize * FileAnalyzer::ANALYSIS_WINDOW_SECONDS;
         let audio = vec![0.0f32; window_samples + step_samples - 1];
 
-        let results = analyzer.analyze(&audio, sample_rate, step_samples).unwrap();
+        let results = analyzer
+            .analyze(&audio, sample_rate, Some(step_samples))
+            .unwrap();
 
         assert_eq!(results.len(), 1);
         assert_all_scores_in_range(&results);
