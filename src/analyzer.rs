@@ -442,7 +442,7 @@ pub struct Analyzer<'a> {
 }
 
 impl<'a> Analyzer<'a> {
-    pub(crate) fn new(analyzer_ptr: *mut AicAnalyzer, _model: &Model<'a>) -> Self {
+    fn new(analyzer_ptr: *mut AicAnalyzer, _model: &Model<'a>) -> Self {
         Self {
             inner: analyzer_ptr,
             marker: PhantomData,
