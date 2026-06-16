@@ -6,6 +6,7 @@ edition = "2024"
 homepage = "https://ai-coustics.com/sdk/"
 license = "Apache-2.0"
 repository = "https://github.com/ai-coustics/aic-sdk-rs"
+rust-version = "1.91"
 version = "0.20.0"
 
 [workspace.dependencies]
@@ -33,6 +34,7 @@ license.workspace = true
 name = "aic-sdk"
 readme = "README.md"
 repository.workspace = true
+rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
