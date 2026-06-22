@@ -325,11 +325,12 @@ uint32_t aic_get_compatible_model_version(void);
  *
  * A single model instance can be used to create multiple processors.
  *
- * # Note
- * Processor instances retain a shared reference to the model data.
- * It is safe to destroy the model handle after creating the desired processors.
- * The memory used by the model will be automatically freed after all processors
- * using that model have been destroyed.
+ * # Lifetime and ownership
+ * Each processor or analyzer created with a given model handle keeps the underlying model alive
+ * through internal reference counting. When the reference count reaches zero the model is destroyed.
+ * You may therefore destroy the model handle before those objects, in any order.
+ * The model data is memory-mapped from the file, not copied into the process. It is the caller's
+ * responsibility to make sure the file is not modified while the model exists.
  *
  * # Parameters
  * - `model`: Receives the handle to the newly created model. Must not be NULL.
@@ -346,6 +347,9 @@ uint32_t aic_get_compatible_model_version(void);
  *
  * # Safety
  * - This function is not thread-safe. Ensure no other threads are using the model handle or the same file path.
+ * - The file at `file_path` must not be modified or deleted while the model, or any
+ *   object created from it, is alive. Accessing the model or a derived object after the
+ *   file is removed or changed is undefined behavior.
  */
 enum AicErrorCode aic_model_create_from_file(struct AicModel **model,
                                              const char *file_path);
@@ -353,13 +357,12 @@ enum AicErrorCode aic_model_create_from_file(struct AicModel **model,
 /**
  * Creates a new model instance from a memory buffer.
  *
- * The buffer must remain valid and unchanged for the lifetime of the model.
- *
- * # Note
- * Processor instances retain a shared reference to the model data.
- * It is safe to destroy the model handle after creating the desired processors.
- * The memory used by the model will be automatically freed after all processors
- * using that model have been destroyed.
+ * # Lifetime and ownership
+ * Each processor or analyzer created with a given model handle keeps the underlying model alive
+ * through internal reference counting. When the reference count reaches zero the model is destroyed.
+ * You may therefore destroy the model handle before those objects, in any order.
+ * The model data is only referenced, not copied. It is the caller's responsibility to make sure the buffer
+ * is not modified while the model exists. Destroying the model does not free the memory `buffer` points to.
  *
  * # Parameters
  * - `model`: Receives the handle to the newly created model. Must not be NULL.
@@ -375,6 +378,8 @@ enum AicErrorCode aic_model_create_from_file(struct AicModel **model,
  *
  * # Safety
  * - This function is not thread-safe. Ensure no other threads are using the model handle.
+ * - The memory `buffer` points to must not be modified until the model handle and every object
+ *   derived from it have all been destroyed.
  */
 enum AicErrorCode aic_model_create_from_buffer(struct AicModel **model,
                                                const uint8_t *buffer,
@@ -386,13 +391,16 @@ enum AicErrorCode aic_model_create_from_buffer(struct AicModel **model,
  * After calling this function, the model handle becomes invalid.
  * This function is safe to call with NULL.
  *
- * # Note
- * Processor instances retain a shared reference to the model data.
- * It is safe to destroy the model handle after creating the desired processors.
+ * # Lifetime and ownership
+ * Each processor or analyzer created with a given model handle keeps the underlying model alive
+ * through internal reference counting. When the reference count reaches zero the model is destroyed.
+ * You may therefore destroy the model handle before those objects, in any order.
  *
- * The memory used by the model will be automatically freed after all processors
- * using that model have been destroyed. If all processors using this model handle
- * have already been destroyed, calling this function frees the memory used by the model.
+ * The model data is only referenced, not copied. Destroying the `model` handle does not free its
+ * backing data.
+ *
+ * If any objects derived from the model still exist after this call, the backing data of the model
+ * being destroyed must remain valid until all the objects are destroyed too.
  *
  * # Parameters
  * - `model`: Model instance to destroy. Can be NULL.
@@ -401,6 +409,7 @@ enum AicErrorCode aic_model_create_from_buffer(struct AicModel **model,
  * - This function is not thread-safe. Ensure no other threads are using the model handle.
  * - The `model` pointer must have been created by
  *   `aic_model_create_from_file` or `aic_model_create_from_buffer` when non-NULL.
+ * - The `model` pointer must not be used to create further objects after this call.
  */
 void aic_model_destroy(struct AicModel *model);
 
@@ -528,6 +537,7 @@ enum AicErrorCode aic_model_get_optimal_num_frames(const struct AicModel *model,
  *
  * # Safety
  * - This function is not thread-safe. Ensure no other threads are using the processor handle.
+ * - The `model`'s backing buffer/file must outlive the `processor` object.
  */
 enum AicErrorCode aic_processor_create(struct AicProcessor **processor,
                                        const struct AicModel *model,
@@ -539,6 +549,11 @@ enum AicErrorCode aic_processor_create(struct AicProcessor **processor,
  *
  * After calling this function, the processor handle becomes invalid.
  * This function is safe to call with NULL.
+ *
+ * # Lifetime and ownership
+ * The `processor` holds a shared reference to the model data, so it can be destroyed
+ * independently of the model handle, in any order.
+ * Destroying it releases that reference.
  *
  * # Parameters
  * - `processor`: Processor instance to destroy. Can be NULL.
@@ -944,14 +959,13 @@ void aic_vad_context_destroy(struct AicVadContext *context);
 /**
  * Returns the VAD's prediction.
  *
- * **Important:**
- * - The latency of the VAD prediction is equal to
- *   the backing processor's processing latency, reported by
- *   `aic_processor_context_get_output_delay`. The prediction lags its input by that
- *   many samples even for a dedicated VAD model whose audio buffer passes through
- *   untouched. Align speech decisions to the input timeline using that delay.
- * - If the backing processor stops being processed,
- *   the VAD will not update its speech detection prediction.
+ * # Latency
+ * The latency of the VAD prediction is equal to the backing processor's processing latency,
+ * reported by `aic_processor_context_get_output_delay`. The prediction lags its input by
+ * that many samples, even for a dedicated VAD model whose audio buffer passes through untouched.
+ * Align speech decisions to the input timeline using that delay.
+ *
+ * If the backing processor stops being processed, the VAD will not update its prediction.
  *
  * # Parameters
  * - `context`: VAD context instance. Must not be NULL.
@@ -967,6 +981,44 @@ void aic_vad_context_destroy(struct AicVadContext *context);
  */
 enum AicErrorCode aic_vad_context_is_speech_detected(const struct AicVadContext *context,
                                                      bool *value);
+
+/**
+ * Returns the raw prediction of the VAD, without any processing.
+ *
+ * In contrast to the output of `aic_vad_context_is_speech_detected`,
+ * the output of this function is the model's direct prediction without
+ * going through the SDK's VAD post-processing (i.e. speech hold duration,
+ * sensitivity thresholding, etc.).
+ *
+ * This value may be used to build other abstractions on top of this data.
+ *
+ * # Note
+ * This value is only useful when using a VAD model. When using an energy-based VAD,
+ * the raw prediction is set to 1.0 or 0.0 depending on whether `is_speech_detected`
+ * is true or false.
+ *
+ * # Latency
+ * The latency of the VAD prediction is equal to the backing processor's processing latency,
+ * reported by `aic_processor_context_get_output_delay`. The prediction lags its input by
+ * that many samples, even for a dedicated VAD model whose audio buffer passes through untouched.
+ * Align speech decisions to the input timeline using that delay.
+ *
+ * If the backing processor stops being processed, the VAD will not update its prediction.
+ *
+ * # Parameters
+ * - `context`: VAD context instance. Must not be NULL.
+ * - `value`: Receives the VAD prediction. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Prediction retrieved successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` or `value` is NULL
+ *
+ * # Safety
+ * - Real-time safe: Can be called from audio processing threads.
+ * - Thread-safe: Can be called from any thread.
+ */
+enum AicErrorCode aic_vad_context_get_raw_vad_probability(const struct AicVadContext *context,
+                                                          float *value);
 
 /**
  * Modifies a VAD parameter.
@@ -1027,12 +1079,11 @@ enum AicErrorCode aic_vad_context_get_parameter(const struct AicVadContext *cont
  * The collector retains a span of audio determined by the analysis model. As more samples
  * get collected, old audio is discarded.
  *
- * # Notes
- * The collector/analyzer pointers must not be aliased. Most APIs require exclusive access to
- * the underlying object.
- *
- * The collector and analyzer are independent from each other and can be destroyed independently,
- * in any order.
+ * # Lifetime and ownership
+ * The analyzer shares ownership of the model data through internal reference
+ * counting, so `model` need not outlive it: you may destroy the model handle (via
+ * `aic_model_destroy`) before the analyzer, in any order.
+ * The collector holds no reference to `model` at all.
  *
  * # Parameters
  * - `collector`: Out-pointer that receives the created collector handle. Must not be NULL.
@@ -1049,6 +1100,9 @@ enum AicErrorCode aic_vad_context_get_parameter(const struct AicVadContext *cont
  * # Safety
  * - This function allocates memory. Avoid calling it from real-time audio threads.
  * - This function is not thread-safe. Ensure no other threads are using the output pointers.
+ * - The `model`'s backing buffer/file must outlive the `collector`/`analyzer` objects.
+ * - The `collector` pointer must not be aliased.
+ * - The `analyzer` pointer must not be aliased.
  */
 enum AicErrorCode aic_analyzer_pair_create(struct AicCollector **collector,
                                            struct AicAnalyzer **analyzer,
@@ -1076,7 +1130,7 @@ enum AicErrorCode aic_analyzer_pair_create(struct AicCollector **collector,
  *
  * # Note
  * All channels are mixed to mono for buffering. To analyze channels
- * independently, create separate analyzer pairs.
+ * independently, create separate collector/analyzer pairs.
  *
  * # Safety
  * - This function allocates memory. Avoid calling it from real-time audio threads.
@@ -1110,7 +1164,7 @@ enum AicErrorCode aic_collector_initialize(struct AicCollector *collector,
  * Input audio is read-only and is not modified.
  *
  * All channels are mixed and buffered in mono. To analyze channels
- * independently, create separate analyzer pairs.
+ * independently, create separate collector/analyzer pairs.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Audio buffered successfully
@@ -1146,7 +1200,7 @@ enum AicErrorCode aic_collector_buffer_planar(struct AicCollector *collector,
  * Input audio is read-only and is not modified.
  *
  * All channels are mixed and buffered in mono. To analyze channels
- * independently, create separate analyzer pairs.
+ * independently, create separate collector/analyzer pairs.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Audio buffered successfully
@@ -1182,7 +1236,7 @@ enum AicErrorCode aic_collector_buffer_interleaved(struct AicCollector *collecto
  * Input audio is read-only and is not modified.
  *
  * All channels are mixed and buffered in mono. To analyze channels
- * independently, create separate analyzer pairs.
+ * independently, create separate collector/analyzer pairs.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Audio buffered successfully
@@ -1233,7 +1287,7 @@ enum AicErrorCode aic_analyzer_reset(const struct AicAnalyzer *analyzer);
  *
  * # Note
  * When buffering, all channels are mixed down to mono. To analyze channels
- * independently, create separate analyzer pairs.
+ * independently, create separate collector/analyzer pairs.
  *
  * # Parameters
  * - `analyzer`: Analyzer instance. Must not be NULL.
@@ -1300,6 +1354,10 @@ enum AicErrorCode aic_analyzer_update_bearer_token(const struct AicAnalyzer *ana
  * After calling this function, the collector handle becomes invalid.
  * This function is safe to call with NULL.
  *
+ * # Lifetime and ownership
+ * The collector holds no reference to its model, so it can be destroyed
+ * independently of the model and its paired analyzer, in any order.
+ *
  * # Parameters
  * - `collector`: Collector instance to destroy. Can be NULL.
  *
@@ -1314,6 +1372,11 @@ void aic_collector_destroy(struct AicCollector *collector);
  *
  * After calling this function, the analyzer handle becomes invalid.
  * This function is safe to call with NULL.
+ *
+ * # Lifetime and ownership
+ * The `analyzer` holds a shared reference to the model data, so it can be destroyed
+ * independently of the model handle and its paired collector, in any order.
+ * Destroying it releases that reference.
  *
  * # Parameters
  * - `analyzer`: Analyzer instance to destroy. Can be NULL.
