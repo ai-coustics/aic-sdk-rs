@@ -113,15 +113,16 @@ impl VadContext {
 
     /// Returns the VAD's prediction.
     ///
-    /// **Important:**
-    /// - The latency of the VAD prediction is equal to
-    ///   the backing processor's processing latency, reported by
-    ///   [`ProcessorContext::output_delay`](crate::ProcessorContext::output_delay).
-    ///   The prediction lags its input by that many samples even for a dedicated VAD model
-    ///   whose audio buffer passes through untouched. Align speech decisions to the input timeline
-    ///   using that delay.
-    /// - If the backing processor stops being processed,
-    ///   the VAD will not update its speech detection prediction.
+    /// # Latency
+    ///
+    /// The latency of the VAD prediction is equal to the backing processor's processing latency,
+    /// reported by [`ProcessorContext::output_delay`](crate::ProcessorContext::output_delay).
+    /// The prediction lags its input by that many samples, even for a dedicated VAD model
+    /// whose audio buffer passes through untouched.
+    ///
+    /// Align speech decisions to the input timeline using that delay.
+    ///
+    /// If the backing processor stops being processed, the VAD will not update its prediction.
     pub fn is_speech_detected(&self) -> bool {
         let mut value: bool = false;
         // SAFETY:
@@ -130,6 +131,45 @@ impl VadContext {
         // - This function can be called from any thread, so we only borrow `&self`.
         let error_code =
             unsafe { aic_vad_context_is_speech_detected(self.as_const_ptr(), &mut value) };
+
+        // This should never fail
+        assert!(handle_error(error_code).is_ok());
+        value
+    }
+
+    /// Returns the raw prediction of the VAD, without any processing.
+    ///
+    /// In contrast to the output of [`VadContext::is_speech_detected`],
+    /// the output of this function is the model's direct prediction without
+    /// going through the SDK's VAD post-processing (i.e. speech hold duration,
+    /// sensitivity thresholding, etc.).
+    ///
+    /// This value may be used to build other abstractions on top of this data.
+    ///
+    /// # Note
+    ///
+    /// This value is only useful when using a VAD model. When using an energy-based VAD,
+    /// the raw prediction is set to 1.0 or 0.0 depending on whether [`VadContext::is_speech_detected`]
+    /// is true or false.
+    ///
+    /// # Latency
+    ///
+    /// The latency of the VAD prediction is equal to the backing processor's processing latency,
+    /// reported by [`ProcessorContext::output_delay`](crate::ProcessorContext::output_delay).
+    /// The prediction lags its input by that many samples, even for a dedicated VAD model
+    /// whose audio buffer passes through untouched.
+    ///
+    /// Align speech decisions to the input timeline using that delay.
+    ///
+    /// If the backing processor stops being processed, the VAD will not update its prediction.
+    pub fn raw_vad_probability(&self) -> f32 {
+        let mut value: f32 = 0.0;
+        // SAFETY:
+        // - `self.as_const_ptr()` is a valid pointer to a live VAD context.
+        // - `value` points to stack storage for output.
+        // - This function can be called from any thread, so we only borrow `&self`.
+        let error_code =
+            unsafe { aic_vad_context_get_raw_vad_probability(self.as_const_ptr(), &mut value) };
 
         // This should never fail
         assert!(handle_error(error_code).is_ok());
