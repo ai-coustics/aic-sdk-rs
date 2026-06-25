@@ -336,3 +336,13 @@ cargo run --example basic_usage --features download-lib,download-model
 ## License
 
 This Rust wrapper is distributed under the Apache 2.0 license. The core C SDK is distributed under the proprietary AIC-SDK license.
+
+### Third-party notices
+
+[`NOTICE.txt`](NOTICE.txt) lists the third-party software distributed with the SDK, in two parts: the open-source code statically linked into the native `libaic` library, and the third-party Rust crates the bindings depend on. It is generated, not edited by hand. Regenerate with:
+
+```bash
+./scripts/generate-notice.sh   # requires: cargo install cargo-about
+```
+
+The `libaic` part is mirrored from the SDK release into [`aic-sdk-sys/NOTICE.libaic.txt`](aic-sdk-sys/NOTICE.libaic.txt) and kept in sync by CI; update it from a release's `NOTICE.txt` whenever you bump `aic-sdk-sys/checksum.txt`.

@@ -1,5 +1,9 @@
 [workspace]
-members = ["aic-model-downloader", "aic-sdk-sys", "examples/build-time-download"]
+members = [
+  "aic-model-downloader",
+  "aic-sdk-sys",
+  "examples/build-time-download",
+]
 
 [workspace.package]
 edition = "2024"
@@ -12,7 +16,9 @@ version = "0.21.0"
 aic-model-downloader = { version = "0.21.0", path = "aic-model-downloader" }
 aic-sdk-sys = { version = "0.21.0", path = "aic-sdk-sys" }
 async-lock = "3"
-futures-channel = { version = "0.3", default-features = false, features = ["std"] }
+futures-channel = { version = "0.3", default-features = false, features = [
+  "std",
+] }
 rayon = "1"
 serde = { version = "1.0" }
 serde_json = { version = "1.0" }
@@ -48,7 +54,12 @@ approx = "0.5"
 audio-file = "0.4.1"
 futures = "0.3"
 serde_json = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
+tokio = { workspace = true, features = [
+  "macros",
+  "rt-multi-thread",
+  "sync",
+  "time",
+] }
 
 [features]
 async = ["dep:async-lock", "dep:futures-channel", "dep:rayon"]

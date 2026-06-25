@@ -1,0 +1,112 @@
+name: Check Notice Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - aic-sdk-sys/checksum.txt
+      - aic-sdk-sys/NOTICE.libaic.txt
+      - NOTICE.txt
+      - about.toml
+      - about.hbs
+      - scripts/generate-notice.sh
+      - "**/Cargo.toml"
+      - Cargo.lock
+  pull_request:
+    paths:
+      - aic-sdk-sys/checksum.txt
+      - aic-sdk-sys/NOTICE.libaic.txt
+      - NOTICE.txt
+      - about.toml
+      - about.hbs
+      - scripts/generate-notice.sh
+      - "**/Cargo.toml"
+      - Cargo.lock
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  sync-libaic:
+    name: NOTICE.libaic.txt matches SDK release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse SDK version from checksum.txt
+        id: sdk
+        run: |
+          VERSION=$(grep 'x86_64-unknown-linux-gnu' aic-sdk-sys/checksum.txt \
+            | grep -oP '\d+\.\d+\.\d+')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "SDK version: $VERSION"
+
+      - name: Download SDK archive
+        run: |
+          VERSION=${{ steps.sdk.outputs.version }}
+          URL="https://github.com/ai-coustics/aic-sdk-c/releases/download/${VERSION}/aic-sdk-x86_64-unknown-linux-gnu-${VERSION}.tar.gz"
+          echo "Downloading $URL"
+          curl -fsSL "$URL" -o sdk.tar.gz
+
+      - name: Verify checksum
+        run: |
+          EXPECTED=$(grep 'x86_64-unknown-linux-gnu' aic-sdk-sys/checksum.txt | awk '{print $1}')
+          ACTUAL=$(sha256sum sdk.tar.gz | awk '{print $1}')
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::SHA256 mismatch: expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
+          echo "Checksum OK: $ACTUAL"
+
+      - name: Extract NOTICE.txt from archive
+        id: extract
+        run: |
+          mkdir extracted
+          if tar -xzf sdk.tar.gz -C extracted ./NOTICE.txt 2>/dev/null; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compare NOTICE.txt
+        run: |
+          VERSION=${{ steps.sdk.outputs.version }}
+          # TRANSITION: releases before NOTICE.txt was bundled do not contain the
+          # file, so we warn and pass instead of failing. Once checksum.txt pins a
+          # release that ships NOTICE.txt, delete this whole `if` block so that a
+          # missing file becomes a hard error and the strict diff below always runs.
+          if [ "${{ steps.extract.outputs.present }}" != "true" ]; then
+            echo "::warning::SDK release ${VERSION} predates NOTICE.txt bundling; skipping the notice diff. Bump checksum.txt to a release that includes NOTICE.txt to enable this check."
+            exit 0
+          fi
+          if diff -u aic-sdk-sys/NOTICE.libaic.txt extracted/NOTICE.txt; then
+            echo "NOTICE.libaic.txt is in sync with SDK ${VERSION}"
+          else
+            echo "::error::aic-sdk-sys/NOTICE.libaic.txt differs from SDK release ${VERSION}. Update the mirror to match (copy the release's NOTICE.txt), then regenerate the top-level NOTICE.txt with scripts/generate-notice.sh."
+            exit 1
+          fi
+
+  freshness:
+    name: NOTICE.txt is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pin cargo-about so its output format matches what the file was generated
+      # with; a version bump that changes formatting would otherwise look like
+      # spurious drift.
+      - name: Install cargo-about
+        run: cargo install cargo-about --version 0.9.0 --locked
+
+      - name: Regenerate NOTICE.txt
+        run: ./scripts/generate-notice.sh
+
+      - name: Check for drift
+        run: |
+          if ! git diff --exit-code NOTICE.txt; then
+            echo "::error::NOTICE.txt is out of date. Run scripts/generate-notice.sh and commit the result."
+            exit 1
+          fi
+          echo "NOTICE.txt is up to date"
