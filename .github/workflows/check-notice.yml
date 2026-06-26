@@ -97,8 +97,9 @@ jobs:
       # Pin cargo-about so its output format matches what the file was generated
       # with; a version bump that changes formatting would otherwise look like
       # spurious drift.
-      - name: Install cargo-about
-        run: cargo install cargo-about --version 0.9.0 --locked
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.0
 
       - name: Regenerate NOTICE.txt
         run: ./scripts/generate-notice.sh
