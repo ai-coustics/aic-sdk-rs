@@ -1,3 +1,9 @@
+# about.toml is hand-maintained and excluded from formatting: its `accepted`
+# array is ordered by license preference (cargo-about picks the first match for
+# an `OR` expression), and taplo can only toggle array reordering globally, not
+# per key.
+exclude = ["about.toml"]
+
 [formatting]
 column_width = 100
 reorder_arrays = true

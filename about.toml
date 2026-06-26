@@ -1,0 +1,32 @@
+# Configuration for `cargo about generate`, which produces the third-party
+# notice for THIS crate's own Rust dependencies (the bindings layer).
+# Regenerate with scripts/generate-notice.sh.
+#
+# Dev- and build-only dependencies are excluded: the bindgen/syn/quote build
+# toolchain and the test harness are not shipped in a downstream binary, so
+# they are not third-party code distributed to users.
+ignore-dev-dependencies = true
+ignore-build-dependencies = true
+
+# No `targets` list: when it is omitted, cargo-about gathers license info for
+# every target, so the notice is the union of the third-party code reachable on
+# any platform the bindings can be built for. This avoids maintaining a target
+# list in lockstep with the SDK release matrix, at the cost of slight
+# over-attribution (a few crates for targets we do not ship, e.g. 32-bit
+# Windows), which is harmless for an attribution notice.
+
+# Permissive licenses we accept, in preference order. For crates offering a
+# choice (e.g. "Apache-2.0 OR MIT"), cargo-about picks the first match here.
+accepted = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "ISC",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "Unicode-3.0",
+  "Zlib",
+  "BSL-1.0",
+  "CDLA-Permissive-2.0",
+  "Unlicense",
+]
