@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.21.1 - 2026-06-26
+
+### New Features
+
+Support for offline entitlements in JWT licenses.
+
+
 ## 0.21.0 - 2026-06-22
 
 ### New Features
