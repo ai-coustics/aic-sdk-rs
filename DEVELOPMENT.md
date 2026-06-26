@@ -2,20 +2,18 @@
 
 Before creating a release, check that everything can be published to crates.io.
 
-1. If the C SDK changed:
-  - Update the [checksums.txt](aic-sdk-sys/checksums.txt) with the one distributed in the C SDK
-  - Update the [aic.h](aic-sdk-sys/include/aic.h) header file with the one distributed in the C SDK
+1. The C SDK version is locked to the crate version (the build fails if they differ), so for every release update both files with the ones distributed in the C SDK:
+  - [checksum.txt](aic-sdk-sys/checksum.txt)
+  - [aic.h](aic-sdk-sys/include/aic.h)
 
-2. If there were changes in `aic-sdk-sys`:
-  - Increase version number in [aic-sdk-sys/Cargo.toml](aic-sdk-sys/Cargo.toml)
-  - Set `aic-sdk-sys` dependency version number in top-level [Cargo.toml](Cargo.toml) to the newest version
+2. Bump the version in the top-level [Cargo.toml](Cargo.toml):
+  - `version` under `[workspace.package]` (inherited by all member crates)
+  - the `aic-sdk-sys` and `aic-model-downloader` version requirements under `[workspace.dependencies]`, to the same number
 
-3. Update the version number of the workspace in the top level [Cargo.toml](Cargo.toml)
+3. Check that the unsupported Rust version in the [README.md](README.md) warning matches the one in `build-info.txt` (shipped with the C SDK artifacts)
 
-4. Check that the right unsupported Rust version number is reflected in the [README.md](README.md) warning
+4. Update [changelog](CHANGELOG.md)
 
-5. Update [changelog](CHANGELOG.md)
+5. Run `cargo check --features download-lib` (to update `Cargo.lock`, if necessary)
 
-6. Run `cargo build` (to update `Cargo.lock`, if necessary)
-
-7. Create a new release on the GitHub main branch with a tag that has the same version number as the main crate
+6. Create a new release on the GitHub main branch with a tag that matches the version number
