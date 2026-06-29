@@ -126,6 +126,18 @@ fn download_lib() -> PathBuf {
     downloader.download()
 }
 
+/// Maps a Cargo target triple to the triple clang should use when parsing the C header.
+///
+/// Returns `Some` only for the Rust-only `*-pc-windows-gnullvm` targets, which clang rejects
+/// (it parses the `gnullvm` environment as an invalid OS version). Their ABI-compatible clang
+/// triple is `*-pc-windows-gnu`. All other targets are valid clang triples, so this returns
+/// `None` and bindgen keeps using the `TARGET` value unchanged.
+fn clang_target_for(target: &str) -> Option<String> {
+    target
+        .strip_suffix("-pc-windows-gnullvm")
+        .map(|arch| format!("{arch}-pc-windows-gnu"))
+}
+
 fn generate_bindings() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let header_path = manifest_dir.join("include").join("aic.h");
@@ -142,6 +154,16 @@ fn generate_bindings() {
         .constified_enum_module("AicErrorCode")
         .constified_enum_module("AicProcessorParameter")
         .constified_enum_module("AicVadParameter");
+
+    // bindgen feeds the Cargo `TARGET` triple to libclang, but clang does not understand the
+    // Rust-only `gnullvm` environment: it reads `windows-gnullvm` as the `windows-gnu` triple
+    // with an invalid OS version (`llvm`) and aborts before it can parse the header. Map such
+    // triples to their clang equivalent (`*-pc-windows-gnu`, ABI-compatible) and pass it
+    // explicitly. bindgen detects the user-provided `--target=` and does not add its own.
+    let target = env::var("TARGET").unwrap_or_default();
+    if let Some(clang_target) = clang_target_for(&target) {
+        builder = builder.clang_arg(format!("--target={clang_target}"));
+    }
 
     if env::var("CARGO_FEATURE_RUNTIME_LINKING").is_ok() {
         let runtime_bindings = builder
