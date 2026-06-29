@@ -93,26 +93,36 @@ fn main() {
 }
 
 fn add_platform_specific_libs() {
-    if cfg!(target_os = "macos") {
-        // macOS requires CoreFoundation framework for time zone operations
-        // This is needed by chrono and other crates that interact with system time
-        println!("cargo:rustc-link-lib=framework=CoreFoundation");
+    // Select libraries by the *target* OS via `CARGO_CFG_TARGET_OS`, not `cfg!(target_os = ...)`.
+    // A build script is compiled for the host, so `cfg!` reports the host platform and would link
+    // the wrong system libraries when cross-compiling (e.g. host Linux -> target windows-gnullvm
+    // would pull in `dl`/`rt` and miss the Windows libs). For a native build the two agree.
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    match target_os.as_str() {
+        "macos" => {
+            // macOS requires CoreFoundation framework for time zone operations
+            // This is needed by chrono and other crates that interact with system time
+            println!("cargo:rustc-link-lib=framework=CoreFoundation");
 
-        // Security framework might also be needed for some operations
-        println!("cargo:rustc-link-lib=framework=Security");
-    } else if cfg!(target_os = "windows") {
-        // Windows system libraries that might be needed
-        println!("cargo:rustc-link-lib=advapi32");
-        println!("cargo:rustc-link-lib=bcrypt");
-        println!("cargo:rustc-link-lib=kernel32");
-        println!("cargo:rustc-link-lib=ws2_32");
-        println!("cargo:rustc-link-lib=oleaut32");
-        println!("cargo:rustc-link-lib=crypt32");
-    } else if cfg!(target_os = "linux") {
-        // Linux system libraries
-        println!("cargo:rustc-link-lib=pthread");
-        println!("cargo:rustc-link-lib=dl");
-        println!("cargo:rustc-link-lib=rt");
+            // Security framework might also be needed for some operations
+            println!("cargo:rustc-link-lib=framework=Security");
+        }
+        "windows" => {
+            // Windows system libraries that might be needed
+            println!("cargo:rustc-link-lib=advapi32");
+            println!("cargo:rustc-link-lib=bcrypt");
+            println!("cargo:rustc-link-lib=kernel32");
+            println!("cargo:rustc-link-lib=ws2_32");
+            println!("cargo:rustc-link-lib=oleaut32");
+            println!("cargo:rustc-link-lib=crypt32");
+        }
+        "linux" => {
+            // Linux system libraries
+            println!("cargo:rustc-link-lib=pthread");
+            println!("cargo:rustc-link-lib=dl");
+            println!("cargo:rustc-link-lib=rt");
+        }
+        _ => {}
     }
 }
 
