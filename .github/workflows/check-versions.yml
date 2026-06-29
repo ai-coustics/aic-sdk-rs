@@ -1,0 +1,52 @@
+name: Check Internal Versions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/Cargo.toml"
+  pull_request:
+    paths:
+      - "**/Cargo.toml"
+  merge_group:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  internal-versions:
+    name: Internal dep versions match workspace version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.91.0
+
+      # The path-deps in [workspace.dependencies] each carry an explicit version requirement
+      # (publishing requires it), which must be bumped in lockstep with [workspace.package].version.
+      # Cargo.toml has no interpolation to enforce this, so guard it here. cargo metadata reports
+      # the requirement as "^0.21.1" and the package version as "0.21.1", so the compare is exact.
+      - name: Check version sync
+        run: |
+          set -euo pipefail
+          meta=$(cargo metadata --format-version 1 --no-deps)
+          ws=$(jq -r '.packages[] | select(.name=="aic-sdk") | .version' <<<"$meta")
+          echo "Workspace version: $ws"
+          fail=0
+          for crate in aic-sdk-sys aic-model-downloader; do
+            req=$(jq -r --arg c "$crate" \
+              '.packages[].dependencies[] | select(.name==$c and .path!=null) | .req' \
+              <<<"$meta" | sort -u)
+            if [ "$req" != "^$ws" ]; then
+              echo "::error::[workspace.dependencies] $crate is \"$req\" but the workspace version is \"$ws\". Bump it in Cargo.toml to match."
+              fail=1
+            fi
+          done
+          if [ "$fail" -eq 0 ]; then
+            echo "Internal dependency versions are in sync"
+          fi
+          exit $fail

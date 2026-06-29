@@ -9,8 +9,8 @@ repository = "https://github.com/ai-coustics/aic-sdk-rs"
 version = "0.21.1"
 
 [workspace.dependencies]
-aic-model-downloader = { version = "0.21.0", path = "aic-model-downloader" }
-aic-sdk-sys = { version = "0.21.0", path = "aic-sdk-sys" }
+aic-model-downloader = { version = "0.21.1", path = "aic-model-downloader" }
+aic-sdk-sys = { version = "0.21.1", path = "aic-sdk-sys" }
 async-lock = "3"
 futures-channel = { version = "0.3", default-features = false, features = ["std"] }
 rayon = "1"
