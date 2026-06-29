@@ -213,6 +213,13 @@ jobs:
           # The Windows loader searches PATH for aic.dll at run time.
           echo "$run_dir" >> "$GITHUB_PATH"
 
+      # Default static linking: build.rs emits `static=aic` (resolving `libaic.a` in the lib dir)
+      # plus the Windows system libs the static archive depends on.
+      - name: Compile-time static linking
+        env:
+          AIC_LIB_PATH: ${{ steps.sdk.outputs.lib_dir }}
+        run: cargo run --target "$TARGET" --example basic_usage --features "download-model"
+
       - name: Compile-time dynamic linking
         env:
           AIC_LIB_PATH: ${{ steps.sdk.outputs.lib_dir }}
