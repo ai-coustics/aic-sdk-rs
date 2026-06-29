@@ -55,7 +55,10 @@ impl Downloader {
 
         let extracted_path = self.output_path.join(&file_prefix);
 
-        if os == "windows" {
+        // Decide the archive format from the artifact name rather than the OS: Windows has two
+        // flavours (MSVC ships `.zip`, GNU/LLVM `gnullvm` ships `.tar.gz`), so `os == "windows"`
+        // alone is no longer enough.
+        if file_name.ends_with(".zip") {
             extract_zip(&downloaded_file, &extracted_path);
         } else {
             extract_tgz(&downloaded_file, &extracted_path);
@@ -153,7 +156,14 @@ fn extract_version_from_filename(filename: &str) -> Option<String> {
 }
 
 fn artifact_file_name(target: &str, os: &str, version: &str) -> String {
-    let ext = if os == "windows" { "zip" } else { "tar.gz" };
+    // Windows MSVC artifacts are distributed as `.zip`. Every other platform uses `.tar.gz`,
+    // including the Windows GNU/LLVM (`*-pc-windows-gnullvm`) target, which ships GNU-style
+    // files (`libaic.a`, `libaic.dll.a`, `aic.dll`) in a tarball like the Unix platforms.
+    let ext = if os == "windows" && target.ends_with("msvc") {
+        "zip"
+    } else {
+        "tar.gz"
+    };
     format!("aic-sdk-{target}-{version}.{ext}")
 }
 
@@ -250,6 +260,12 @@ mod tests {
         ("x86_64-pc-windows-msvc", "windows"),
     ];
 
+    // Targets whose upstream aic-sdk-c artifact has not been published yet. They are kept
+    // separate from `TARGETS` so the checksum-presence test (`artifact_file_name_all_targets`)
+    // does not require a `checksum.txt` entry that does not exist yet. Once a target's artifact
+    // and checksum are published upstream, move its entry into `TARGETS` above.
+    const PENDING_TARGETS: &[(&str, &str)] = &[("x86_64-pc-windows-gnullvm", "windows")];
+
     fn read_checksum_filenames() -> std::collections::HashSet<String> {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("checksum.txt");
         let content = std::fs::read_to_string(&path).expect("Failed to read checksum.txt");
@@ -291,15 +307,42 @@ mod tests {
     }
 
     #[test]
-    fn windows_targets_use_zip() {
-        for &(target, os) in TARGETS {
-            if os == "windows" {
-                let name = artifact_file_name(target, os, "0.0.0");
-                assert!(
-                    name.ends_with(".zip"),
-                    "expected .zip for target '{target}', got '{name}'",
-                );
+    fn windows_targets_use_expected_extension() {
+        // MSVC Windows targets ship `.zip`; GNU/LLVM (`gnullvm`) Windows targets ship `.tar.gz`.
+        // Cover both the published and the pending targets so this stays correct once a pending
+        // entry is promoted into `TARGETS`.
+        for &(target, os) in TARGETS.iter().chain(PENDING_TARGETS) {
+            if os != "windows" {
+                continue;
             }
+            let name = artifact_file_name(target, os, "0.0.0");
+            let expected = if target.ends_with("msvc") {
+                ".zip"
+            } else {
+                ".tar.gz"
+            };
+            assert!(
+                name.ends_with(expected),
+                "expected {expected} for target '{target}', got '{name}'",
+            );
+        }
+    }
+
+    #[test]
+    fn pending_targets_have_no_checksum_yet() {
+        // Forcing function: when an upstream artifact is finally published and its checksum is
+        // added to checksum.txt, this guard fails on purpose. That is the reminder to move the
+        // target out of PENDING_TARGETS and into TARGETS so it gets full coverage (including the
+        // checksum-presence check in `artifact_file_name_all_targets`).
+        const VERSION: &str = env!("CARGO_PKG_VERSION");
+        let checksums = read_checksum_filenames();
+
+        for &(target, os) in PENDING_TARGETS {
+            let name = artifact_file_name(target, os, VERSION);
+            assert!(
+                !checksums.contains(&name),
+                "checksum for '{name}' now exists; move {target} from PENDING_TARGETS into TARGETS",
+            );
         }
     }
 
@@ -310,6 +353,10 @@ mod tests {
 
         let name = artifact_file_name("x86_64-pc-windows-msvc", "windows", "1.2.3");
         assert_eq!(name, "aic-sdk-x86_64-pc-windows-msvc-1.2.3.zip");
+
+        // The GNU/LLVM Windows target shares the Windows OS but uses a `.tar.gz` like Unix.
+        let name = artifact_file_name("x86_64-pc-windows-gnullvm", "windows", "1.2.3");
+        assert_eq!(name, "aic-sdk-x86_64-pc-windows-gnullvm-1.2.3.tar.gz");
 
         let name = artifact_file_name("aarch64-apple-ios-macabi", "ios", "1.2.3");
         assert_eq!(name, "aic-sdk-aarch64-apple-ios-macabi-1.2.3.tar.gz");

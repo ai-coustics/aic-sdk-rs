@@ -72,6 +72,14 @@ fn main() {
         // verbatim so the linker binds against `aic.dll` instead.
         println!("cargo:rustc-link-lib=dylib:+verbatim=aic.dll.lib");
     } else {
+        // Every other target uses the standard `-laic` naming, so no verbatim trick is needed:
+        //   * static: `libaic.a` (Unix and the Windows `gnullvm` target).
+        //   * dynamic on Unix: `libaic.so` / `libaic.dylib`.
+        //   * dynamic on `gnullvm` (target_env == "gnu"): the MinGW/LLD driver searches the GNU
+        //     import library `libaic.dll.a` before the static `libaic.a`, so `dylib=aic` binds
+        //     against `aic.dll` correctly. This is the gnu equivalent of the MSVC case above,
+        //     which only needs special handling because its import library (`aic.dll.lib`) and
+        //     static archive (`aic.lib`) collide under the plain `dylib=aic` name.
         let link_kind = if dynamic_linking { "dylib" } else { "static" };
         println!("cargo:rustc-link-lib={link_kind}=aic");
     }

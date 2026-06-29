@@ -6,6 +6,14 @@ on:
   pull_request:
   merge_group:
   workflow_dispatch:
+    inputs:
+      run_gnullvm:
+        description: >-
+          Run the experimental x86_64-pc-windows-gnullvm linking job. Leave this OFF until the
+          aic-sdk-c gnullvm artifact and its checksum.txt entry are published; enabling it before
+          then will fail at the download/checksum step.
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -111,3 +119,106 @@ jobs:
           LD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
           DYLD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
         run: cargo run --example basic_usage --features "download-model runtime-linking"
+
+  # Experimental: dynamic + runtime linking against the Windows GNU/LLVM (`gnullvm`) artifact.
+  #
+  # This is a separate, gated job rather than a row in the matrix above because building a
+  # consumer for `x86_64-pc-windows-gnullvm` needs setup the native MSVC/macOS/Linux rows do not:
+  # the rustup target, an llvm-mingw toolchain (the gnullvm DLL runs natively on Windows, but
+  # compiling against it needs a MinGW/LLVM linker), a linker override, and an explicit
+  # `--target`.
+  #
+  # GATING: it only runs on a manual `workflow_dispatch` with `run_gnullvm=true`, so it never
+  # touches push / pull_request / merge_group CI. It is also `continue-on-error` so a manual run
+  # cannot fail the workflow while the upstream artifact is still missing.
+  #
+  # TO ENABLE PERMANENTLY once aic-sdk-c publishes the gnullvm artifact and its checksum.txt
+  # entry exists: change the `if:` below to `if: ${{ true }}` (or fold this into the matrix above
+  # with `ext: tar.gz` plus the extra setup steps).
+  linking-gnullvm:
+    name: Dynamic & runtime linking (x86_64-pc-windows-gnullvm)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_gnullvm }}
+    continue-on-error: true
+    runs-on: windows-latest
+    env:
+      TARGET: x86_64-pc-windows-gnullvm
+      # gnullvm ships GNU-style files in a `.tar.gz` like the non-MSVC platforms.
+      EXT: tar.gz
+      # Use the llvm-mingw clang driver (installed below, on PATH) as the linker for this target.
+      CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_LINKER: x86_64-w64-mingw32-clang
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.91.0
+        with:
+          targets: x86_64-pc-windows-gnullvm
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install llvm-mingw toolchain
+        run: |
+          set -eu
+          # Prebuilt UCRT/x86_64 toolchain that provides the gnullvm linker and import libs.
+          # Pin a known release; bump as needed.
+          LLVM_MINGW_VERSION=20250528
+          ZIP="llvm-mingw-${LLVM_MINGW_VERSION}-ucrt-x86_64.zip"
+          URL="https://github.com/mstorsjo/llvm-mingw/releases/download/${LLVM_MINGW_VERSION}/${ZIP}"
+          echo "Downloading $URL"
+          curl -fsSL "$URL" -o "$ZIP"
+          # 7z is preinstalled on Windows runners; Git Bash `tar` cannot extract zip.
+          7z x "$ZIP" -o"$PWD/llvm-mingw" >/dev/null
+          # The zip extracts into a single top-level dir; add its bin/ (holding the clang driver)
+          # to PATH so cargo's linker override resolves.
+          clang_exe=$(find "$PWD/llvm-mingw" -name 'x86_64-w64-mingw32-clang.exe' | head -1)
+          if [ -z "$clang_exe" ]; then
+            echo "llvm-mingw clang driver not found after extraction" >&2
+            exit 1
+          fi
+          cygpath -w "$(dirname "$clang_exe")" >> "$GITHUB_PATH"
+
+      - name: Download AIC SDK (gnullvm)
+        id: sdk
+        run: |
+          set -eu
+          # `grep -oE` (not -P) so this works with BSD grep too.
+          VERSION=$(grep "$TARGET" aic-sdk-sys/checksum.txt \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -z "${VERSION:-}" ]; then
+            echo "No checksum.txt entry for $TARGET yet; the gnullvm artifact is not published." >&2
+            echo "Add the published artifact's sha256 to aic-sdk-sys/checksum.txt first." >&2
+            exit 1
+          fi
+          URL="https://github.com/ai-coustics/aic-sdk-c/releases/download/${VERSION}/aic-sdk-${TARGET}-${VERSION}.${EXT}"
+          echo "Downloading $URL"
+          curl -fsSL "$URL" -o "sdk.${EXT}"
+          mkdir -p "$PWD/aic-sdk"
+          # Git Bash `tar` handles `.tar.gz` fine on Windows runners.
+          tar -xzf "sdk.${EXT}" -C "$PWD/aic-sdk"
+          echo "SDK layout:" && find "$PWD/aic-sdk" \( -name 'aic.*' -o -name 'libaic.*' \)
+
+          # Link dir holds the import/static library (libaic.dll.a / libaic.a); runtime dir holds
+          # aic.dll. Discover both rather than assuming a fixed layout.
+          link_lib=$(find "$PWD/aic-sdk" -name 'libaic.*' | head -1)
+          run_lib=$(find "$PWD/aic-sdk" -name 'aic.dll' | head -1)
+          if [ -z "$link_lib" ] || [ -z "$run_lib" ]; then
+            echo "Could not locate the AIC link/runtime library in the package" >&2
+            exit 1
+          fi
+          # clang/lld want native Windows paths for the link-search dir.
+          lib_dir=$(cygpath -w "$(dirname "$link_lib")")
+          run_dir=$(cygpath -w "$(dirname "$run_lib")")
+          echo "lib_dir=$lib_dir" >> "$GITHUB_OUTPUT"
+          echo "run_dir=$run_dir" >> "$GITHUB_OUTPUT"
+          # The Windows loader searches PATH for aic.dll at run time.
+          echo "$run_dir" >> "$GITHUB_PATH"
+
+      - name: Compile-time dynamic linking
+        env:
+          AIC_LIB_PATH: ${{ steps.sdk.outputs.lib_dir }}
+        run: cargo run --target "$TARGET" --example basic_usage --features "download-model dynamic-linking"
+
+      # runtime-linking loads aic.dll lazily by name on first use; no build-time link step runs,
+      # so the loader just needs aic.dll on PATH (set above).
+      - name: Runtime dynamic loading
+        run: cargo run --target "$TARGET" --example basic_usage --features "download-model runtime-linking"
