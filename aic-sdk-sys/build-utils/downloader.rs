@@ -258,13 +258,8 @@ mod tests {
         ("x86_64-linux-android", "android"),
         ("aarch64-pc-windows-msvc", "windows"),
         ("x86_64-pc-windows-msvc", "windows"),
+        ("x86_64-pc-windows-gnullvm", "windows"),
     ];
-
-    // Targets whose upstream aic-sdk-c artifact has not been published yet. They are kept
-    // separate from `TARGETS` so the checksum-presence test (`artifact_file_name_all_targets`)
-    // does not require a `checksum.txt` entry that does not exist yet. Once a target's artifact
-    // and checksum are published upstream, move its entry into `TARGETS` above.
-    const PENDING_TARGETS: &[(&str, &str)] = &[("x86_64-pc-windows-gnullvm", "windows")];
 
     fn read_checksum_filenames() -> std::collections::HashSet<String> {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("checksum.txt");
@@ -309,9 +304,7 @@ mod tests {
     #[test]
     fn windows_targets_use_expected_extension() {
         // MSVC Windows targets ship `.zip`; GNU/LLVM (`gnullvm`) Windows targets ship `.tar.gz`.
-        // Cover both the published and the pending targets so this stays correct once a pending
-        // entry is promoted into `TARGETS`.
-        for &(target, os) in TARGETS.iter().chain(PENDING_TARGETS) {
+        for &(target, os) in TARGETS {
             if os != "windows" {
                 continue;
             }
@@ -324,24 +317,6 @@ mod tests {
             assert!(
                 name.ends_with(expected),
                 "expected {expected} for target '{target}', got '{name}'",
-            );
-        }
-    }
-
-    #[test]
-    fn pending_targets_have_no_checksum_yet() {
-        // Forcing function: when an upstream artifact is finally published and its checksum is
-        // added to checksum.txt, this guard fails on purpose. That is the reminder to move the
-        // target out of PENDING_TARGETS and into TARGETS so it gets full coverage (including the
-        // checksum-presence check in `artifact_file_name_all_targets`).
-        const VERSION: &str = env!("CARGO_PKG_VERSION");
-        let checksums = read_checksum_filenames();
-
-        for &(target, os) in PENDING_TARGETS {
-            let name = artifact_file_name(target, os, VERSION);
-            assert!(
-                !checksums.contains(&name),
-                "checksum for '{name}' now exists; move {target} from PENDING_TARGETS into TARGETS",
             );
         }
     }

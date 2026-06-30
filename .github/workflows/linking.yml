@@ -112,13 +112,11 @@ jobs:
           DYLD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
         run: cargo run --example basic_usage --features "download-model runtime-linking"
 
-  # Experimental: dynamic + runtime linking against the Windows GNU/LLVM (`gnullvm`) artifact.
-  #
-  # This is a separate, gated job rather than a row in the matrix above because building a
-  # consumer for `x86_64-pc-windows-gnullvm` needs setup the native MSVC/macOS/Linux rows do not:
-  # the rustup target, an llvm-mingw toolchain (the gnullvm DLL runs natively on Windows, but
-  # compiling against it needs a MinGW/LLVM linker), a linker override, and an explicit
-  # `--target`.
+  # Static, dynamic and runtime linking against the Windows GNU/LLVM (`gnullvm`) artifact. This is
+  # a separate job rather than a row in the matrix above because building a consumer for
+  # `x86_64-pc-windows-gnullvm` needs setup the native MSVC/macOS/Linux rows do not: the rustup
+  # target, an llvm-mingw toolchain (the gnullvm DLL runs natively on Windows, but compiling
+  # against it needs a MinGW/LLVM linker), a linker override, and an explicit `--target`.
   linking-gnullvm:
     name: Dynamic & runtime linking (x86_64-pc-windows-gnullvm)
     runs-on: windows-latest
@@ -163,12 +161,12 @@ jobs:
         id: sdk
         run: |
           set -eu
-          # `grep -oE` (not -P) so this works with BSD grep too.
+          # Read the SDK release version from this target's checksum.txt entry, same idiom as the
+          # matrix job above. `grep -oE` (not -P) so this works with BSD grep too.
           VERSION=$(grep "$TARGET" aic-sdk-sys/checksum.txt \
             | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
           if [ -z "${VERSION:-}" ]; then
-            echo "No checksum.txt entry for $TARGET yet; the gnullvm artifact is not published." >&2
-            echo "Add the published artifact's sha256 to aic-sdk-sys/checksum.txt first." >&2
+            echo "No checksum.txt entry for $TARGET; cannot determine the SDK version." >&2
             exit 1
           fi
           URL="https://github.com/ai-coustics/aic-sdk-c/releases/download/${VERSION}/aic-sdk-${TARGET}-${VERSION}.${EXT}"

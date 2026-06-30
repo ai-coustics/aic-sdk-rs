@@ -15,17 +15,3 @@ ddd83bd01e77a0bbe06a60e0328e06bd9dff7a9da55f9778a3c8a5789f54c003  aic-sdk-x86_64
 a7a4babf2843094d6e665a8079269c2972a3e4c6da0b5fdffd2e3b5d4a9fd22b  aic-sdk-x86_64-unknown-linux-gnu-0.21.1.tar.gz
 c911306aa2074d87ee3bc9cfcd218f8fa836669d90bb4b62a6088ae8fa4a08f2  aic-sdk-aarch64-pc-windows-msvc-0.21.1.zip
 d457a9e210a63cd929c45d3a82e95e9ce1852601d88a0274ff6c4db4919e44fa  aic-sdk-x86_64-pc-windows-msvc-0.21.1.zip
-# TODO(gnullvm): aic-sdk-c has not published the x86_64-pc-windows-gnullvm artifact yet, so it
-# has no checksum. This line is intentionally commented out (the parser skips any line whose
-# token count is not exactly 2), so it does not affect builds for other targets.
-#
-# To enable it once the upstream artifact exists:
-#   1. Download aic-sdk-x86_64-pc-windows-gnullvm-<version>.tar.gz from the aic-sdk-c release.
-#   2. Compute its sha256 and replace <REPLACE_WITH_SHA256> below.
-#   3. Make sure <version> matches the version of the other entries in this file (the crate
-#      version); checksum.txt is regenerated per release, so it will already be correct then.
-#   4. Drop the leading "# " so the line is parsed (it must be: "<sha256><spaces><filename>").
-#   5. Move x86_64-pc-windows-gnullvm from PENDING_TARGETS into TARGETS in
-#      build-utils/downloader.rs (the `pending_targets_have_no_checksum_yet` test will remind you).
-#
-# <REPLACE_WITH_SHA256>  aic-sdk-x86_64-pc-windows-gnullvm-0.21.1.tar.gz
