@@ -6,14 +6,6 @@ on:
   pull_request:
   merge_group:
   workflow_dispatch:
-    inputs:
-      run_gnullvm:
-        description: >-
-          Run the experimental x86_64-pc-windows-gnullvm linking job. Leave this OFF until the
-          aic-sdk-c gnullvm artifact and its checksum.txt entry are published; enabling it before
-          then will fail at the download/checksum step.
-        type: boolean
-        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -127,18 +119,8 @@ jobs:
   # the rustup target, an llvm-mingw toolchain (the gnullvm DLL runs natively on Windows, but
   # compiling against it needs a MinGW/LLVM linker), a linker override, and an explicit
   # `--target`.
-  #
-  # GATING: it only runs on a manual `workflow_dispatch` with `run_gnullvm=true`, so it never
-  # touches push / pull_request / merge_group CI. It is also `continue-on-error` so a manual run
-  # cannot fail the workflow while the upstream artifact is still missing.
-  #
-  # TO ENABLE PERMANENTLY once aic-sdk-c publishes the gnullvm artifact and its checksum.txt
-  # entry exists: change the `if:` below to `if: ${{ true }}` (or fold this into the matrix above
-  # with `ext: tar.gz` plus the extra setup steps).
   linking-gnullvm:
     name: Dynamic & runtime linking (x86_64-pc-windows-gnullvm)
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_gnullvm }}
-    continue-on-error: true
     runs-on: windows-latest
     env:
       TARGET: x86_64-pc-windows-gnullvm
