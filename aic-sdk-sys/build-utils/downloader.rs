@@ -259,6 +259,7 @@ mod tests {
         ("aarch64-pc-windows-msvc", "windows"),
         ("x86_64-pc-windows-msvc", "windows"),
         ("x86_64-pc-windows-gnullvm", "windows"),
+        ("aarch64-pc-windows-gnullvm", "windows"),
     ];
 
     fn read_checksum_filenames() -> std::collections::HashSet<String> {
@@ -329,9 +330,12 @@ mod tests {
         let name = artifact_file_name("x86_64-pc-windows-msvc", "windows", "1.2.3");
         assert_eq!(name, "aic-sdk-x86_64-pc-windows-msvc-1.2.3.zip");
 
-        // The GNU/LLVM Windows target shares the Windows OS but uses a `.tar.gz` like Unix.
+        // The GNU/LLVM Windows targets share the Windows OS but use a `.tar.gz` like Unix.
         let name = artifact_file_name("x86_64-pc-windows-gnullvm", "windows", "1.2.3");
         assert_eq!(name, "aic-sdk-x86_64-pc-windows-gnullvm-1.2.3.tar.gz");
+
+        let name = artifact_file_name("aarch64-pc-windows-gnullvm", "windows", "1.2.3");
+        assert_eq!(name, "aic-sdk-aarch64-pc-windows-gnullvm-1.2.3.tar.gz");
 
         let name = artifact_file_name("aarch64-apple-ios-macabi", "ios", "1.2.3");
         assert_eq!(name, "aic-sdk-aarch64-apple-ios-macabi-1.2.3.tar.gz");

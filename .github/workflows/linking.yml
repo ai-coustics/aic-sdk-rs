@@ -112,20 +112,31 @@ jobs:
           DYLD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
         run: cargo run --example basic_usage --features "download-model runtime-linking"
 
-  # Static, dynamic and runtime linking against the Windows GNU/LLVM (`gnullvm`) artifact. This is
-  # a separate job rather than a row in the matrix above because building a consumer for
-  # `x86_64-pc-windows-gnullvm` needs setup the native MSVC/macOS/Linux rows do not: the rustup
-  # target, an llvm-mingw toolchain (the gnullvm DLL runs natively on Windows, but compiling
-  # against it needs a MinGW/LLVM linker), a linker override, and an explicit `--target`.
+  # Static, dynamic and runtime linking against the Windows GNU/LLVM (`gnullvm`) artifacts. These
+  # are separate from the matrix above because building a gnullvm consumer needs setup the native
+  # MSVC/macOS/Linux rows do not: the rustup target, an llvm-mingw toolchain (the gnullvm DLL runs
+  # natively on Windows, but compiling against it needs a MinGW/LLVM linker), a linker override,
+  # and an explicit `--target`. Each architecture runs on a native Windows runner of the matching
+  # arch so the built example can actually execute.
   linking-gnullvm:
-    name: Dynamic & runtime linking (x86_64-pc-windows-gnullvm)
-    runs-on: windows-latest
+    name: Static, dynamic & runtime linking (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-gnullvm
+            llvm_mingw_arch: x86_64
+            linker: x86_64-w64-mingw32-clang
+          - os: windows-11-arm
+            target: aarch64-pc-windows-gnullvm
+            llvm_mingw_arch: aarch64
+            linker: aarch64-w64-mingw32-clang
     env:
-      TARGET: x86_64-pc-windows-gnullvm
+      TARGET: ${{ matrix.target }}
       # gnullvm ships GNU-style files in a `.tar.gz` like the non-MSVC platforms.
       EXT: tar.gz
-      # Use the llvm-mingw clang driver (installed below, on PATH) as the linker for this target.
-      CARGO_TARGET_X86_64_PC_WINDOWS_GNULLVM_LINKER: x86_64-w64-mingw32-clang
     defaults:
       run:
         shell: bash
@@ -133,16 +144,24 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.91.0
         with:
-          targets: x86_64-pc-windows-gnullvm
+          targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
+
+      - name: Configure cargo linker for the gnullvm target
+        run: |
+          set -eu
+          # cargo reads the linker from CARGO_TARGET_<TRIPLE>_LINKER, with the triple upper-cased
+          # and `-` replaced by `_`. The driver itself is installed and put on PATH below.
+          var="CARGO_TARGET_$(echo "$TARGET" | tr 'a-z-' 'A-Z_')_LINKER"
+          echo "$var=${{ matrix.linker }}" >> "$GITHUB_ENV"
 
       - name: Install llvm-mingw toolchain
         run: |
           set -eu
-          # Prebuilt UCRT/x86_64 toolchain that provides the gnullvm linker and import libs.
-          # Pin a known release; bump as needed.
+          # Prebuilt UCRT toolchain (host = runner arch) that provides the gnullvm linker and
+          # import libs. Pin a known release; bump as needed.
           LLVM_MINGW_VERSION=20250528
-          ZIP="llvm-mingw-${LLVM_MINGW_VERSION}-ucrt-x86_64.zip"
+          ZIP="llvm-mingw-${LLVM_MINGW_VERSION}-ucrt-${{ matrix.llvm_mingw_arch }}.zip"
           URL="https://github.com/mstorsjo/llvm-mingw/releases/download/${LLVM_MINGW_VERSION}/${ZIP}"
           echo "Downloading $URL"
           curl -fsSL "$URL" -o "$ZIP"
@@ -150,7 +169,7 @@ jobs:
           7z x "$ZIP" -o"$PWD/llvm-mingw" >/dev/null
           # The zip extracts into a single top-level dir; add its bin/ (holding the clang driver)
           # to PATH so cargo's linker override resolves.
-          clang_exe=$(find "$PWD/llvm-mingw" -name 'x86_64-w64-mingw32-clang.exe' | head -1)
+          clang_exe=$(find "$PWD/llvm-mingw" -name '${{ matrix.linker }}.exe' | head -1)
           if [ -z "$clang_exe" ]; then
             echo "llvm-mingw clang driver not found after extraction" >&2
             exit 1
