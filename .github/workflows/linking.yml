@@ -111,3 +111,120 @@ jobs:
           LD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
           DYLD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
         run: cargo run --example basic_usage --features "download-model runtime-linking"
+
+  # Static, dynamic and runtime linking against the Windows GNU/LLVM (`gnullvm`) artifacts. These
+  # are separate from the matrix above because building a gnullvm consumer needs setup the native
+  # MSVC/macOS/Linux rows do not: the rustup target, an llvm-mingw toolchain (the gnullvm DLL runs
+  # natively on Windows, but compiling against it needs a MinGW/LLVM linker), a linker override,
+  # and an explicit `--target`. Each architecture runs on a native Windows runner of the matching
+  # arch so the built example can actually execute.
+  linking-gnullvm:
+    name: Static, dynamic & runtime linking (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-gnullvm
+            llvm_mingw_arch: x86_64
+            linker: x86_64-w64-mingw32-clang
+          - os: windows-11-arm
+            target: aarch64-pc-windows-gnullvm
+            llvm_mingw_arch: aarch64
+            linker: aarch64-w64-mingw32-clang
+    env:
+      TARGET: ${{ matrix.target }}
+      # gnullvm ships GNU-style files in a `.tar.gz` like the non-MSVC platforms.
+      EXT: tar.gz
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.91.0
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Configure cargo linker for the gnullvm target
+        run: |
+          set -eu
+          # cargo reads the linker from CARGO_TARGET_<TRIPLE>_LINKER, with the triple upper-cased
+          # and `-` replaced by `_`. The driver itself is installed and put on PATH below.
+          var="CARGO_TARGET_$(echo "$TARGET" | tr 'a-z-' 'A-Z_')_LINKER"
+          echo "$var=${{ matrix.linker }}" >> "$GITHUB_ENV"
+
+      - name: Install llvm-mingw toolchain
+        run: |
+          set -eu
+          # Prebuilt UCRT toolchain (host = runner arch) that provides the gnullvm linker and
+          # import libs. Pin a known release; bump as needed.
+          LLVM_MINGW_VERSION=20250528
+          ZIP="llvm-mingw-${LLVM_MINGW_VERSION}-ucrt-${{ matrix.llvm_mingw_arch }}.zip"
+          URL="https://github.com/mstorsjo/llvm-mingw/releases/download/${LLVM_MINGW_VERSION}/${ZIP}"
+          echo "Downloading $URL"
+          curl -fsSL "$URL" -o "$ZIP"
+          # 7z is preinstalled on Windows runners; Git Bash `tar` cannot extract zip.
+          7z x "$ZIP" -o"$PWD/llvm-mingw" >/dev/null
+          # The zip extracts into a single top-level dir; add its bin/ (holding the clang driver)
+          # to PATH so cargo's linker override resolves.
+          clang_exe=$(find "$PWD/llvm-mingw" -name '${{ matrix.linker }}.exe' | head -1)
+          if [ -z "$clang_exe" ]; then
+            echo "llvm-mingw clang driver not found after extraction" >&2
+            exit 1
+          fi
+          cygpath -w "$(dirname "$clang_exe")" >> "$GITHUB_PATH"
+
+      - name: Download AIC SDK (gnullvm)
+        id: sdk
+        run: |
+          set -eu
+          # Read the SDK release version from this target's checksum.txt entry, same idiom as the
+          # matrix job above. `grep -oE` (not -P) so this works with BSD grep too.
+          VERSION=$(grep "$TARGET" aic-sdk-sys/checksum.txt \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -z "${VERSION:-}" ]; then
+            echo "No checksum.txt entry for $TARGET; cannot determine the SDK version." >&2
+            exit 1
+          fi
+          URL="https://github.com/ai-coustics/aic-sdk-c/releases/download/${VERSION}/aic-sdk-${TARGET}-${VERSION}.${EXT}"
+          echo "Downloading $URL"
+          curl -fsSL "$URL" -o "sdk.${EXT}"
+          mkdir -p "$PWD/aic-sdk"
+          # Git Bash `tar` handles `.tar.gz` fine on Windows runners.
+          tar -xzf "sdk.${EXT}" -C "$PWD/aic-sdk"
+          echo "SDK layout:" && find "$PWD/aic-sdk" \( -name 'aic.*' -o -name 'libaic.*' \)
+
+          # Link dir holds the import/static library (libaic.dll.a / libaic.a); runtime dir holds
+          # aic.dll. Discover both rather than assuming a fixed layout.
+          link_lib=$(find "$PWD/aic-sdk" -name 'libaic.*' | head -1)
+          run_lib=$(find "$PWD/aic-sdk" -name 'aic.dll' | head -1)
+          if [ -z "$link_lib" ] || [ -z "$run_lib" ]; then
+            echo "Could not locate the AIC link/runtime library in the package" >&2
+            exit 1
+          fi
+          # clang/lld want native Windows paths for the link-search dir.
+          lib_dir=$(cygpath -w "$(dirname "$link_lib")")
+          run_dir=$(cygpath -w "$(dirname "$run_lib")")
+          echo "lib_dir=$lib_dir" >> "$GITHUB_OUTPUT"
+          echo "run_dir=$run_dir" >> "$GITHUB_OUTPUT"
+          # The Windows loader searches PATH for aic.dll at run time.
+          echo "$run_dir" >> "$GITHUB_PATH"
+
+      # Default static linking: build.rs emits `static=aic` (resolving `libaic.a` in the lib dir)
+      # plus the Windows system libs the static archive depends on.
+      - name: Compile-time static linking
+        env:
+          AIC_LIB_PATH: ${{ steps.sdk.outputs.lib_dir }}
+        run: cargo run --target "$TARGET" --example basic_usage --features "download-model"
+
+      - name: Compile-time dynamic linking
+        env:
+          AIC_LIB_PATH: ${{ steps.sdk.outputs.lib_dir }}
+        run: cargo run --target "$TARGET" --example basic_usage --features "download-model dynamic-linking"
+
+      # runtime-linking loads aic.dll lazily by name on first use; no build-time link step runs,
+      # so the loader just needs aic.dll on PATH (set above).
+      - name: Runtime dynamic loading
+        run: cargo run --target "$TARGET" --example basic_usage --features "download-model runtime-linking"

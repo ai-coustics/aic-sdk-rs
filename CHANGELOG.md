@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.21.2 - 2026-06-30
+
+### Platform Support
+
+- Added Windows GNU/LLVM release targets `x86_64-pc-windows-gnullvm` and `aarch64-pc-windows-gnullvm`
+
+
 ## 0.21.1 - 2026-06-26
 
 ### New Features
