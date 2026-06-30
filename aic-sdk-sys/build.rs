@@ -72,6 +72,14 @@ fn main() {
         // verbatim so the linker binds against `aic.dll` instead.
         println!("cargo:rustc-link-lib=dylib:+verbatim=aic.dll.lib");
     } else {
+        // Every other target uses the standard `-laic` naming, so no verbatim trick is needed:
+        //   * static: `libaic.a` (Unix and the Windows `gnullvm` target).
+        //   * dynamic on Unix: `libaic.so` / `libaic.dylib`.
+        //   * dynamic on `gnullvm` (target_env == "gnu"): the MinGW/LLD driver searches the GNU
+        //     import library `libaic.dll.a` before the static `libaic.a`, so `dylib=aic` binds
+        //     against `aic.dll` correctly. This is the gnu equivalent of the MSVC case above,
+        //     which only needs special handling because its import library (`aic.dll.lib`) and
+        //     static archive (`aic.lib`) collide under the plain `dylib=aic` name.
         let link_kind = if dynamic_linking { "dylib" } else { "static" };
         println!("cargo:rustc-link-lib={link_kind}=aic");
     }
@@ -85,26 +93,36 @@ fn main() {
 }
 
 fn add_platform_specific_libs() {
-    if cfg!(target_os = "macos") {
-        // macOS requires CoreFoundation framework for time zone operations
-        // This is needed by chrono and other crates that interact with system time
-        println!("cargo:rustc-link-lib=framework=CoreFoundation");
+    // Select libraries by the *target* OS via `CARGO_CFG_TARGET_OS`, not `cfg!(target_os = ...)`.
+    // A build script is compiled for the host, so `cfg!` reports the host platform and would link
+    // the wrong system libraries when cross-compiling (e.g. host Linux -> target windows-gnullvm
+    // would pull in `dl`/`rt` and miss the Windows libs). For a native build the two agree.
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    match target_os.as_str() {
+        "macos" => {
+            // macOS requires CoreFoundation framework for time zone operations
+            // This is needed by chrono and other crates that interact with system time
+            println!("cargo:rustc-link-lib=framework=CoreFoundation");
 
-        // Security framework might also be needed for some operations
-        println!("cargo:rustc-link-lib=framework=Security");
-    } else if cfg!(target_os = "windows") {
-        // Windows system libraries that might be needed
-        println!("cargo:rustc-link-lib=advapi32");
-        println!("cargo:rustc-link-lib=bcrypt");
-        println!("cargo:rustc-link-lib=kernel32");
-        println!("cargo:rustc-link-lib=ws2_32");
-        println!("cargo:rustc-link-lib=oleaut32");
-        println!("cargo:rustc-link-lib=crypt32");
-    } else if cfg!(target_os = "linux") {
-        // Linux system libraries
-        println!("cargo:rustc-link-lib=pthread");
-        println!("cargo:rustc-link-lib=dl");
-        println!("cargo:rustc-link-lib=rt");
+            // Security framework might also be needed for some operations
+            println!("cargo:rustc-link-lib=framework=Security");
+        }
+        "windows" => {
+            // Windows system libraries that might be needed
+            println!("cargo:rustc-link-lib=advapi32");
+            println!("cargo:rustc-link-lib=bcrypt");
+            println!("cargo:rustc-link-lib=kernel32");
+            println!("cargo:rustc-link-lib=ws2_32");
+            println!("cargo:rustc-link-lib=oleaut32");
+            println!("cargo:rustc-link-lib=crypt32");
+        }
+        "linux" => {
+            // Linux system libraries
+            println!("cargo:rustc-link-lib=pthread");
+            println!("cargo:rustc-link-lib=dl");
+            println!("cargo:rustc-link-lib=rt");
+        }
+        _ => {}
     }
 }
 
@@ -116,6 +134,18 @@ fn download_lib() -> PathBuf {
 
     let downloader = Downloader::new(&out_dir);
     downloader.download()
+}
+
+/// Maps a Cargo target triple to the triple clang should use when parsing the C header.
+///
+/// Returns `Some` only for the Rust-only `*-pc-windows-gnullvm` targets, which clang rejects
+/// (it parses the `gnullvm` environment as an invalid OS version). Their ABI-compatible clang
+/// triple is `*-pc-windows-gnu`. All other targets are valid clang triples, so this returns
+/// `None` and bindgen keeps using the `TARGET` value unchanged.
+fn clang_target_for(target: &str) -> Option<String> {
+    target
+        .strip_suffix("-pc-windows-gnullvm")
+        .map(|arch| format!("{arch}-pc-windows-gnu"))
 }
 
 fn generate_bindings() {
@@ -134,6 +164,16 @@ fn generate_bindings() {
         .constified_enum_module("AicErrorCode")
         .constified_enum_module("AicProcessorParameter")
         .constified_enum_module("AicVadParameter");
+
+    // bindgen feeds the Cargo `TARGET` triple to libclang, but clang does not understand the
+    // Rust-only `gnullvm` environment: it reads `windows-gnullvm` as the `windows-gnu` triple
+    // with an invalid OS version (`llvm`) and aborts before it can parse the header. Map such
+    // triples to their clang equivalent (`*-pc-windows-gnu`, ABI-compatible) and pass it
+    // explicitly. bindgen detects the user-provided `--target=` and does not add its own.
+    let target = env::var("TARGET").unwrap_or_default();
+    if let Some(clang_target) = clang_target_for(&target) {
+        builder = builder.clang_arg(format!("--target={clang_target}"));
+    }
 
     if env::var("CARGO_FEATURE_RUNTIME_LINKING").is_ok() {
         let runtime_bindings = builder

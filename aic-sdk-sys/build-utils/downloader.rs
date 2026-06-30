@@ -55,7 +55,10 @@ impl Downloader {
 
         let extracted_path = self.output_path.join(&file_prefix);
 
-        if os == "windows" {
+        // Decide the archive format from the artifact name rather than the OS: Windows has two
+        // flavours (MSVC ships `.zip`, GNU/LLVM `gnullvm` ships `.tar.gz`), so `os == "windows"`
+        // alone is no longer enough.
+        if file_name.ends_with(".zip") {
             extract_zip(&downloaded_file, &extracted_path);
         } else {
             extract_tgz(&downloaded_file, &extracted_path);
@@ -153,7 +156,14 @@ fn extract_version_from_filename(filename: &str) -> Option<String> {
 }
 
 fn artifact_file_name(target: &str, os: &str, version: &str) -> String {
-    let ext = if os == "windows" { "zip" } else { "tar.gz" };
+    // Windows MSVC artifacts are distributed as `.zip`. Every other platform uses `.tar.gz`,
+    // including the Windows GNU/LLVM (`*-pc-windows-gnullvm`) target, which ships GNU-style
+    // files (`libaic.a`, `libaic.dll.a`, `aic.dll`) in a tarball like the Unix platforms.
+    let ext = if os == "windows" && target.ends_with("msvc") {
+        "zip"
+    } else {
+        "tar.gz"
+    };
     format!("aic-sdk-{target}-{version}.{ext}")
 }
 
@@ -248,6 +258,8 @@ mod tests {
         ("x86_64-linux-android", "android"),
         ("aarch64-pc-windows-msvc", "windows"),
         ("x86_64-pc-windows-msvc", "windows"),
+        ("x86_64-pc-windows-gnullvm", "windows"),
+        ("aarch64-pc-windows-gnullvm", "windows"),
     ];
 
     fn read_checksum_filenames() -> std::collections::HashSet<String> {
@@ -291,15 +303,22 @@ mod tests {
     }
 
     #[test]
-    fn windows_targets_use_zip() {
+    fn windows_targets_use_expected_extension() {
+        // MSVC Windows targets ship `.zip`; GNU/LLVM (`gnullvm`) Windows targets ship `.tar.gz`.
         for &(target, os) in TARGETS {
-            if os == "windows" {
-                let name = artifact_file_name(target, os, "0.0.0");
-                assert!(
-                    name.ends_with(".zip"),
-                    "expected .zip for target '{target}', got '{name}'",
-                );
+            if os != "windows" {
+                continue;
             }
+            let name = artifact_file_name(target, os, "0.0.0");
+            let expected = if target.ends_with("msvc") {
+                ".zip"
+            } else {
+                ".tar.gz"
+            };
+            assert!(
+                name.ends_with(expected),
+                "expected {expected} for target '{target}', got '{name}'",
+            );
         }
     }
 
@@ -310,6 +329,13 @@ mod tests {
 
         let name = artifact_file_name("x86_64-pc-windows-msvc", "windows", "1.2.3");
         assert_eq!(name, "aic-sdk-x86_64-pc-windows-msvc-1.2.3.zip");
+
+        // The GNU/LLVM Windows targets share the Windows OS but use a `.tar.gz` like Unix.
+        let name = artifact_file_name("x86_64-pc-windows-gnullvm", "windows", "1.2.3");
+        assert_eq!(name, "aic-sdk-x86_64-pc-windows-gnullvm-1.2.3.tar.gz");
+
+        let name = artifact_file_name("aarch64-pc-windows-gnullvm", "windows", "1.2.3");
+        assert_eq!(name, "aic-sdk-aarch64-pc-windows-gnullvm-1.2.3.tar.gz");
 
         let name = artifact_file_name("aarch64-apple-ios-macabi", "ios", "1.2.3");
         assert_eq!(name, "aic-sdk-aarch64-apple-ios-macabi-1.2.3.tar.gz");
