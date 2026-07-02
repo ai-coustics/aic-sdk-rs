@@ -1,5 +1,21 @@
 name: Linking Modes
 
+# What this workflow proves, and what it deliberately does NOT.
+#
+# aic-sdk-rs varies by `build.rs` branch, not by CPU architecture. What changes between targets is
+# the OS (which system libraries the static archive needs), the link environment (the MSVC verbatim
+# import library `aic.dll.lib` vs the GNU-style `libaic.dll.a`), and the link mode (default static /
+# `dynamic-linking` / `runtime-linking`). None of that is arch-dependent, and because this repo
+# *downloads* a prebuilt libaic, per-arch runs would be redundant. So this workflow runs one runner
+# per distinct `build.rs` branch, not one per arch.
+#
+# The per-architecture linkability, the runtime execution, and the exported-symbol/ABI audit are
+# already tested for every shipped target in the internal repo that builds libaic. So this workflow
+# does not re-prove any of that per arch. It only covers what is specific to these Rust bindings:
+# that the `build.rs` link logic wires the freshly downloaded library up correctly for each branch,
+# and that the published download path (checksum.txt -> published release tarball/zip -> extract ->
+# link) works, which is tested nowhere else.
+
 on:
   push:
     branches: [main]
@@ -194,12 +210,17 @@ jobs:
           RUSTFLAGS: ${{ matrix.rustflags }}
         run: cargo run --example enhancement --features "download-model"
 
-  # Static, dynamic and runtime linking against the Windows GNU/LLVM (`gnullvm`) artifacts. These
-  # are separate from the matrix above because building a gnullvm consumer needs setup the native
+  # Static, dynamic and runtime linking against the Windows GNU/LLVM (`gnullvm`) artifacts. This is
+  # a separate job from the matrix above because building a gnullvm consumer needs setup the native
   # MSVC/macOS/Linux rows do not: the rustup target, an llvm-mingw toolchain (the gnullvm DLL runs
-  # natively on Windows, but compiling against it needs a MinGW/LLVM linker), a linker override,
-  # and an explicit `--target`. Each architecture runs on a native Windows runner of the matching
-  # arch so the built example can actually execute.
+  # natively on Windows, but compiling against it needs a MinGW/LLVM linker), a linker override, and
+  # an explicit `--target`.
+  #
+  # Only the x86_64 row runs here. The gnullvm `build.rs` branch (`dylib=aic` resolving the GNU
+  # import library `libaic.dll.a`, the llvm-mingw toolchain, and the `windows-gnu` clang-target
+  # mapping in `clang_target_for`) is identical across architectures, so an aarch64 row would only
+  # re-exercise the same branch against a differently downloaded prebuilt DLL. The arm64 build, link
+  # and run of aarch64-pc-windows-gnullvm is already tested in the internal repo that builds libaic.
   linking-gnullvm:
     name: Static, dynamic & runtime linking (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
@@ -211,10 +232,6 @@ jobs:
             target: x86_64-pc-windows-gnullvm
             llvm_mingw_arch: x86_64
             linker: x86_64-w64-mingw32-clang
-          - os: windows-11-arm
-            target: aarch64-pc-windows-gnullvm
-            llvm_mingw_arch: aarch64
-            linker: aarch64-w64-mingw32-clang
     env:
       TARGET: ${{ matrix.target }}
       # gnullvm ships GNU-style files in a `.tar.gz` like the non-MSVC platforms.
