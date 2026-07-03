@@ -10,7 +10,9 @@
 /// feature (`RUSTFLAGS="-C target-feature=+crt-static"`, i.e. `/MT`) selects `static-crt`; its
 /// absence is the MSVC default (`/MD`) and selects `dynamic-crt`.
 pub fn msvc_static_crt_subdir(target_features: &str) -> &'static str {
-    let crt_static = target_features.split(',').any(|feature| feature == "crt-static");
+    let crt_static = target_features
+        .split(',')
+        .any(|feature| feature == "crt-static");
     if crt_static {
         "static-crt"
     } else {
