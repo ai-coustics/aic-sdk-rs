@@ -16,6 +16,8 @@ Set `AIC_LIB_PATH` to the directory containing the native static library, or ena
 AIC_LIB_PATH=/path/to/aic-sdk/lib cargo build -p aic-sdk-sys
 ```
 
+On Windows MSVC the static library ships in a C-runtime-specific subdirectory of `lib`: `static-crt/aic.lib` (built for `/MT`) and `dynamic-crt/aic.lib` (built for `/MD`). `AIC_LIB_PATH` (and the downloader) still point at the `lib` root; the build script appends the correct subdirectory based on whether the `crt-static` target feature is enabled. Build with `RUSTFLAGS="-C target-feature=+crt-static"` to select `static-crt`; the default (no `crt-static`) selects `dynamic-crt`.
+
 ### Compile-time dynamic linking
 
 Enable `dynamic-linking` to link against `libaic.so` / `libaic.dylib` / `aic.dll` dynamically at build time.

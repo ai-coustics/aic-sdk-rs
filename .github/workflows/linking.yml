@@ -70,11 +70,14 @@ jobs:
           fi
           echo "SDK layout:" && find "$PWD/aic-sdk" \( -name 'aic.*' -o -name 'libaic.*' \)
 
-          # The build linker needs the directory holding the link library (libaic.* on Unix,
-          # aic.lib on Windows); the runtime loader needs the directory holding the shared
-          # library (aic.dll on Windows, the same libaic.* file on Unix). Discover both rather
-          # than assuming a fixed layout.
-          link_lib=$(find "$PWD/aic-sdk" \( -name 'libaic.*' -o -name 'aic.lib' \) | head -1)
+          # The build linker needs the directory holding the link library (libaic.* on Unix, the
+          # DLL import library aic.dll.lib on Windows MSVC); the runtime loader needs the directory
+          # holding the shared library (aic.dll on Windows, the same libaic.* file on Unix). This
+          # job only exercises dynamic and runtime linking, so on MSVC the relevant link library is
+          # aic.dll.lib, which sits at the `lib` root, not the CRT-split static aic.lib in the
+          # static-crt/ and dynamic-crt/ subdirectories. Discover both rather than assuming a fixed
+          # layout.
+          link_lib=$(find "$PWD/aic-sdk" \( -name 'libaic.*' -o -name 'aic.dll.lib' \) | head -1)
           run_lib=$(find "$PWD/aic-sdk" \( -name 'libaic.so' -o -name 'libaic.dylib' -o -name 'aic.dll' \) | head -1)
           if [ -z "$link_lib" ] || [ -z "$run_lib" ]; then
             echo "Could not locate the AIC link/runtime library in the package" >&2
@@ -111,6 +114,82 @@ jobs:
           LD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
           DYLD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
         run: cargo run --example basic_usage --features "download-model runtime-linking"
+
+  # Static linking on Windows MSVC selects a CRT-specific copy of aic.lib: build.rs appends
+  # `static-crt/` when the `crt-static` target feature is on (`/MT`) and `dynamic-crt/` otherwise
+  # (`/MD`, the MSVC default). Exercise both CRT flavours on both shipped MSVC arches so a
+  # regression in the package layout or the selection logic fails here. The default-CRT static path
+  # is also covered by build.yml/tests.yml via download-lib; this job adds the `+crt-static` variant
+  # and pins AIC_LIB_PATH at the `lib` root explicitly.
+  linking-msvc-crt:
+    name: Static linking MSVC (${{ matrix.target }}, ${{ matrix.crt }} CRT)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            crt: dynamic
+            rustflags: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            crt: static
+            rustflags: "-C target-feature=+crt-static"
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            crt: dynamic
+            rustflags: ""
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            crt: static
+            rustflags: "-C target-feature=+crt-static"
+    env:
+      TARGET: ${{ matrix.target }}
+      EXT: zip
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.91.0
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Download AIC SDK
+        id: sdk
+        run: |
+          set -eu
+          # `grep -oE` (not -P) so this works with BSD grep too.
+          VERSION=$(grep "$TARGET" aic-sdk-sys/checksum.txt \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          URL="https://github.com/ai-coustics/aic-sdk-c/releases/download/${VERSION}/aic-sdk-${TARGET}-${VERSION}.${EXT}"
+          echo "Downloading $URL"
+          curl -fsSL "$URL" -o "sdk.${EXT}"
+          mkdir -p "$PWD/aic-sdk"
+          # 7z is preinstalled on Windows runners; Git Bash `tar` cannot extract zip.
+          7z x "sdk.zip" -o"$PWD/aic-sdk" >/dev/null
+          echo "SDK layout:" && find "$PWD/aic-sdk" -name 'aic.lib'
+
+          # AIC_LIB_PATH must point at the `lib` root; build.rs appends static-crt/ or dynamic-crt/.
+          # Find the CRT-split static library to assert the new layout is present, then take its
+          # grandparent (lib/<crt>/aic.lib -> lib).
+          crt_lib=$(find "$PWD/aic-sdk" -path '*/dynamic-crt/aic.lib' | head -1)
+          if [ -z "$crt_lib" ]; then
+            echo "Expected lib/dynamic-crt/aic.lib in the MSVC package; the CRT-split layout is missing." >&2
+            exit 1
+          fi
+          lib_root=$(dirname "$(dirname "$crt_lib")")
+          # Emit a native Windows path so the MSVC linker understands AIC_LIB_PATH.
+          echo "lib_dir=$(cygpath -w "$lib_root")" >> "$GITHUB_OUTPUT"
+
+      # Static link the SDK. With `+crt-static` build.rs must resolve lib/static-crt/aic.lib and with
+      # the default CRT lib/dynamic-crt/aic.lib; a wrong choice fails to link or clashes on CRT
+      # symbols. The resulting exe is self-contained, so no aic.dll is needed at run time.
+      - name: Compile-time static linking
+        env:
+          AIC_LIB_PATH: ${{ steps.sdk.outputs.lib_dir }}
+          RUSTFLAGS: ${{ matrix.rustflags }}
+        run: cargo run --example basic_usage --features "download-model"
 
   # Static, dynamic and runtime linking against the Windows GNU/LLVM (`gnullvm`) artifacts. These
   # are separate from the matrix above because building a gnullvm consumer needs setup the native

@@ -8,6 +8,9 @@ mod downloader;
 #[path = "build-utils/runtime_linking.rs"]
 mod runtime_linking;
 
+#[path = "build-utils/linking.rs"]
+mod linking;
+
 fn main() {
     // Rerun the build script if the header file changes
     println!("cargo:rerun-if-changed=include/aic.h");
@@ -62,6 +65,21 @@ fn main() {
     };
 
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+
+    // On Windows MSVC the SDK ships the *static* library twice, once per C runtime flavour, under
+    // `static-crt/` and `dynamic-crt/`. Pick the directory matching the CRT the Rust toolchain
+    // links against (controlled by the `crt-static` target feature), otherwise the CRT symbols
+    // clash at link time. `AIC_LIB_PATH` and the downloader both point at the SDK `lib` root, so
+    // the CRT subdirectory is appended here.
+    //
+    // The dynamic (DLL) import library `aic.dll.lib` is CRT-agnostic: `aic.dll` bundles its own
+    // CRT, so it stays at the `lib` root and the subdirectory is not applied when dynamic linking.
+    let lib_path = if target_env == "msvc" && !dynamic_linking {
+        let target_features = env::var("CARGO_CFG_TARGET_FEATURE").unwrap_or_default();
+        lib_path.join(linking::msvc_static_crt_subdir(&target_features))
+    } else {
+        lib_path
+    };
 
     // Link with the curated library
     println!("cargo:rustc-link-search=native={}", lib_path.display());
