@@ -65,7 +65,7 @@ dependencies = [
  "libloading",
  "quote",
  "sha2",
- "syn", 
+ "syn",
  "tar",
  "ureq",
  "zip",
