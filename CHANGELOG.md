@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.21.4 - 2026-07-08
+
+### Platform Support
+
+- The SDK can now be built with any Rust version, including the same version the native library was built with.
+- Enabled static linking for Android.
+
 ## 0.21.3 - 2026-07-03
 
 ## Platform Support
@@ -8,20 +15,17 @@
 - Windows MSVC: both CRT variants of the static import library are now shipped, `lib/dynamic-crt/aic.lib` and `lib/static-crt/aic.lib`. This lets consumers match their own runtime setting and avoids LNK2038 mismatches for projects building with the default `/MD`, which a `/MT`-only library would break.
 - Apple: the release artifacts now include an `aic-sdk-apple-xcframework` bundle covering macOS, Mac Catalyst, iOS, tvOS, and visionOS (device and simulator).
 
- 
 ## 0.21.2 - 2026-06-30
 
 ### Platform Support
 
 - Added Windows GNU/LLVM release targets `x86_64-pc-windows-gnullvm` and `aarch64-pc-windows-gnullvm`
 
-
 ## 0.21.1 - 2026-06-26
 
 ### New Features
 
 Support for offline entitlements in JWT licenses.
-
 
 ## 0.21.0 - 2026-06-22
 
@@ -33,16 +37,16 @@ This release includes a new `VadContext::raw_vad_probability` API to read the ra
 
 Reduced the necessary output delay of the `Processor` when using `allow_variable_frames = true`.
 
-
 ## 0.20.0 - 2026-06-11
 
 ### New Features
 
-This release includes several new APIs for running our newest audio intelligence model, *Tyto*.
+This release includes several new APIs for running our newest audio intelligence model, _Tyto_.
 
 The new APIs introduce two new concepts: The `Collector` and the `Analyzer`.
- - The `Collector` is designed to be placed in the audio thread, buffering audio chunks for later analysis.
- - The `Analyzer` is designed to be run separately. Analysis models are computationally expensive and cannot run in the audio thread. The analyzer has access to the audio buffered by the collector, and it can access it safely across threads.
+
+- The `Collector` is designed to be placed in the audio thread, buffering audio chunks for later analysis.
+- The `Analyzer` is designed to be run separately. Analysis models are computationally expensive and cannot run in the audio thread. The analyzer has access to the audio buffered by the collector, and it can access it safely across threads.
 
 Initialize the `Collector` with the same configuration as your existing `Processor` and you can
 call the `Collector::buffer_*` APIs in the same manner as the `Processor::process_*` APIs.
