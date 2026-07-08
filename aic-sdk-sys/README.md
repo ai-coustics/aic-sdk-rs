@@ -4,13 +4,13 @@ Unsafe Rust bindings for the ai-coustics SDK.
 
 ## Linking modes
 
-By default, this crate links the native AIC SDK statically.
+By default, this crate links the native AIC SDK statically. Static linking is the preferred way to use this crate because it produces a self-contained binary and avoids runtime library discovery.
 
 `dynamic-linking` and `runtime-linking` are mutually exclusive linking strategies — enable at most one. Because Cargo features are additive, enabling both (for example via `--all-features`) is allowed but selects `runtime-linking`.
 
 ### Static linking
 
-Set `AIC_LIB_PATH` to the directory containing the native static library, or enable `download-lib` to download the SDK during the build.
+Set `AIC_LIB_PATH` to the directory containing the native static library, or enable `download-lib` to download the SDK during the build. This preferred static mode is supported on the bundled Android targets as of SDK 0.21.4.
 
 ```bash
 AIC_LIB_PATH=/path/to/aic-sdk/lib cargo build -p aic-sdk-sys
