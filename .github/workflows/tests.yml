@@ -24,8 +24,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
       # `--all-features` is avoided on purpose: it would enable `runtime-linking`, so the test
       # binaries would have to load `libaic` at runtime before any SDK call. The dynamic and
       # runtime linking modes are exercised separately in linking.yml.

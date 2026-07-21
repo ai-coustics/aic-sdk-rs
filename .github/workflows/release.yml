@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.91.0
+      - uses: dtolnay/rust-toolchain@42520bdb3cb59f71dae6f8557f7056cf3a46c898 # 1.91.0
 
       - name: Create Release Notes
         id: changelog
@@ -33,7 +33,7 @@ jobs:
           echo "Generated release body:" && echo "-----" && cat RELEASE_BODY.md && echo "-----"
 
       - name: Create GH Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           name: ${{ github.ref_name }}
           body_path: RELEASE_BODY.md
