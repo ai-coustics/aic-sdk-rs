@@ -13,9 +13,7 @@ pub enum AicError {
         "Processor must be initialized before calling this operation. Call `Processor::initialize` first."
     )]
     ProcessorNotInitialized,
-    #[error(
-        "Audio configuration (samplerate, num_channels, num_frames) is not supported by the model"
-    )]
+    #[error("Audio configuration (samplerate, num_frames) is not supported by the model")]
     AudioConfigUnsupported,
     #[error("Audio buffer configuration differs from the one provided during initialization")]
     AudioConfigMismatch,

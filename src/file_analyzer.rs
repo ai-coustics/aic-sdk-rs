@@ -119,7 +119,6 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
 
         let config = ProcessorConfig {
             sample_rate,
-            num_channels: 1,
             // Collector/STFT output advances at the model hop size, so always feed fixed optimal
             // frames regardless of the requested analysis step.
             num_frames: optimal_num_frames,
@@ -193,8 +192,7 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
             if available_samples == frame_samples {
                 // Fast path: the next fixed-size frame is fully available from the source audio.
                 let frame_end = frame_start + frame_samples;
-                self.collector
-                    .buffer_interleaved(&audio[frame_start..frame_end])?;
+                self.collector.buffer(&audio[frame_start..frame_end])?;
             } else {
                 // Pad short windows or non-aligned tails with silence while still feeding the
                 // collector exactly one fixed-size frame.
@@ -203,7 +201,7 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
                     let frame_end = frame_start + available_samples;
                     frame[..available_samples].copy_from_slice(&audio[frame_start..frame_end]);
                 }
-                self.collector.buffer_interleaved(&frame)?;
+                self.collector.buffer(&frame)?;
             }
 
             buffered_samples += frame_samples;

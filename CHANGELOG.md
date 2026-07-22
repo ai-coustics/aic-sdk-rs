@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+`Processor::process_planar`, `process_interleaved`, and `process_sequential` (and the matching
+`ProcessorAsync` and `Collector::buffer_*` methods) are replaced by a single `Processor::process` /
+`ProcessorAsync::process` / `Collector::buffer` method that takes a plain mono `f32` buffer.
+
+`ProcessorConfig::num_channels` and `with_num_channels` are removed; processing has always mixed
+every channel down to mono internally, so the layout choice and channel count added surface area
+without adding capability. Callers with multi-channel audio should downmix to mono themselves
+before calling `process`/`buffer`.
+
 ## 0.21.4 - 2026-07-08
 
 ### Platform Support

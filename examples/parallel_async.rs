@@ -26,8 +26,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = ProcessorConfig::optimal(&model);
     println!(
-        "Config: {} Hz, {} frames/buffer, {} channel(s)\n",
-        config.sample_rate, config.num_frames, config.num_channels
+        "Config: {} Hz, {} frames/buffer\n",
+        config.sample_rate, config.num_frames
     );
 
     // Build all processors up front
@@ -43,14 +43,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         NUM_PROCESSORS, ITERATIONS
     );
 
-    let buf_len = config.num_channels as usize * config.num_frames;
+    let buf_len = config.num_frames;
 
     // Sequential baseline
     let sequential_start = Instant::now();
     for p in &processors {
         let mut audio = vec![0.0f32; buf_len];
         for _ in 0..ITERATIONS {
-            audio = p.process_interleaved(audio).await?;
+            audio = p.process(audio).await?;
         }
     }
     let sequential_elapsed = sequential_start.elapsed();
@@ -68,10 +68,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|p| {
             let config = config.clone();
             async move {
-                let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
+                let mut audio = vec![0.0f32; config.num_frames];
                 let t0 = Instant::now();
                 for _ in 0..ITERATIONS {
-                    audio = p.process_interleaved(audio).await?;
+                    audio = p.process(audio).await?;
                 }
                 Ok::<_, aic_sdk::AicError>(t0.elapsed())
             }
