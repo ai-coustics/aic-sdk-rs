@@ -1,13 +1,11 @@
-use crate::{
-    AicError, Model, OtelConfig, Processor, ProcessorConfig, ProcessorContext, VadContext,
-};
+use crate::{AicError, Model, OtelConfig, Processor, ProcessorConfig, ProcessorContext};
 use async_lock::Mutex;
 use futures_channel::oneshot;
 use std::sync::{Arc, OnceLock};
 
 static RAYON_POOL: OnceLock<rayon::ThreadPool> = OnceLock::new();
 
-fn get_global_thread_pool() -> &'static rayon::ThreadPool {
+pub(crate) fn get_global_thread_pool() -> &'static rayon::ThreadPool {
     RAYON_POOL.get_or_init(|| {
         let num_threads = std::env::var("AIC_NUM_THREADS")
             .ok()
@@ -111,7 +109,7 @@ impl ProcessorAsync {
     /// Processes mono audio.
     ///
     /// This method takes ownership of `audio`, moves it to a background processing
-    /// thread, and returns the processed buffer.
+    /// thread, and returns the processed audio block.
     ///
     /// See [`Processor::process`] for details.
     pub async fn process(&self, mut audio: Vec<f32>) -> Result<Vec<f32>, AicError> {
@@ -142,15 +140,8 @@ impl ProcessorAsync {
 
     /// Returns a [`ProcessorContext`] for real-time parameter control.
     ///
-    /// See [`Processor::processor_context`] for details.
-    pub async fn processor_context(&self) -> ProcessorContext {
-        self.inner.lock().await.processor_context()
-    }
-
-    /// Returns a [`VadContext`] for voice activity detection.
-    ///
-    /// See [`Processor::vad_context`] for details.
-    pub async fn vad_context(&self) -> VadContext {
-        self.inner.lock().await.vad_context()
+    /// See [`Processor::context`] for details.
+    pub async fn context(&self) -> ProcessorContext {
+        self.inner.lock().await.context()
     }
 }

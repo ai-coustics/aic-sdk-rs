@@ -236,7 +236,7 @@ impl Collector {
     /// ```
     pub fn buffer(&mut self, audio: &[f32]) -> Result<(), AicError> {
         if !self.initialized {
-            return Err(AicError::ProcessorNotInitialized);
+            return Err(AicError::NotInitialized);
         }
 
         let audio_len = audio.len();
@@ -605,10 +605,7 @@ mod tests {
 
         let audio = vec![0.0f32; 4];
 
-        assert_eq!(
-            collector.buffer(&audio),
-            Err(AicError::ProcessorNotInitialized)
-        );
+        assert_eq!(collector.buffer(&audio), Err(AicError::NotInitialized));
     }
 
     #[test]

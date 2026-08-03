@@ -9,7 +9,55 @@
   processor or analyzer to be dropped. After termination the processor may no longer process audio
   and the analyzer may no longer analyze buffered audio.
 
+- Voice activity detection has its own `Vad` type (plus `VadAsync` with the `async` feature),
+  created from a dedicated VAD model:
+
+  ```rust,ignore
+  use aic_sdk::{Model, ProcessorConfig, Vad};
+
+  let model = Model::from_file("path/to/vad_model.aicmodel")?;
+  let config = ProcessorConfig::optimal(&model);
+  let mut vad = Vad::new(&model, &license_key)?.with_config(&config)?;
+  let vad_ctx = vad.context();
+
+  // The audio is not modified, it only updates the prediction.
+  vad.process(&mut audio_block)?;
+  println!("Speech detected: {}", vad_ctx.is_speech_detected());
+  ```
+
+  `VadContext` gained `reset`, `output_delay` and `update_bearer_token`, mirroring
+  `ProcessorContext`. `Vad` and `VadAsync` also support `terminate_session` and
+  `with_otel_config`.
+
+### Bug Fixes
+
+- Resetting the VAD state through `VadContext::reset` now immediately clears the published speech
+  detection and raw VAD probability values, so `is_speech_detected` and `raw_vad_probability` no
+  longer return stale values from the previous stream after a reset.
+
 ### Breaking Changes
+
+- Renamed `Processor::processor_context`, `ProcessorAsync::processor_context`, `Vad::vad_context`,
+  and `VadAsync::vad_context` to `context`.
+
+Energy-based VADs derived from the output of enhancement models have been removed, so voice
+activity detection now always uses a dedicated VAD model (e.g. `vad-2.1-xxs-16khz`):
+
+- `Processor::vad_context` and `ProcessorAsync::vad_context` are removed. Create a `Vad` (or
+  `VadAsync`) from a VAD model and read its prediction through `Vad::context` instead. A
+  `Processor` accepts only enhancement and bypass models; every other model type is rejected with
+  `AicError::ModelTypeUnsupported`.
+- The `VadParameter::Sensitivity` range is now always 0.0 to 1.0, the probability threshold of the
+  VAD model output. The 1.0 to 15.0 energy-threshold range of the removed energy-based VAD is gone.
+- `ProcessorContext::reset` no longer resets any VAD state, and `ProcessorContext::output_delay`
+  only reports the enhancement delay. Use `VadContext::reset` and `VadContext::output_delay` for
+  the VAD.
+
+Two error variants are renamed, following the C API:
+
+- `AicError::ProcessorNotInitialized` is now `AicError::NotInitialized`, since processors, VADs and
+  collectors all report it.
+- `AicError::EnhancementNotAllowed` is now `AicError::ProcessingNotAllowed`.
 
 `Processor::process_planar`, `process_interleaved`, and `process_sequential` (and the matching
 `ProcessorAsync` and `Collector::buffer_*` methods) are replaced by a single `Processor::process` /

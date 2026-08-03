@@ -16,6 +16,9 @@ mod processor;
 #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 mod processor_async;
 mod vad;
+#[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
+mod vad_async;
 
 pub use analyzer::*;
 pub use error::*;
@@ -26,6 +29,9 @@ pub use processor::*;
 #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub use processor_async::*;
 pub use vad::*;
+#[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
+pub use vad_async::*;
 
 #[cfg(feature = "runtime-linking")]
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime-linking")))]

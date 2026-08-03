@@ -1,25 +1,37 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
-use aic_sdk::{Model, Processor, ProcessorConfig, ProcessorParameter};
+use aic_sdk::{Model, Processor, ProcessorConfig, ProcessorParameter, Vad};
 
 pub const TEST_AUDIO_PATH: &str = "tests/data/test_signal.wav";
 pub const TEST_AUDIO_ENHANCED_PATH: &str = "tests/data/test_signal_enhanced.wav";
 pub const VAD_RESULTS_PATH: &str = "tests/data/vad_results.json";
+
+/// Enhancement model used for the audio enhancement tests.
+const ENHANCEMENT_MODEL_ID: &str = "quail-vf-2.1-s-16khz";
+/// Dedicated VAD model used for the voice activity detection tests. Enhancement models cannot
+/// be used for voice activity detection since the SDK dropped energy-based VADs.
+const VAD_MODEL_ID: &str = "vad-2.1-xxs-16khz";
 
 fn download_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     LOCK.get_or_init(|| Mutex::new(()))
 }
 
-fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
+/// Model files are named after their id, with `-` and `.` replaced by `_`.
+fn model_file_prefix(model_id: &str) -> String {
+    model_id.replace(['-', '.'], "_")
+}
+
+fn find_existing_model(target_dir: &Path, model_id: &str) -> Option<PathBuf> {
+    let prefix = model_file_prefix(model_id);
     let entries = std::fs::read_dir(target_dir).ok()?;
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().is_some_and(|ext| ext == "aicmodel")
             && path
                 .file_name()
-                .is_some_and(|name| name.to_string_lossy().starts_with("quail_vf_2_1_s_16khz"))
+                .is_some_and(|name| name.to_string_lossy().starts_with(&prefix))
         {
             return Some(path);
         }
@@ -27,21 +39,21 @@ fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
     None
 }
 
-/// Downloads the test model `quail-vf-2.1-s-16khz` into the crate's `target/` directory.
+/// Downloads `model_id` into the crate's `target/` directory.
 /// Returns the path to the downloaded model file.
-fn get_test_model_path() -> PathBuf {
+fn get_test_model_path(model_id: &str) -> PathBuf {
     let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
 
-    if let Some(existing) = find_existing_model(&target_dir) {
+    if let Some(existing) = find_existing_model(&target_dir, model_id) {
         return existing;
     }
 
     let _guard = download_lock().lock().unwrap();
-    if let Some(existing) = find_existing_model(&target_dir) {
+    if let Some(existing) = find_existing_model(&target_dir, model_id) {
         return existing;
     }
 
-    Model::download("quail-vf-2.1-s-16khz", &target_dir).expect("Failed to download test model")
+    Model::download(model_id, &target_dir).expect("Failed to download test model")
 }
 
 fn license_key() -> String {
@@ -59,7 +71,8 @@ fn load_audio(path: impl AsRef<Path>) -> audio_file::Audio<f32> {
 #[test]
 fn process_full_file() {
     let audio = load_audio(TEST_AUDIO_PATH);
-    let model = Model::from_file(get_test_model_path()).expect("Failed to load model");
+    let model =
+        Model::from_file(get_test_model_path(ENHANCEMENT_MODEL_ID)).expect("Failed to load model");
 
     let config = ProcessorConfig {
         sample_rate: audio.sample_rate,
@@ -72,7 +85,7 @@ fn process_full_file() {
         .with_config(&config)
         .expect("Failed to initialize processor");
 
-    let proc_ctx = processor.processor_context();
+    let proc_ctx = processor.context();
     proc_ctx
         .set_parameter(ProcessorParameter::EnhancementLevel, 0.9)
         .expect("Failed to set enhancement level");
@@ -88,15 +101,11 @@ fn process_full_file() {
     }
 }
 
-/// Tests block-based audio processing with voice activity detection (VAD).
-/// Processes audio in optimal-sized blocks and collects per-block speech detection results.
-/// The processor is set to bypass mode to verify that VAD continues to work even when audio
-/// enhancement is disabled. Compares the VAD output sequence against a pre-generated reference
-/// to ensure deterministic behavior.
-#[test]
-fn process_blocks_with_vad() {
+/// Runs the test signal through a VAD model in optimal-sized blocks and returns one speech
+/// detection result per block.
+fn speech_detection_per_block() -> Vec<bool> {
     let audio = load_audio(TEST_AUDIO_PATH);
-    let model = Model::from_file(get_test_model_path()).expect("Failed to load model");
+    let model = Model::from_file(get_test_model_path(VAD_MODEL_ID)).expect("Failed to load model");
 
     let config = ProcessorConfig {
         sample_rate: audio.sample_rate,
@@ -104,17 +113,12 @@ fn process_blocks_with_vad() {
         variable_block_size: false,
     };
 
-    let mut processor = Processor::new(&model, &license_key())
-        .expect("Failed to create processor")
+    let mut vad = Vad::new(&model, &license_key())
+        .expect("Failed to create VAD")
         .with_config(&config)
-        .expect("Failed to initialize processor");
+        .expect("Failed to initialize VAD");
 
-    let proc_ctx = processor.processor_context();
-    proc_ctx
-        .set_parameter(ProcessorParameter::Bypass, 1.0)
-        .expect("Failed to set bypass");
-
-    let vad_ctx = processor.vad_context();
+    let vad_ctx = vad.context();
 
     let mut samples = audio.samples_interleaved;
     let block_size = config.block_size;
@@ -122,10 +126,21 @@ fn process_blocks_with_vad() {
 
     for chunk in samples.chunks_mut(block_size) {
         if chunk.len() == block_size {
-            processor.process(chunk).expect("Failed to process block");
+            vad.process(chunk).expect("Failed to process block");
             speech_detected_results.push(vad_ctx.is_speech_detected());
         }
     }
+
+    speech_detected_results
+}
+
+/// Tests block-based voice activity detection.
+/// Processes audio in optimal-sized blocks and collects per-block speech detection results,
+/// then compares the sequence against a pre-generated reference to ensure deterministic
+/// behavior.
+#[test]
+fn process_blocks_with_vad() {
+    let speech_detected_results = speech_detection_per_block();
 
     let expected_json =
         std::fs::read_to_string(VAD_RESULTS_PATH).expect("Failed to read VAD results");
@@ -134,14 +149,12 @@ fn process_blocks_with_vad() {
     assert_eq!(speech_detected_results, expected_results);
 }
 
-/// Tests that VAD output is independent of the enhancement level.
-/// Uses an enhancement level of 0.5 (instead of bypass) and verifies that the VAD results
-/// match the same reference as the bypass test, confirming enhancement settings do not
-/// affect voice activity detection.
+/// Tests that resetting the VAD state clears the published prediction immediately, so query
+/// APIs do not return stale values from the previous stream.
 #[test]
-fn process_blocks_with_vad_and_enhancement() {
+fn vad_reset_clears_published_prediction() {
     let audio = load_audio(TEST_AUDIO_PATH);
-    let model = Model::from_file(get_test_model_path()).expect("Failed to load model");
+    let model = Model::from_file(get_test_model_path(VAD_MODEL_ID)).expect("Failed to load model");
 
     let config = ProcessorConfig {
         sample_rate: audio.sample_rate,
@@ -149,34 +162,33 @@ fn process_blocks_with_vad_and_enhancement() {
         variable_block_size: false,
     };
 
-    let mut processor = Processor::new(&model, &license_key())
-        .expect("Failed to create processor")
+    let mut vad = Vad::new(&model, &license_key())
+        .expect("Failed to create VAD")
         .with_config(&config)
-        .expect("Failed to initialize processor");
+        .expect("Failed to initialize VAD");
 
-    let proc_ctx = processor.processor_context();
-    proc_ctx
-        .set_parameter(ProcessorParameter::EnhancementLevel, 0.5)
-        .expect("Failed to set enhancement level");
-
-    let vad_ctx = processor.vad_context();
+    let vad_ctx = vad.context();
 
     let mut samples = audio.samples_interleaved;
     let block_size = config.block_size;
-    let mut speech_detected_results = Vec::new();
 
+    let mut speech_was_detected = false;
     for chunk in samples.chunks_mut(block_size) {
         if chunk.len() == block_size {
-            processor.process(chunk).expect("Failed to process block");
-            speech_detected_results.push(vad_ctx.is_speech_detected());
+            vad.process(chunk).expect("Failed to process block");
+            if vad_ctx.is_speech_detected() {
+                speech_was_detected = true;
+                break;
+            }
         }
     }
+    assert!(
+        speech_was_detected,
+        "the test signal contains speech, so the VAD should detect it"
+    );
 
-    // Compare against the same expected results as the bypass test
-    // This verifies that VAD output is independent of enhancement level
-    let expected_json =
-        std::fs::read_to_string(VAD_RESULTS_PATH).expect("Failed to read VAD results");
-    let expected_results: Vec<bool> =
-        serde_json::from_str(&expected_json).expect("Failed to parse VAD results");
-    assert_eq!(speech_detected_results, expected_results);
+    vad_ctx.reset().expect("Failed to reset VAD state");
+
+    assert!(!vad_ctx.is_speech_detected());
+    assert_eq!(vad_ctx.raw_vad_probability(), 0.0);
 }

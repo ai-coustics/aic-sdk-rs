@@ -1,8 +1,8 @@
 /**
  * This file contains the definitions and declarations for the ai-coustics
- * speech enhancement SDK, including initialization, processing, and configuration
- * functions. The ai-coustics SDK provides advanced machine learning models for
- * speech enhancement, that can be used in audio streaming contexts.
+ * SDK, including initialization, processing, and configuration functions. The
+ * ai-coustics SDK provides advanced machine learning models that can be used
+ * in audio streaming contexts.
  *
  * Copyright (C) ai-coustics GmbH - All Rights Reserved
  *
@@ -36,9 +36,9 @@ typedef enum AicErrorCode {
    */
   AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE = 2,
   /**
-   * Processor must be initialized before calling this operation. Call `aic_processor_initialize` first.
+   * Handle must be initialized before calling this operation.
    */
-  AIC_ERROR_CODE_PROCESSOR_NOT_INITIALIZED = 3,
+  AIC_ERROR_CODE_NOT_INITIALIZED = 3,
   /**
    * Audio configuration (sample_rate, block_size) is not supported by the model
    */
@@ -48,9 +48,9 @@ typedef enum AicErrorCode {
    */
   AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH = 5,
   /**
-   * SDK key was not authorized or process failed to report usage. Check if you have internet connection.
+   * Processing is not allowed because the SDK key was not authorized or usage reporting failed.
    */
-  AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED = 6,
+  AIC_ERROR_CODE_PROCESSING_NOT_ALLOWED = 6,
   /**
    * Internal error occurred. Contact support.
    */
@@ -92,7 +92,7 @@ typedef enum AicErrorCode {
    */
   AIC_ERROR_CODE_MODEL_DATA_UNALIGNED = 104,
   /**
-   * The model type is not supported by the processor.
+   * The model type is not supported by the requested API.
    */
   AIC_ERROR_CODE_MODEL_TYPE_UNSUPPORTED = 105,
 } AicErrorCode;
@@ -162,26 +162,14 @@ typedef enum AicVadParameter {
   /**
    * Controls the sensitivity of the VAD.
    *
-   * There are two kinds of VADs offered by the SDK:
-   *
-   * - VAD models (e.g. Quail VAD): These are models specifically trained for voice activity detection.
-   *   They output a probability of speech presence for each processed audio block, 1.0 being the model
-   *   is certain speech is present and 0.0 being the model is certain speech is not present.
-   *   The probability is compared against the sensitivity threshold to determine if speech is detected.
-   *
-   * - Energy-based VAD of speech enhancement models (e.g. Quail, Rook): These models filter out
-   *   background noise and enhance speech, but they do not explicitly output a VAD decision.
-   *   To provide VAD functionality, the SDK determines whether speech is present based on how much
-   *   energy is left in the signal after enhancement, since the model suppresses non-speech components.
-   *   For these models, the sensitivity parameter controls the energy threshold for detecting speech presence.
-   *   The formula for the energy threshold is `10 ^ (-sensitivity)`, so higher sensitivity values require
-   *   less energy in the signal, therefore resulting in more aggressive speech detection.
+   * VAD models output a probability of speech presence for each processed
+   * audio block, 1.0 being the model is certain speech is present and 0.0 being the
+   * model is certain speech is not present. The probability is compared against the
+   * sensitivity threshold to determine if speech is detected.
    *
    * A value above the threshold will trigger a speech detected decision.
    *
-   * **Range:**
-   *  - On VAD models: 0.0 to 1.0
-   *  - On energy-based VADs: 1.0 to 15.0
+   * **Range:** 0.0 to 1.0
    *
    * **Default:** model-specific
    */
@@ -192,7 +180,7 @@ typedef enum AicVadParameter {
    *
    * This affects the stability of speech not detected -> detected transitions.
    *
-   * NOTE: The VAD returns a value per processed buffer, so this duration is rounded
+   * NOTE: The VAD returns a value per processed audio block, so this duration is rounded
    * to the closest model window length. For example, if the model has a processing window
    * length of 10 ms, the VAD will round up/down to the closest multiple of 10 ms.
    * Because of this, this parameter may return a different value than the one it was last set to.
@@ -213,6 +201,8 @@ typedef struct AicModel AicModel;
 typedef struct AicProcessor AicProcessor;
 
 typedef struct AicProcessorContext AicProcessorContext;
+
+typedef struct AicVad AicVad;
 
 typedef struct AicVadContext AicVadContext;
 
@@ -323,12 +313,14 @@ uint32_t aic_get_compatible_model_version(void);
 /**
  * Creates a new model instance from a model file.
  *
- * A single model instance can be used to create multiple processors.
+ * A single model instance can be used to create multiple processors, VADs or analyzers,
+ * according to the model type.
  *
  * # Lifetime and ownership
- * Each processor or analyzer created with a given model handle keeps the underlying model alive
- * through internal reference counting. When the reference count reaches zero the model is destroyed.
+ * Each processor, VAD or analyzer created with a given model handle keeps the underlying model
+ * alive through internal reference counting. When the reference count reaches zero the model is destroyed.
  * You may therefore destroy the model handle before those objects, in any order.
+ *
  * The model data is memory-mapped from the file, not copied into the process. It is the caller's
  * responsibility to make sure the file is not modified while the model exists.
  *
@@ -346,7 +338,7 @@ uint32_t aic_get_compatible_model_version(void);
  * - `AIC_ERROR_CODE_MODEL_DATA_UNALIGNED`: Model data is not aligned to 64 bytes.
  *
  * # Safety
- * - This function is not thread-safe. Ensure no other threads are using the model handle or the same file path.
+ * - The `model` output pointer must be valid, writable, and not aliased.
  * - The file at `file_path` must not be modified or deleted while the model, or any
  *   object created from it, is alive. Accessing the model or a derived object after the
  *   file is removed or changed is undefined behavior.
@@ -357,10 +349,14 @@ enum AicErrorCode aic_model_create_from_file(struct AicModel **model,
 /**
  * Creates a new model instance from a memory buffer.
  *
+ * A single model instance can be used to create multiple processors, VADs or analyzers,
+ * according to the model type.
+ *
  * # Lifetime and ownership
- * Each processor or analyzer created with a given model handle keeps the underlying model alive
- * through internal reference counting. When the reference count reaches zero the model is destroyed.
+ * Each processor, VAD or analyzer created with a given model handle keeps the underlying model
+ * alive through internal reference counting. When the reference count reaches zero the model is destroyed.
  * You may therefore destroy the model handle before those objects, in any order.
+ *
  * The model data is only referenced, not copied. It is the caller's responsibility to make sure the buffer
  * is not modified while the model exists. Destroying the model does not free the memory `buffer` points to.
  *
@@ -377,7 +373,7 @@ enum AicErrorCode aic_model_create_from_file(struct AicModel **model,
  * - `AIC_ERROR_CODE_MODEL_DATA_UNALIGNED`: Model data is not aligned to 64 bytes.
  *
  * # Safety
- * - This function is not thread-safe. Ensure no other threads are using the model handle.
+ * - The `model` output pointer must be valid, writable, and not aliased.
  * - The memory `buffer` points to must not be modified until the model handle and every object
  *   derived from it have all been destroyed.
  */
@@ -392,8 +388,8 @@ enum AicErrorCode aic_model_create_from_buffer(struct AicModel **model,
  * This function is safe to call with NULL.
  *
  * # Lifetime and ownership
- * Each processor or analyzer created with a given model handle keeps the underlying model alive
- * through internal reference counting. When the reference count reaches zero the model is destroyed.
+ * Each processor, VAD or analyzer created with a given model handle keeps the underlying model
+ * alive through internal reference counting. When the reference count reaches zero the model is destroyed.
  * You may therefore destroy the model handle before those objects, in any order.
  *
  * The model data is only referenced, not copied. Destroying the `model` handle does not free its
@@ -428,8 +424,6 @@ void aic_model_destroy(struct AicModel *model);
  * - The pointer is only valid while the `AicModel` remains alive. Do not use it
  *   after calling `aic_model_destroy`.
  * - Read-only: do not modify or free the returned pointer.
- * - Not thread-safe with concurrent model destruction. Ensure no other thread can
- *   destroy the model while this pointer is in use.
  */
 const char *aic_model_get_id(const struct AicModel *model);
 
@@ -514,10 +508,14 @@ enum AicErrorCode aic_model_get_optimal_block_size(const struct AicModel *model,
                                                    size_t *block_size);
 
 /**
- * Creates a new audio processor instance.
+ * Creates a new audio processor instance from an enhancement or bypass model.
  *
  * Multiple processors can be created to process different audio streams simultaneously
  * or to switch between different enhancement algorithms during runtime.
+ *
+ * The same `AicModel` handle may be passed to this function more than once:
+ * each call creates an independent processor that shares the underlying model
+ * data internally.
  *
  * # Parameters
  * - `processor`: Receives the handle to the newly created processor. Must not be NULL.
@@ -533,10 +531,10 @@ enum AicErrorCode aic_model_get_optimal_block_size(const struct AicModel *model,
  * - `AIC_ERROR_CODE_LICENSE_FORMAT_INVALID`: License key format is incorrect
  * - `AIC_ERROR_CODE_LICENSE_VERSION_UNSUPPORTED`: License version is not compatible with the SDK version
  * - `AIC_ERROR_CODE_LICENSE_EXPIRED`: License key has expired
- * - `AIC_ERROR_CODE_MODEL_TYPE_UNSUPPORTED`: The model type is not supported by the processor
+ * - `AIC_ERROR_CODE_MODEL_TYPE_UNSUPPORTED`: The model is not an enhancement or bypass model
  *
  * # Safety
- * - This function is not thread-safe. Ensure no other threads are using the processor handle.
+ * - The `processor` output pointer must be valid, writable, and not aliased.
  * - The `model`'s backing buffer/file must outlive the `processor` object.
  */
 enum AicErrorCode aic_processor_create(struct AicProcessor **processor,
@@ -559,7 +557,8 @@ enum AicErrorCode aic_processor_create(struct AicProcessor **processor,
  * - `processor`: Processor instance to destroy. Can be NULL.
  *
  * # Safety
- * - This function is not thread-safe. Ensure no other threads are using the processor while it is being destroyed.
+ * - This function is not thread-safe. Ensure no other threads are using the
+ *   processor while it is being destroyed.
  * - The `processor` pointer must have been created by `aic_processor_create` when non-NULL.
  */
 void aic_processor_destroy(struct AicProcessor *processor);
@@ -585,7 +584,8 @@ void aic_processor_destroy(struct AicProcessor *processor);
  *
  * # Safety
  * - This function allocates memory. Avoid calling it from real-time audio threads.
- * - This function is not thread-safe. Ensure no other threads are using the processor during initialization.
+ * - This function is not thread-safe. Ensure no other threads are using the
+ *   processor during initialization.
  */
 enum AicErrorCode aic_processor_initialize(struct AicProcessor *processor,
                                            uint32_t sample_rate,
@@ -603,13 +603,14 @@ enum AicErrorCode aic_processor_initialize(struct AicProcessor *processor,
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Audio processed successfully
  * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `audio_ptr` is NULL
- * - `AIC_ERROR_CODE_PROCESSOR_NOT_INITIALIZED`: Processor has not been initialized
+ * - `AIC_ERROR_CODE_NOT_INITIALIZED`: Processor has not been initialized
  * - `AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH`: Block size mismatch
- * - `AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED`: SDK key was not authorized or process failed to report usage. Check if you have internet connection.
+ * - `AIC_ERROR_CODE_PROCESSING_NOT_ALLOWED`: Processing is not allowed because the SDK key was not authorized or usage reporting failed.
  *
  * # Safety
  * - Real-time safe: Can be called from audio processing threads.
- * - This function is not thread-safe. Do not call this function from multiple threads.
+ * - This function is not thread-safe. Do not use the processor from any other
+ *   thread while this call is active.
  */
 enum AicErrorCode aic_processor_process(struct AicProcessor *processor,
                                         float *audio_ptr,
@@ -642,8 +643,8 @@ enum AicErrorCode aic_processor_process(struct AicProcessor *processor,
  *
  * # Safety
  * - This function is not real-time safe. It may block until the session is terminated.
- * - This function is not thread-safe. Do not call it concurrently with any
- *   other function that takes the same `AicProcessor` handle.
+ * - This function is not thread-safe. Ensure no other threads are using the
+ *   processor while this call is active.
  * - The `processor` pointer must have been created by `aic_processor_create`.
  */
 enum AicErrorCode aic_processor_terminate_session(struct AicProcessor *processor);
@@ -663,7 +664,7 @@ enum AicErrorCode aic_processor_terminate_session(struct AicProcessor *processor
  * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `context` is NULL
  *
  * # Safety
- * - Thread-safe: Can be called from any thread.
+ * - The `context` output pointer must be valid, writable, and not aliased.
  */
 enum AicErrorCode aic_processor_context_create(struct AicProcessorContext **context,
                                                const struct AicProcessor *processor);
@@ -679,13 +680,15 @@ enum AicErrorCode aic_processor_context_create(struct AicProcessorContext **cont
  * - `context`: Context instance to destroy. Can be NULL.
  *
  * # Safety
- * - Thread-safe: Can be called from any thread.
+ * - Thread-safe with calls that use other context handles.
+ * - Do not use the same context handle from another thread while this call is
+ *   active.
  * - The `context` pointer must have been created by `aic_processor_context_create` when non-NULL.
  */
 void aic_processor_context_destroy(struct AicProcessorContext *context);
 
 /**
- * Clears all internal state and buffers. This also resets the VAD state associated with this processor.
+ * Clears all internal state and buffers.
  *
  * Call this when the audio stream is interrupted or when seeking
  * to prevent artifacts from previous audio content.
@@ -767,14 +770,6 @@ enum AicErrorCode aic_processor_context_get_parameter(const struct AicProcessorC
  *
  * This queries the processor associated with the provided context handle.
  *
- * **Enhancement vs. VAD models:**
- * - For an enhancement model this is the latency of the enhanced audio: the number of
- *   samples by which the processed output lags behind the input.
- * - For a dedicated VAD model, the audio block is input-only and passes through unchanged.
- *   This delay is the VAD prediction latency: how many samples a speech decision from
- *   `aic_vad_context_is_speech_detected` lags behind the input it describes.
- *   Use this value to line up VAD decisions with the input timeline.
- *
  * **Delay behavior:**
  * - **Before initialization:** Returns the base processing delay using the processor's
  *   optimal block size at its native sample rate
@@ -848,60 +843,306 @@ enum AicErrorCode aic_processor_context_update_bearer_token(const struct AicProc
                                                             const char *token);
 
 /**
- * Creates a VAD context handle for thread-safe control APIs.
+ * Creates a new voice activity detector instance from a VAD model.
  *
- * The voice activity detection works automatically using the enhanced audio output
- * of a given processor.
+ * Multiple VAD instances can be created to process different audio streams simultaneously.
  *
- * This uses the processor associated with the provided processor handle.
- * All handles created from a given processor reference the same VAD instance.
- *
- * **Important:** If the backing processor is destroyed, the VAD instance will stop
- * producing new data. It is safe to destroy the processor without destroying the VAD.
+ * The same `AicModel` handle may be passed to this function more than once:
+ * each call creates an independent VAD that shares the underlying model data
+ * internally.
  *
  * # Parameters
- * - `context`: VAD context instance. Must not be NULL.
- * - `processor`: Processor instance to use as data source for the VAD. Must not be NULL.
+ * - `vad`: Receives the handle to the newly created VAD. Must not be NULL.
+ * - `model`: Handle to the model instance to process. Must not be NULL.
+ * - `license_key`: NULL-terminated string containing your license key. Must not be NULL.
+ * - `otel_config`: Optional pointer to OpenTelemetry configuration.
+ *    If non-NULL, telemetry will be sent according to the provided configuration.
+ *    Otherwise it will be configured according to the runtime environment.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: VAD created successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `context` or `processor` is NULL
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `vad` or `model` or `license_key` is NULL
+ * - `AIC_ERROR_CODE_LICENSE_FORMAT_INVALID`: License key format is incorrect
+ * - `AIC_ERROR_CODE_LICENSE_VERSION_UNSUPPORTED`: License version is not compatible with the SDK version
+ * - `AIC_ERROR_CODE_LICENSE_EXPIRED`: License key has expired
+ * - `AIC_ERROR_CODE_MODEL_TYPE_UNSUPPORTED`: The model is not a VAD model
  *
  * # Safety
- * - Thread-safe: Can be called from any thread.
- * - It is safe for the processor handle to be currently in use by other threads.
+ * - The `vad` output pointer must be valid, writable, and not aliased.
+ * - The `model`'s backing buffer/file must outlive the `vad` object.
  */
-enum AicErrorCode aic_vad_context_create(struct AicVadContext **context,
-                                         const struct AicProcessor *processor);
+enum AicErrorCode aic_vad_create(struct AicVad **vad,
+                                 const struct AicModel *model,
+                                 const char *license_key,
+                                 const struct AicOtelConfig *otel_config);
+
+/**
+ * Releases all resources associated with a VAD instance.
+ *
+ * After calling this function, the VAD handle becomes invalid.
+ * This function is safe to call with NULL.
+ *
+ * # Lifetime and ownership
+ * The `vad` holds a shared reference to the model data, so it can be destroyed
+ * independently of the model handle, in any order.
+ * Destroying it releases that reference.
+ *
+ * # Parameters
+ * - `vad`: VAD instance to destroy. Can be NULL.
+ *
+ * # Safety
+ * - This function is not thread-safe. Ensure no other threads are using the
+ *   VAD while it is being destroyed.
+ * - The `vad` pointer must have been created by `aic_vad_create` when non-NULL.
+ */
+void aic_vad_destroy(struct AicVad *vad);
+
+/**
+ * Configures the VAD for a specific audio format.
+ *
+ * This function must be called before processing any audio.
+ * For the most frequent prediction updates, use the sample rate and block size returned by
+ * `aic_model_get_optimal_sample_rate` and `aic_model_get_optimal_block_size`.
+ *
+ * # Parameters
+ * - `vad`: VAD instance to configure. Must not be NULL.
+ * - `sample_rate`: Audio sample rate in Hz (8000 - 192000).
+ * - `block_size`: Number of samples per process call (the maximum, if `variable_block_size` is `true`).
+ * - `variable_block_size`: If `true`, permits shorter calls at the cost of extra buffering
+ *   before new predictions are published; calls larger than `block_size` are always rejected.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Configuration accepted
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `vad` is NULL
+ * - `AIC_ERROR_CODE_AUDIO_CONFIG_UNSUPPORTED`: Configuration is not supported
+ *
+ * # Safety
+ * - This function allocates memory. Avoid calling it from real-time audio threads.
+ * - This function is not thread-safe. Ensure no other threads are using the
+ *   VAD during initialization.
+ */
+enum AicErrorCode aic_vad_initialize(struct AicVad *vad,
+                                     uint32_t sample_rate,
+                                     size_t block_size,
+                                     bool variable_block_size);
+
+/**
+ * Processes the provided mono audio block and updates the VAD prediction.
+ *
+ * The audio buffer is not enhanced. Treat it as input to the detector.
+ *
+ * # Parameters
+ * - `vad`: Initialized VAD instance. Must not be NULL.
+ * - `audio_ptr`: Pointer to a mono audio block of `audio_len` samples. Must not be NULL.
+ * - `audio_len`: Number of samples in the block (must match `block_size` from initialization, or if `variable_block_size` was enabled, must be ≤ `block_size`).
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Audio processed successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `vad` or `audio_ptr` is NULL
+ * - `AIC_ERROR_CODE_NOT_INITIALIZED`: VAD has not been initialized
+ * - `AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH`: Block size mismatch
+ * - `AIC_ERROR_CODE_PROCESSING_NOT_ALLOWED`: Processing is not allowed because the SDK key was not authorized or usage reporting failed.
+ *
+ * # Safety
+ * - Real-time safe: Can be called from audio processing threads.
+ * - This function is not thread-safe. Do not use the VAD from any other
+ *   thread while this call is active.
+ */
+enum AicErrorCode aic_vad_process(struct AicVad *vad,
+                                  float *audio_ptr,
+                                  size_t audio_len);
+
+/**
+ * Terminates the telemetry session associated with this VAD.
+ *
+ * Once the request has been handled, the VAD is no longer allowed to process audio.
+ *
+ * This function is meant to be used in lifecycle management events.
+ * A telemetry session is automatically stopped when a VAD is destroyed.
+ *
+ * However, in cases where this SDK is integrated with languages with automatic
+ * memory management, object deallocation could be delayed - for example, until the
+ * garbage collector runs. Use this function to start termination on demand.
+ *
+ * This function blocks until the telemetry session is terminated, unless another
+ * session is still alive. In that case, this function returns early and termination
+ * happens asynchronously. This keeps lifecycle management smooth while ensuring
+ * all sessions are closed when the last VAD is terminated.
+ *
+ * # Parameters
+ * - `vad`: VAD instance. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Termination requested successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `vad` is NULL
+ *
+ * # Safety
+ * - This function is not real-time safe. It may block until the session is terminated.
+ * - This function is not thread-safe. Ensure no other threads are using the
+ *   VAD while this call is active.
+ * - The `vad` pointer must have been created by `aic_vad_create`.
+ */
+enum AicErrorCode aic_vad_terminate_session(struct AicVad *vad);
+
+/**
+ * Creates a VAD context handle for thread-safe control APIs.
+ *
+ * The voice activity detection works automatically as `aic_vad_process` processes audio.
+ *
+ * This uses the VAD associated with the provided VAD handle.
+ * All handles created from a given VAD reference the same VAD instance.
+ *
+ * **Important:** If the backing VAD is destroyed, the VAD context will stop
+ * producing new data. It is safe to destroy the VAD without destroying the context.
+ *
+ * # Parameters
+ * - `context`: VAD context instance. Must not be NULL.
+ * - `vad`: VAD instance to use as data source. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Context handle created successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` or `vad` is NULL
+ *
+ * # Safety
+ * - The `context` output pointer must be valid, writable, and not aliased.
+ */
+enum AicErrorCode aic_vad_context_create(struct AicVadContext **context, const struct AicVad *vad);
 
 /**
  * Releases a VAD context handle.
  *
- * **Important:** This does **NOT** destroy the backing processor.
- * `aic_processor_destroy` must be called separately.
+ * **Important:** This does **NOT** destroy the backing VAD.
+ * `aic_vad_destroy` must be called separately.
  *
- * After calling this function, the VAD handle becomes invalid.
+ * After calling this function, the context handle becomes invalid.
  * This function is safe to call with NULL.
  *
  * # Parameters
  * - `context`: VAD context instance. Can be NULL.
  *
  * # Safety
- * - Thread-safe: Can be called from any thread.
+ * - Thread-safe with calls that use other VAD context handles.
+ * - Do not use the same context handle from another thread while this call is
+ *   active.
  * - The `context` pointer must have been created by `aic_vad_context_create` when non-NULL.
  */
 void aic_vad_context_destroy(struct AicVadContext *context);
 
 /**
+ * Clears all internal state and buffers. This also resets the VAD state.
+ *
+ * Call this when the audio stream is interrupted or when seeking
+ * to prevent mispredictions from previous audio content.
+ *
+ * This operates on the VAD associated with the provided context handle.
+ *
+ * The VAD stays initialized to the configured settings.
+ *
+ * # Parameters
+ * - `context`: VAD context instance to reset. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: State cleared successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` is NULL
+ *
+ * # Safety
+ * - Real-time safe: Can be called from audio processing threads.
+ * - Thread-safe: Can be called from any thread.
+ */
+enum AicErrorCode aic_vad_context_reset(const struct AicVadContext *context);
+
+/**
+ * Returns the total VAD prediction delay in samples for the current audio configuration.
+ *
+ * This function provides the complete end-to-end latency of the VAD prediction,
+ * which includes input reblocking, STFT, and model processing delay. Use this value
+ * to line up VAD decisions with the input timeline.
+ *
+ * This queries the VAD associated with the provided context handle.
+ *
+ * **Delay behavior:**
+ * - **Before initialization:** Returns the base processing delay using the VAD's
+ *   optimal block size at its native sample rate
+ * - **After initialization:** Returns the end-to-end VAD prediction delay at the
+ *   initialized sample rate, including adapter input-buffering latency for the
+ *   configured block size
+ *
+ * **Important:** The delay value is always expressed in samples at the sample rate
+ * you configured during `aic_vad_initialize`. To convert to time units:
+ * `delay_ms = (delay_samples * 1000) / sample_rate`
+ *
+ * **Note:** Using a block size different from the optimal value returned by
+ * `aic_model_get_optimal_block_size`, or enabling variable block sizes, can add
+ * input-buffering latency before a new VAD prediction is published. That
+ * latency is included in the reported delay.
+ *
+ * # Parameters
+ * - `context`: VAD context instance. Must not be NULL.
+ * - `delay`: Receives the delay in samples. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Delay retrieved successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` or `delay` is NULL
+ *
+ * # Safety
+ * - Real-time safe: Can be called from audio processing threads.
+ * - Thread-safe: Can be called from any thread.
+ */
+enum AicErrorCode aic_vad_context_get_output_delay(const struct AicVadContext *context,
+                                                   size_t *delay);
+
+/**
+ * Replaces the bearer token on a running VAD.
+ *
+ * Use this when your license key is a JWT and needs to be refreshed
+ * before it expires. Calling this with a renewed token lets you stay authenticated
+ * without tearing down and recreating the VAD: audio processing continues
+ * uninterrupted, the context handle stays valid, and the new token is used for all
+ * subsequent authentication against the ai-coustics backend.
+ *
+ * In-place updates are only supported when both the originally configured key and
+ * the new token are JWTs. Other license types cannot be swapped in this way.
+ *
+ * On any error the call is a no-op: the previously active token remains in use and
+ * the telemetry session is unaffected (no backoff, no interruption to processing).
+ *
+ * On success the swap is applied immediately and is **not** gated on backend
+ * acceptance. The token is validated locally for format only; if the backend later
+ * rejects it (e.g. expired or revoked), the SDK retries it under backoff rather than
+ * rolling back to the prior token, and audio processing is eventually disabled if no
+ * accepted token arrives in time. Supplying a known-good token via this call during
+ * that window recovers the session.
+ *
+ * Safe to call concurrently with `aic_vad_process()` on the originating VAD.
+ *
+ * # Parameters
+ * - `context`: VAD context instance. Must not be NULL.
+ * - `token`: NULL-terminated string containing the new JWT. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Token replaced successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `context` or `token` is NULL
+ * - `AIC_ERROR_CODE_LICENSE_FORMAT_INVALID`: New token could not be parsed; the existing token stays in use
+ * - `AIC_ERROR_CODE_TOKEN_UPDATE_UNSUPPORTED`: The original or new key does not support in-place updates; the existing token stays in use
+ *
+ * # Safety
+ * - This function is not real-time safe. It locks a mutex and allocates memory.
+ * - Thread-safe: Can be called from any thread.
+ * - The `context` pointer must have been created by `aic_vad_context_create`.
+ * - `token` must point to a valid null-terminated UTF-8 string.
+ */
+enum AicErrorCode aic_vad_context_update_bearer_token(const struct AicVadContext *context,
+                                                      const char *token);
+
+/**
  * Returns the VAD's prediction.
  *
  * # Latency
- * The latency of the VAD prediction is equal to the backing processor's processing latency,
- * reported by `aic_processor_context_get_output_delay`. The prediction lags its input by
- * that many samples, even for a dedicated VAD model whose audio block passes through untouched.
- * Align speech decisions to the input timeline using that delay.
+ * The latency of the VAD prediction is equal to the backing VAD's processing latency,
+ * reported by `aic_vad_context_get_output_delay`. The prediction lags its input by
+ * that many samples. Align speech decisions to the input timeline using that delay.
  *
- * If the backing processor stops being processed, the VAD will not update its prediction.
+ * If the backing VAD stops being processed, the VAD will not update its prediction.
  *
  * # Parameters
  * - `context`: VAD context instance. Must not be NULL.
@@ -928,18 +1169,12 @@ enum AicErrorCode aic_vad_context_is_speech_detected(const struct AicVadContext 
  *
  * This value may be used to build other abstractions on top of this data.
  *
- * # Note
- * This value is only useful when using a VAD model. When using an energy-based VAD,
- * the raw prediction is set to 1.0 or 0.0 depending on whether `is_speech_detected`
- * is true or false.
- *
  * # Latency
- * The latency of the VAD prediction is equal to the backing processor's processing latency,
- * reported by `aic_processor_context_get_output_delay`. The prediction lags its input by
- * that many samples, even for a dedicated VAD model whose audio block passes through untouched.
- * Align speech decisions to the input timeline using that delay.
+ * The latency of the VAD prediction is equal to the backing VAD's processing latency,
+ * reported by `aic_vad_context_get_output_delay`. The prediction lags its input by
+ * that many samples. Align speech decisions to the input timeline using that delay.
  *
- * If the backing processor stops being processed, the VAD will not update its prediction.
+ * If the backing VAD stops being processed, the VAD will not update its prediction.
  *
  * # Parameters
  * - `context`: VAD context instance. Must not be NULL.
@@ -1015,6 +1250,10 @@ enum AicErrorCode aic_vad_context_get_parameter(const struct AicVadContext *cont
  * The collector retains a span of audio determined by the analysis model. As more samples
  * get collected, old audio is discarded.
  *
+ * The same `AicModel` handle may be passed to this function more than once:
+ * each call creates an independent collector/analyzer pair whose analyzer
+ * shares the underlying model data internally.
+ *
  * # Lifetime and ownership
  * The analyzer shares ownership of the model data through internal reference
  * counting, so `model` need not outlive it: you may destroy the model handle (via
@@ -1035,10 +1274,9 @@ enum AicErrorCode aic_vad_context_get_parameter(const struct AicVadContext *cont
  *
  * # Safety
  * - This function allocates memory. Avoid calling it from real-time audio threads.
- * - This function is not thread-safe. Ensure no other threads are using the output pointers.
+ * - The `collector` and `analyzer` output pointers must be valid, writable,
+ *   and not aliased.
  * - The `model`'s backing buffer/file must outlive the `collector`/`analyzer` objects.
- * - The `collector` pointer must not be aliased.
- * - The `analyzer` pointer must not be aliased.
  */
 enum AicErrorCode aic_analyzer_pair_create(struct AicCollector **collector,
                                            struct AicAnalyzer **analyzer,
@@ -1067,7 +1305,8 @@ enum AicErrorCode aic_analyzer_pair_create(struct AicCollector **collector,
  *
  * # Safety
  * - This function allocates memory. Avoid calling it from real-time audio threads.
- * - This function is not thread-safe. Ensure no other threads are using the collector during initialization.
+ * - This function is not thread-safe. Ensure no other threads are using the
+ *   collector during initialization.
  */
 enum AicErrorCode aic_collector_initialize(struct AicCollector *collector,
                                            uint32_t sample_rate,
@@ -1088,12 +1327,13 @@ enum AicErrorCode aic_collector_initialize(struct AicCollector *collector,
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Audio buffered successfully
  * - `AIC_ERROR_CODE_NULL_POINTER`: `collector` or `audio_ptr` is NULL
- * - `AIC_ERROR_CODE_PROCESSOR_NOT_INITIALIZED`: Collector has not been initialized
+ * - `AIC_ERROR_CODE_NOT_INITIALIZED`: Collector has not been initialized
  * - `AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH`: Block size mismatch
  *
  * # Safety
  * - Real-time safe: Can be called from audio processing threads.
- * - This function is not thread-safe. Do not call this function from multiple threads.
+ * - This function is not thread-safe. Do not use the collector from any other
+ *   thread while this call is active.
  */
 enum AicErrorCode aic_collector_buffer(struct AicCollector *collector,
                                        const float *audio_ptr,
@@ -1113,7 +1353,8 @@ enum AicErrorCode aic_collector_buffer(struct AicCollector *collector,
  * - `collector`: Collector instance to destroy. Can be NULL.
  *
  * # Safety
- * - This function is not thread-safe. Ensure no other threads are using the collector.
+ * - This function is not thread-safe. Ensure no other threads are using the
+ *   collector while this call is active.
  * - The `collector` pointer must have been created by `aic_analyzer_pair_create` when non-NULL.
  */
 void aic_collector_destroy(struct AicCollector *collector);
@@ -1157,11 +1398,13 @@ enum AicErrorCode aic_analyzer_reset(const struct AicAnalyzer *analyzer);
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Analysis completed successfully
  * - `AIC_ERROR_CODE_NULL_POINTER`: `analyzer` or `result` is NULL
- * - `AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED`: SDK key was not authorized or process failed to report usage. Check if you have internet connection.
+ * - `AIC_ERROR_CODE_PROCESSING_NOT_ALLOWED`: Processing is not allowed because the SDK key was not authorized or usage reporting failed.
  *
  * # Safety
  * - This function is not real-time safe. Avoid calling it from real-time audio threads.
- * - This function is not thread-safe. Do not call it from multiple threads.
+ * - This function is not thread-safe. Do not use the analyzer from any other
+ *   thread while this call is active. `aic_collector_buffer` may run
+ *   concurrently on the paired collector.
  */
 enum AicErrorCode aic_analyzer_analyze_buffered(struct AicAnalyzer *analyzer,
                                                 struct AicAnalysisResult *result);
@@ -1193,8 +1436,8 @@ enum AicErrorCode aic_analyzer_analyze_buffered(struct AicAnalyzer *analyzer,
  *
  * # Safety
  * - This function is not real-time safe. It may block until the session is terminated.
- * - This function is not thread-safe. Do not call it concurrently with any
- *   other function that takes the same `AicAnalyzer` handle.
+ * - This function is not thread-safe. Ensure no other threads are using the
+ *   analyzer while this call is active.
  * - The `analyzer` pointer must have been created by `aic_analyzer_pair_create`.
  */
 enum AicErrorCode aic_analyzer_terminate_session(struct AicAnalyzer *analyzer);
@@ -1221,8 +1464,7 @@ enum AicErrorCode aic_analyzer_terminate_session(struct AicAnalyzer *analyzer);
  * accepted token arrives in time. Supplying a known-good token via this call
  * during that window recovers the session.
  *
- * Safe to call concurrently with collector buffering. Do not call this concurrently
- * with `aic_analyzer_analyze_buffered` or `aic_analyzer_destroy` on the same handle.
+ * Safe to call concurrently with collector buffering.
  *
  * # Parameters
  * - `analyzer`: Analyzer instance. Must not be NULL.
@@ -1257,7 +1499,8 @@ enum AicErrorCode aic_analyzer_update_bearer_token(const struct AicAnalyzer *ana
  * - `analyzer`: Analyzer instance to destroy. Can be NULL.
  *
  * # Safety
- * - This function is not thread-safe. Ensure no other threads are using the analyzer.
+ * - This function is not thread-safe. Ensure no other threads are using the
+ *   analyzer while this call is active.
  * - The `analyzer` pointer must have been created by `aic_analyzer_pair_create` when non-NULL.
  */
 void aic_analyzer_destroy(struct AicAnalyzer *analyzer);

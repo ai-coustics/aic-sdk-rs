@@ -72,6 +72,11 @@ path = "examples/benchmark.rs"
 required-features = ["download-model"]
 
 [[example]]
+name = "vad"
+path = "examples/vad.rs"
+required-features = ["download-model"]
+
+[[example]]
 name = "analyze_file"
 path = "examples/analyze_file.rs"
 required-features = ["download-model"]

@@ -4,7 +4,8 @@ use aic_sdk_sys::{AicProcessorParameter::*, *};
 
 use std::{ffi::CString, marker::PhantomData, ptr};
 
-/// Audio processing configuration passed to [`Processor::initialize`] and
+/// Audio processing configuration passed to [`Processor::initialize`],
+/// [`Vad::initialize`](crate::Vad::initialize) and
 /// [`Collector::initialize`](crate::Collector::initialize).
 ///
 /// Use [`ProcessorConfig::optimal`] as a starting point, then adjust fields
@@ -13,7 +14,8 @@ use std::{ffi::CString, marker::PhantomData, ptr};
 pub struct ProcessorConfig {
     /// Sample rate in Hz (8000 - 192000).
     pub sample_rate: u32,
-    /// Number of samples passed to each [`Processor::process`] or
+    /// Number of samples passed to each [`Processor::process`],
+    /// [`Vad::process`](crate::Vad::process) or
     /// [`Collector::buffer`](crate::Collector::buffer) call (the maximum, if
     /// `variable_block_size` is `true`).
     /// Note that using a non-optimal block size increases latency.
@@ -112,12 +114,12 @@ impl From<ProcessorParameter> for AicProcessorParameter::Type {
     }
 }
 
-/// OpenTelemetry configuration for a [`Processor`].
+/// OpenTelemetry configuration for a [`Processor`] or [`Vad`](crate::Vad).
 ///
-/// Pass to [`Processor::with_otel_config`] to control telemetry on a per-processor
-/// basis. When no [`OtelConfig`] is provided (e.g. when using [`Processor::new`]), telemetry
-/// is configured according to the runtime environment (e.g. the `AIC_SDK_OTEL_ENABLE`
-/// environment variable).
+/// Pass to [`Processor::with_otel_config`] or [`Vad::with_otel_config`](crate::Vad::with_otel_config)
+/// to control telemetry on a per-instance basis. When no [`OtelConfig`] is provided (e.g. when
+/// using [`Processor::new`]), telemetry is configured according to the runtime environment
+/// (e.g. the `AIC_SDK_OTEL_ENABLE` environment variable).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OtelConfig {
     /// Whether to enable OpenTelemetry telemetry.
@@ -163,7 +165,7 @@ impl OtelConfig {
 
 /// Thread-safe control handle for a [`Processor`].
 ///
-/// Create one with [`Processor::processor_context`]. Every method on this type maps to an SDK
+/// Create one with [`Processor::context`]. Every method on this type maps to an SDK
 /// function that can be called from any thread, so a context can be moved to another thread to
 /// read and write parameters, query the output delay, or reset the processor while audio is being
 /// processed elsewhere.
@@ -206,7 +208,7 @@ impl ProcessorContext {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// # let processor = Processor::new(&model, &license_key)?;
-    /// # let proc_ctx = processor.processor_context();
+    /// # let proc_ctx = processor.context();
     /// proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.8)?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
@@ -239,7 +241,7 @@ impl ProcessorContext {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// # let processor = Processor::new(&model, &license_key)?;
-    /// # let processor_context = processor.processor_context();
+    /// # let processor_context = processor.context();
     /// let enhancement_level = processor_context.parameter(ProcessorParameter::EnhancementLevel)?;
     /// println!("Current enhancement level: {enhancement_level}");
     /// # Ok::<(), aic_sdk::AicError>(())
@@ -261,16 +263,9 @@ impl ProcessorContext {
     ///
     /// This function provides the complete end-to-end latency introduced by the processor,
     /// which includes both algorithmic processing delay and any buffering overhead.
+    /// It is the number of samples by which the enhanced output lags behind the input.
     /// Use this value to synchronize enhanced audio with other streams or to implement
     /// delay compensation in your application.
-    ///
-    /// **Enhancement vs. VAD models:**
-    /// - For an enhancement model this is the latency of the enhanced audio: the number of
-    ///   samples by which the processed output lags behind the input.
-    /// - For a dedicated VAD model, the audio block is input-only and passes through unchanged.
-    ///   This delay is the VAD prediction latency: how many samples a speech decision from
-    ///   [`VadContext::is_speech_detected`](crate::VadContext::is_speech_detected) lags behind
-    ///   the input it describes. Use this value to line up VAD decisions with the input timeline.
     ///
     /// **Delay behavior:**
     /// - **Before initialization:** Returns the base processing delay using the model's
@@ -296,7 +291,7 @@ impl ProcessorContext {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// # let processor = Processor::new(&model, &license_key)?;
-    /// # let processor_context = processor.processor_context();
+    /// # let processor_context = processor.context();
     /// let delay = processor_context.output_delay();
     /// println!("Output delay: {} samples", delay);
     /// # Ok::<(), aic_sdk::AicError>(())
@@ -322,7 +317,6 @@ impl ProcessorContext {
     }
 
     /// Clears all internal state and buffers.
-    /// This also resets the VAD state associated with this processor.
     ///
     /// Call this when the audio stream is interrupted or when seeking
     /// to prevent artifacts from previous audio content.
@@ -344,7 +338,7 @@ impl ProcessorContext {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// # let processor = Processor::new(&model, &license_key)?;
-    /// # let processor_context = processor.processor_context();
+    /// # let processor_context = processor.context();
     /// processor_context.reset()?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
@@ -395,7 +389,7 @@ impl ProcessorContext {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// let processor = Processor::new(&model, &license_key)?;
-    /// let processor_context = processor.processor_context();
+    /// let processor_context = processor.context();
     /// let renewed_jwt = String::from("<JWT_BEARER_TOKEN>");
     /// processor_context.update_bearer_token(&renewed_jwt)?;
     /// # Ok::<(), aic_sdk::AicError>(())
@@ -430,6 +424,9 @@ unsafe impl Send for ProcessorContext {}
 unsafe impl Sync for ProcessorContext {}
 
 /// High-level wrapper for the ai-coustics audio enhancement processor.
+///
+/// A processor is created from an enhancement or bypass model. For voice activity detection,
+/// create a [`Vad`](crate::Vad) from a VAD model instead.
 ///
 /// This struct provides a safe, Rust-friendly interface to the underlying C library.
 /// It handles memory management automatically and converts C-style error codes
@@ -470,7 +467,8 @@ impl<'a> Processor<'a> {
     ///
     /// # Arguments
     ///
-    /// * `model` - The loaded model instance
+    /// * `model` - The loaded model instance. Must be an enhancement or bypass model,
+    ///   otherwise [`AicError::ModelTypeUnsupported`] is returned.
     /// * `license_key` - license key for the ai-coustics SDK
     ///   (generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com/))
     ///
@@ -620,10 +618,10 @@ impl<'a> Processor<'a> {
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// let model = Model::from_file("/path/to/model.aicmodel")?;
     /// let processor = Processor::new(&model, &license_key)?;
-    /// let processor_context = processor.processor_context();
+    /// let processor_context = processor.context();
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
-    pub fn processor_context(&self) -> ProcessorContext {
+    pub fn context(&self) -> ProcessorContext {
         let mut processor_context: *mut AicProcessorContext = ptr::null_mut();
 
         // SAFETY:
@@ -643,41 +641,6 @@ impl<'a> Processor<'a> {
         );
 
         ProcessorContext::new(processor_context)
-    }
-
-    /// Creates a [Voice Activity Detector Context](crate::vad::VadContext) instance.
-    /// All handles created from a given processor reference the same VAD instance.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use aic_sdk::{Model, Processor};
-    /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// let processor = Processor::new(&model, &license_key)?;
-    /// let vad = processor.vad_context();
-    /// # Ok::<(), aic_sdk::AicError>(())
-    /// ```
-    pub fn vad_context(&self) -> crate::VadContext {
-        let mut vad_ptr: *mut AicVadContext = ptr::null_mut();
-
-        // SAFETY:
-        // - `vad_ptr` is valid output storage.
-        // - `self.as_const_ptr()` is a live processor pointer.
-        // - This function can be called from any thread and may run while the
-        //   processor is in use, so we only borrow `&self`.
-        let error_code = unsafe { aic_vad_context_create(&mut vad_ptr, self.as_const_ptr()) };
-
-        // This should never fail
-        assert!(handle_error(error_code).is_ok());
-
-        // This should never happen if the C library is well-behaved, but let's be defensive
-        assert!(
-            !vad_ptr.is_null(),
-            "C library returned success but null pointer"
-        );
-
-        crate::vad::VadContext::new(vad_ptr)
     }
 
     /// Configures the processor for specific audio settings.
@@ -728,7 +691,7 @@ impl<'a> Processor<'a> {
 
     /// Processes mono audio.
     ///
-    /// Enhances speech in the provided audio buffer in-place.
+    /// Enhances speech in the provided audio block in-place.
     ///
     /// # Arguments
     ///
@@ -759,7 +722,7 @@ impl<'a> Processor<'a> {
     /// ```
     pub fn process(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
         if !self.initialized {
-            return Err(AicError::ProcessorNotInitialized);
+            return Err(AicError::NotInitialized);
         }
 
         let audio_len = audio.len();
@@ -839,10 +802,10 @@ unsafe impl<'a> Send for Processor<'a> {}
 // SAFETY: Processor does not expose any interior mutability. The SDK functions that are documented
 // as not thread-safe (`aic_processor_initialize`, `aic_processor_process`,
 // `aic_processor_terminate_session`, `aic_processor_destroy`) are only reachable through methods
-// that take `&mut self` or through `drop`, so Rust's borrow rules serialize them. The methods that
-// take `&self` (`processor_context`, `vad_context`) only call functions the SDK documents as
-// thread-safe and safe to run while the processor is in use on another thread. Therefore, it is
-// safe to implement Sync for Processor.
+// that take `&mut self` or through `drop`, so Rust's borrow rules serialize them. The only method
+// that takes `&self` (`context`) just creates a new context handle from a const
+// processor pointer, which is safe to do while the processor is in use on another thread.
+// Therefore, it is safe to implement Sync for Processor.
 unsafe impl<'a> Sync for Processor<'a> {}
 
 #[cfg(test)]

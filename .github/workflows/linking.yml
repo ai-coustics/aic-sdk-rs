@@ -17,11 +17,10 @@ env:
 
 jobs:
   # Exercises the opt-in linking strategies against a real `libaic` on every platform. Running
-  # the `basic_usage` example touches almost the entire FFI surface (model, processor, all
-  # process layouts, processor/VAD contexts, bearer-token refresh), so it also guards the
-  # hand-maintained runtime symbol table in aic-sdk-sys against ABI drift. The default static
-  # link is covered on all platforms by build.yml and tests.yml; this job adds the dynamic and
-  # runtime-loading paths.
+  # the `basic_usage` and `vad` examples touches almost the entire FFI surface (model, processor,
+  # VAD, processor/VAD contexts, bearer-token refresh), so it also guards the runtime symbol table
+  # in aic-sdk-sys against ABI drift. The default static link is covered on all platforms by
+  # build.yml and tests.yml; this job adds the dynamic and runtime-loading paths.
   linking:
     name: Dynamic & runtime linking (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -104,7 +103,9 @@ jobs:
           AIC_LIB_PATH: ${{ steps.sdk.outputs.lib_dir }}
           LD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
           DYLD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
-        run: cargo run --example basic_usage --features "download-model dynamic-linking"
+        run: |
+          cargo run --example basic_usage --features "download-model dynamic-linking"
+          cargo run --example vad --features "download-model dynamic-linking"
 
       # runtime-linking loads `libaic` lazily by name on first use, so no build-time link step
       # runs and the dynamic loader just needs to find the library (PATH / LD_LIBRARY_PATH /
@@ -113,7 +114,9 @@ jobs:
         env:
           LD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
           DYLD_LIBRARY_PATH: ${{ steps.sdk.outputs.run_dir }}
-        run: cargo run --example basic_usage --features "download-model runtime-linking"
+        run: |
+          cargo run --example basic_usage --features "download-model runtime-linking"
+          cargo run --example vad --features "download-model runtime-linking"
 
   # Static linking on Windows MSVC selects a CRT-specific copy of aic.lib: build.rs appends
   # `static-crt/` when the `crt-static` target feature is on (`/MT`) and `dynamic-crt/` otherwise

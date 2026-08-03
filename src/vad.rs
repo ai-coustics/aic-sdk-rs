@@ -1,6 +1,12 @@
-use crate::error::*;
+use crate::{
+    error::*,
+    model::Model,
+    processor::{OtelConfig, ProcessorConfig},
+};
 
 use aic_sdk_sys::{AicVadParameter::*, *};
+
+use std::{ffi::CString, marker::PhantomData, ptr};
 
 /// Configurable parameters for Voice Activity Detection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -30,24 +36,14 @@ pub enum VadParameter {
     SpeechHoldDuration,
     /// Controls the sensitivity of the VAD.
     ///
-    /// There are two kinds of VADs offered by the SDK:
-    ///
-    /// - **VAD models** (e.g. Quail VAD): models trained specifically for voice activity
-    ///   detection. They output a probability of speech presence for each processed audio block
-    ///   (1.0 = certain speech, 0.0 = certain no speech). The probability is compared against the
-    ///   sensitivity threshold to decide whether speech is detected.
-    /// - **Energy-based VADs** of speech enhancement models (e.g. Quail, Rook): these models
-    ///   filter out background noise and enhance speech but do not explicitly output a VAD
-    ///   decision. The SDK derives one from the energy remaining in the signal after
-    ///   enhancement. The energy threshold is `10 ^ (-sensitivity)`, so higher sensitivity
-    ///   values require less energy in the signal, resulting in more aggressive speech
-    ///   detection.
+    /// VAD models output a probability of speech presence for each processed audio block,
+    /// 1.0 being the model is certain speech is present and 0.0 being the model is certain
+    /// speech is not present. The probability is compared against the sensitivity threshold
+    /// to determine if speech is detected.
     ///
     /// A value above the threshold triggers a speech-detected decision.
     ///
-    /// **Range:**
-    /// - VAD models: 0.0 to 1.0
-    /// - Energy-based VADs: 1.0 to 15.0
+    /// **Range:** 0.0 to 1.0
     ///
     /// **Default:** model-specific
     Sensitivity,
@@ -77,38 +73,423 @@ impl From<VadParameter> for AicVadParameter::Type {
     }
 }
 
-/// Thread-safe Voice Activity Detector handle backed by a [`Processor`](crate::Processor).
+/// High-level wrapper for the ai-coustics voice activity detector.
 ///
-/// The VAD works automatically from the audio the backing processor is fed: for an enhancement
-/// model it runs on the enhanced output, and for a dedicated VAD model it reads the model's own
-/// prediction. Every method can be called from any thread, so a context can be moved to another
-/// thread while audio is processed elsewhere.
+/// A `Vad` is created from a VAD model (e.g. `vad-2.1-xxs-16khz`). Enhancement models
+/// cannot be used for voice activity detection; pass them to a [`Processor`](crate::Processor)
+/// instead.
 ///
-/// All handles created from a given processor reference the same VAD instance.
-///
-/// **Important:** If the backing processor is destroyed, the VAD instance will stop
-/// producing new data. Dropping the context does not destroy the processor.
+/// Feed the audio to be examined to [`Vad::process`]. The audio is not modified, it only
+/// updates the detector's prediction, which is read through a [`VadContext`].
 ///
 /// # Example
 ///
 /// ```rust,no_run
-/// use aic_sdk::{Model, Processor};
+/// use aic_sdk::{Model, ProcessorConfig, Vad};
 ///
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-/// let model = Model::from_file("/path/to/model.aicmodel")?;
-/// let processor = Processor::new(&model, &license_key)?;
-/// let vad = processor.vad_context();
+/// let model = Model::from_file("/path/to/vad_model.aicmodel")?;
+/// let config = ProcessorConfig::optimal(&model);
+///
+/// let mut vad = Vad::new(&model, &license_key)?.with_config(&config)?;
+/// let vad_ctx = vad.context();
+///
+/// let mut audio_block = vec![0.0f32; config.block_size];
+/// vad.process(&mut audio_block)?;
+///
+/// if vad_ctx.is_speech_detected() {
+///     println!("Speech detected!");
+/// }
+/// # Ok::<(), aic_sdk::AicError>(())
+/// ```
+pub struct Vad<'a> {
+    /// Raw pointer to the C VAD structure
+    inner: *mut AicVad,
+    /// Whether `initialize` has been called
+    initialized: bool,
+    /// Marker to tie the lifetime of the VAD to the lifetime of the model's weights
+    marker: PhantomData<&'a [u8]>,
+}
+
+impl<'a> Vad<'a> {
+    /// Creates a new voice activity detector instance.
+    ///
+    /// Multiple VAD instances can be created to process different audio streams simultaneously.
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - The loaded model instance. Must be a VAD model, otherwise
+    ///   [`AicError::ModelTypeUnsupported`] is returned.
+    /// * `license_key` - license key for the ai-coustics SDK
+    ///   (generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com/))
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Result` containing the new `Vad` instance or an [`AicError`] if creation fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Vad};
+    /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// let model = Model::from_file("/path/to/vad_model.aicmodel")?;
+    /// let vad = Vad::new(&model, &license_key)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
+    /// ```
+    pub fn new(model: &Model<'a>, license_key: &str) -> Result<Self, AicError> {
+        Self::create(model, license_key, None)
+    }
+
+    /// Creates a new voice activity detector instance with explicit OpenTelemetry configuration.
+    ///
+    /// This overrides the SDK's environment-based telemetry defaults (e.g.
+    /// `AIC_SDK_OTEL_ENABLE`) for this VAD.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, OtelConfig, Vad};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// let model = Model::from_file("/path/to/vad_model.aicmodel")?;
+    /// let otel = OtelConfig::enabled();
+    ///
+    /// let vad = Vad::with_otel_config(&model, &license_key, &otel)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
+    /// ```
+    pub fn with_otel_config(
+        model: &Model<'a>,
+        license_key: &str,
+        otel_config: &OtelConfig,
+    ) -> Result<Self, AicError> {
+        Self::create(model, license_key, Some(otel_config))
+    }
+
+    fn create(
+        model: &Model<'a>,
+        license_key: &str,
+        otel_config: Option<&OtelConfig>,
+    ) -> Result<Self, AicError> {
+        // Set the wrapper ID as soon as the user attempts to instantiate a VAD
+        crate::set_wrapper_id();
+
+        // Session ID must outlive the FFI call so its pointer stays valid.
+        let c_session_id = otel_config
+            .and_then(|o| o.session_id.as_deref())
+            .map(CString::new)
+            .transpose()
+            .map_err(|_| AicError::Internal)?;
+
+        let c_otel = otel_config.map(|o| AicOtelConfig {
+            enable: o.enable,
+            session_id: c_session_id.as_ref().map_or(ptr::null(), |s| s.as_ptr()),
+            export_interval_ms: o.export_interval_ms,
+        });
+        let c_otel_ptr = c_otel
+            .as_ref()
+            .map_or(ptr::null(), |o| o as *const AicOtelConfig);
+
+        let mut vad_ptr: *mut AicVad = ptr::null_mut();
+        let c_license_key =
+            CString::new(license_key).map_err(|_| AicError::LicenseFormatInvalid)?;
+
+        // SAFETY:
+        // - `vad_ptr` points to stack storage for output.
+        // - `model` is a valid SDK model pointer for the duration of the call.
+        // - `c_license_key` is a null-terminated CString.
+        // - `c_otel_ptr` is either null or points to a valid `AicOtelConfig` whose
+        //   `session_id` field (if non-null) outlives this call.
+        // - The output pointer is local to this call and not aliased.
+        let error_code = unsafe {
+            aic_vad_create(
+                &mut vad_ptr,
+                model.as_const_ptr(),
+                c_license_key.as_ptr(),
+                c_otel_ptr,
+            )
+        };
+
+        handle_error(error_code)?;
+
+        // This should never happen if the C library is well-behaved, but let's be defensive
+        assert!(
+            !vad_ptr.is_null(),
+            "C library returned success but null pointer"
+        );
+
+        Ok(Self {
+            inner: vad_ptr,
+            initialized: false,
+            marker: PhantomData,
+        })
+    }
+
+    /// Initializes the VAD with the given configuration.
+    ///
+    /// This is a convenience method that calls [`Vad::initialize`] internally and returns `self`.
+    /// The VAD is immediately ready to process audio after calling this method, so you don't
+    /// need to call [`Vad::initialize`] separately.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Audio processing configuration
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(Self)` with the initialized VAD, or an [`AicError`] if initialization fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, ProcessorConfig, Vad};
+    /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// let model = Model::from_file("/path/to/vad_model.aicmodel")?;
+    /// let config = ProcessorConfig::optimal(&model);
+    ///
+    /// let mut vad = Vad::new(&model, &license_key)?.with_config(&config)?;
+    ///
+    /// // VAD is ready to use - no need to call initialize()
+    /// let mut audio_block = vec![0.0f32; config.block_size];
+    /// vad.process(&mut audio_block)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
+    /// ```
+    pub fn with_config(mut self, config: &ProcessorConfig) -> Result<Self, AicError> {
+        self.initialize(config)?;
+        Ok(self)
+    }
+
+    /// Configures the VAD for specific audio settings.
+    ///
+    /// This function must be called before processing any audio.
+    /// For the most frequent prediction updates, use the sample rate and block size returned by
+    /// [`Model::optimal_sample_rate`] and [`Model::optimal_block_size`].
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Audio processing configuration
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an [`AicError`] if initialization fails.
+    ///
+    /// # Warning
+    /// Do not call from audio processing threads as this allocates memory.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, ProcessorConfig, Vad};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/vad_model.aicmodel")?;
+    /// # let mut vad = Vad::new(&model, &license_key)?;
+    /// let config = ProcessorConfig::optimal(&model);
+    /// vad.initialize(&config)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
+    /// ```
+    pub fn initialize(&mut self, config: &ProcessorConfig) -> Result<(), AicError> {
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live VAD.
+        // - This function is not thread-safe, so we borrow `&mut self`.
+        let error_code = unsafe {
+            aic_vad_initialize(
+                self.inner,
+                config.sample_rate,
+                config.block_size,
+                config.variable_block_size,
+            )
+        };
+
+        handle_error(error_code)?;
+        self.initialized = true;
+        Ok(())
+    }
+
+    /// Processes mono audio and updates the VAD prediction.
+    ///
+    /// The audio block is not enhanced. Treat it as input to the detector, and read the
+    /// prediction through a [`VadContext`].
+    ///
+    /// # Arguments
+    ///
+    /// * `audio` - Mono audio block to examine. Must be exactly of size `block_size`, or if
+    ///   `variable_block_size` was enabled, less than the initialization value.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an [`AicError`] if processing fails.
+    ///
+    /// # Real-time safety
+    ///
+    /// Real-time safe. Can be called from audio processing threads.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, ProcessorConfig, Vad};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/vad_model.aicmodel")?;
+    /// # let mut vad = Vad::new(&model, &license_key)?;
+    /// let config = ProcessorConfig::optimal(&model);
+    /// vad.initialize(&config)?;
+    /// let mut audio = vec![0.0f32; config.block_size];
+    /// vad.process(&mut audio)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
+    /// ```
+    pub fn process(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
+        if !self.initialized {
+            return Err(AicError::NotInitialized);
+        }
+
+        let audio_len = audio.len();
+
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live VAD.
+        // - `audio` points to a contiguous, writable f32 slice of length `audio_len`.
+        // - This function is not thread-safe, so we borrow `&mut self`.
+        let error_code = unsafe { aic_vad_process(self.inner, audio.as_mut_ptr(), audio_len) };
+
+        handle_error(error_code)
+    }
+
+    /// Creates a [`VadContext`] instance.
+    /// This can be used to read the prediction and to control all parameters and other
+    /// settings of the VAD.
+    ///
+    /// All handles created from a given VAD reference the same VAD instance.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Vad};
+    /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// let model = Model::from_file("/path/to/vad_model.aicmodel")?;
+    /// let vad = Vad::new(&model, &license_key)?;
+    /// let vad_ctx = vad.context();
+    /// # Ok::<(), aic_sdk::AicError>(())
+    /// ```
+    pub fn context(&self) -> VadContext {
+        let mut context_ptr: *mut AicVadContext = ptr::null_mut();
+
+        // SAFETY:
+        // - `context_ptr` is valid output storage and not aliased.
+        // - `self.as_const_ptr()` is a live VAD pointer.
+        // - This function can be called from any thread and may run while the
+        //   VAD is in use, so we only borrow `&self`.
+        let error_code = unsafe { aic_vad_context_create(&mut context_ptr, self.as_const_ptr()) };
+
+        // This should never fail
+        assert!(handle_error(error_code).is_ok());
+
+        // This should never happen if the C library is well-behaved, but let's be defensive
+        assert!(
+            !context_ptr.is_null(),
+            "C library returned success but null pointer"
+        );
+
+        VadContext::new(context_ptr)
+    }
+
+    /// Terminates the telemetry session associated with this VAD.
+    ///
+    /// Once the request has been handled, the VAD is no longer allowed to process audio.
+    ///
+    /// This is meant for lifecycle management events. A telemetry session is stopped
+    /// automatically when the [`Vad`] is dropped, so calling this is only necessary when
+    /// the session must end before the VAD itself goes out of scope.
+    ///
+    /// This blocks until the telemetry session is terminated, unless another session is still
+    /// alive. In that case it returns early and termination happens asynchronously.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an [`AicError`] if termination cannot be requested.
+    ///
+    /// # Real-time safety
+    ///
+    /// This function is not real-time safe. It may block until the session is terminated.
+    /// Avoid calling it from audio threads.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Vad};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/vad_model.aicmodel")?;
+    /// let mut vad = Vad::new(&model, &license_key)?;
+    /// vad.terminate_session()?;
+    /// # Ok::<(), aic_sdk::AicError>(())
+    /// ```
+    pub fn terminate_session(&mut self) -> Result<(), AicError> {
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live VAD.
+        // - This function must not run concurrently with any other call taking the same
+        //   VAD handle, so we borrow `&mut self`.
+        let error_code = unsafe { aic_vad_terminate_session(self.inner) };
+        handle_error(error_code)
+    }
+
+    fn as_const_ptr(&self) -> *const AicVad {
+        self.inner as *const AicVad
+    }
+}
+
+impl<'a> Drop for Vad<'a> {
+    fn drop(&mut self) {
+        if !self.inner.is_null() {
+            // SAFETY:
+            // - `self.inner` was allocated by the SDK and is still owned by this wrapper.
+            // - This function is not thread-safe with concurrent VAD use, but
+            //   `drop` has exclusive access to `self`.
+            unsafe { aic_vad_destroy(self.inner) };
+        }
+    }
+}
+
+// SAFETY: Everything in Vad is Send, with the exception of the inner raw pointer.
+// The Vad only uses the raw pointer according to the safety contracts of the
+// unsafe APIs that require the pointer, and the Vad does not expose access to the
+// raw pointer in any of its methods. Therefore, it is safe to implement Send for Vad.
+unsafe impl<'a> Send for Vad<'a> {}
+
+// SAFETY: Vad does not expose any interior mutability. The SDK functions that are documented
+// as not thread-safe (`aic_vad_initialize`, `aic_vad_process`, `aic_vad_terminate_session`,
+// `aic_vad_destroy`) are only reachable through methods that take `&mut self` or through `drop`,
+// so Rust's borrow rules serialize them. The only method that takes `&self` (`context`) just
+// creates a new context handle from a const VAD pointer, which is safe to do while the VAD is in
+// use on another thread. Therefore, it is safe to implement Sync for Vad.
+unsafe impl<'a> Sync for Vad<'a> {}
+
+/// Thread-safe control handle for a [`Vad`].
+///
+/// Create one with [`Vad::context`]. Every method on this type maps to an SDK function that
+/// can be called from any thread, so a context can be moved to another thread to read the
+/// prediction, read and write parameters, query the output delay, or reset the VAD while audio is
+/// being processed elsewhere.
+///
+/// All handles created from a given VAD reference the same VAD instance.
+///
+/// **Important:** If the backing [`Vad`] is dropped, the VAD stops producing new data. Dropping
+/// the context does not destroy the VAD.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use aic_sdk::{Model, Vad};
+///
+/// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+/// let model = Model::from_file("/path/to/vad_model.aicmodel")?;
+/// let vad = Vad::new(&model, &license_key)?;
+/// let vad_ctx = vad.context();
 /// # Ok::<(), aic_sdk::AicError>(())
 /// ```
 pub struct VadContext {
-    /// Raw pointer to the C VAD structure
+    /// Raw pointer to the C VAD context structure
     inner: *mut AicVadContext,
 }
 
 impl VadContext {
     /// Creates a new VAD context.
-    pub(crate) fn new(vad_ptr: *mut AicVadContext) -> Self {
-        Self { inner: vad_ptr }
+    pub(crate) fn new(context_ptr: *mut AicVadContext) -> Self {
+        Self { inner: context_ptr }
     }
 
     fn as_const_ptr(&self) -> *const AicVadContext {
@@ -119,14 +500,13 @@ impl VadContext {
     ///
     /// # Latency
     ///
-    /// The latency of the VAD prediction is equal to the backing processor's processing latency,
-    /// reported by [`ProcessorContext::output_delay`](crate::ProcessorContext::output_delay).
-    /// The prediction lags its input by that many samples, even for a dedicated VAD model
-    /// whose audio block passes through untouched.
+    /// The latency of the VAD prediction is equal to the backing VAD's processing latency,
+    /// reported by [`VadContext::output_delay`]. The prediction lags its input by that many
+    /// samples.
     ///
     /// Align speech decisions to the input timeline using that delay.
     ///
-    /// If the backing processor stops being processed, the VAD will not update its prediction.
+    /// If the backing VAD stops being processed, the VAD will not update its prediction.
     pub fn is_speech_detected(&self) -> bool {
         let mut value: bool = false;
         // SAFETY:
@@ -150,22 +530,15 @@ impl VadContext {
     ///
     /// This value may be used to build other abstractions on top of this data.
     ///
-    /// # Note
-    ///
-    /// This value is only useful when using a VAD model. When using an energy-based VAD,
-    /// the raw prediction is set to 1.0 or 0.0 depending on whether [`VadContext::is_speech_detected`]
-    /// is true or false.
-    ///
     /// # Latency
     ///
-    /// The latency of the VAD prediction is equal to the backing processor's processing latency,
-    /// reported by [`ProcessorContext::output_delay`](crate::ProcessorContext::output_delay).
-    /// The prediction lags its input by that many samples, even for a dedicated VAD model
-    /// whose audio block passes through untouched.
+    /// The latency of the VAD prediction is equal to the backing VAD's processing latency,
+    /// reported by [`VadContext::output_delay`]. The prediction lags its input by that many
+    /// samples.
     ///
     /// Align speech decisions to the input timeline using that delay.
     ///
-    /// If the backing processor stops being processed, the VAD will not update its prediction.
+    /// If the backing VAD stops being processed, the VAD will not update its prediction.
     pub fn raw_vad_probability(&self) -> f32 {
         let mut value: f32 = 0.0;
         // SAFETY:
@@ -197,13 +570,13 @@ impl VadContext {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use aic_sdk::{Model, Processor, VadParameter};
+    /// # use aic_sdk::{Model, Vad, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let processor = Processor::new(&model, &license_key)?;
-    /// # let vad = processor.vad_context();
-    /// vad.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
-    /// vad.set_parameter(VadParameter::Sensitivity, 5.0)?;
+    /// # let model = Model::from_file("/path/to/vad_model.aicmodel")?;
+    /// # let vad = Vad::new(&model, &license_key)?;
+    /// # let vad_ctx = vad.context();
+    /// vad_ctx.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
+    /// vad_ctx.set_parameter(VadParameter::Sensitivity, 0.5)?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn set_parameter(&self, parameter: VadParameter, value: f32) -> Result<(), AicError> {
@@ -230,12 +603,12 @@ impl VadContext {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use aic_sdk::{Model, Processor, VadParameter};
+    /// # use aic_sdk::{Model, Vad, VadParameter};
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let processor = Processor::new(&model, &license_key)?;
-    /// # let vad = processor.vad_context();
-    /// let sensitivity = vad.parameter(VadParameter::Sensitivity)?;
+    /// # let model = Model::from_file("/path/to/vad_model.aicmodel")?;
+    /// # let vad = Vad::new(&model, &license_key)?;
+    /// # let vad_ctx = vad.context();
+    /// let sensitivity = vad_ctx.parameter(VadParameter::Sensitivity)?;
     /// println!("Current sensitivity: {sensitivity}");
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
@@ -250,6 +623,154 @@ impl VadContext {
         };
         handle_error(error_code)?;
         Ok(value)
+    }
+
+    /// Returns the total VAD prediction delay in samples for the current audio configuration.
+    ///
+    /// This function provides the complete end-to-end latency of the VAD prediction, which
+    /// includes input reblocking, STFT, and model processing delay. Use this value to line up
+    /// VAD decisions with the input timeline.
+    ///
+    /// **Delay behavior:**
+    /// - **Before initialization:** Returns the base processing delay using the model's
+    ///   optimal block size at its native sample rate
+    /// - **After initialization:** Returns the end-to-end VAD prediction delay at the
+    ///   initialized sample rate, including the input-buffering latency of the configured
+    ///   block size
+    ///
+    /// **Important:** The delay value is always expressed in samples at the sample rate
+    /// you configured during [`Vad::initialize`]. To convert to time units:
+    /// `delay_ms = (delay_samples * 1000) / sample_rate`
+    ///
+    /// **Note:** Using a block size different from the optimal value returned by
+    /// [`Model::optimal_block_size`], or enabling variable block sizes, can add input-buffering
+    /// latency before a new VAD prediction is published. That latency is included in the
+    /// reported delay.
+    ///
+    /// # Returns
+    ///
+    /// Returns the delay in samples.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Vad};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/vad_model.aicmodel")?;
+    /// # let vad = Vad::new(&model, &license_key)?;
+    /// # let vad_ctx = vad.context();
+    /// let delay = vad_ctx.output_delay();
+    /// println!("VAD prediction delay: {delay} samples");
+    /// # Ok::<(), aic_sdk::AicError>(())
+    /// ```
+    pub fn output_delay(&self) -> usize {
+        let mut delay: usize = 0;
+        // SAFETY:
+        // - `self.as_const_ptr()` is a valid pointer to a live VAD context.
+        // - `delay` points to stack storage for output.
+        // - This function can be called from any thread, so we only borrow `&self`.
+        let error_code =
+            unsafe { aic_vad_context_get_output_delay(self.as_const_ptr(), &mut delay) };
+
+        // This should never fail. If it does, it's a bug in the SDK.
+        // `aic_vad_context_get_output_delay` is documented to always succeed if given
+        // valid pointers.
+        assert_success(
+            error_code,
+            "`aic_vad_context_get_output_delay` failed. This is a bug, please open an issue on GitHub for further investigation.",
+        );
+
+        delay
+    }
+
+    /// Clears all internal state and buffers. This also resets the VAD state, so the published
+    /// speech detection and raw probability values are cleared immediately.
+    ///
+    /// Call this when the audio stream is interrupted or when seeking
+    /// to prevent mispredictions from previous audio content.
+    ///
+    /// The VAD stays initialized to the configured settings.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an [`AicError`] if the reset fails.
+    ///
+    /// # Real-time safety
+    ///
+    /// Real-time safe. Can be called from audio processing threads.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Vad};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/vad_model.aicmodel")?;
+    /// # let vad = Vad::new(&model, &license_key)?;
+    /// # let vad_ctx = vad.context();
+    /// vad_ctx.reset()?;
+    /// # Ok::<(), aic_sdk::AicError>(())
+    /// ```
+    pub fn reset(&self) -> Result<(), AicError> {
+        // SAFETY:
+        // - `self.as_const_ptr()` is a valid pointer to a live VAD context.
+        // - This function can be called from any thread, so we only borrow `&self`.
+        let error_code = unsafe { aic_vad_context_reset(self.as_const_ptr()) };
+        handle_error(error_code)
+    }
+
+    /// Replaces the bearer token on the running VAD.
+    ///
+    /// Use this when your license key is a JWT and needs to be refreshed before it expires.
+    /// Audio processing continues uninterrupted, the context handle stays valid, and the new
+    /// token is used for all subsequent authentication against the ai-coustics backend.
+    ///
+    /// In-place updates are only supported when both the originally configured key and the
+    /// new token are JWTs. If either side is not, the call returns
+    /// [`AicError::TokenUpdateUnsupported`] and the existing token stays in use.
+    ///
+    /// On any error the call is a no-op: the previously active token stays in use and the
+    /// telemetry session is unaffected. On success the swap is applied immediately and is **not**
+    /// gated on backend acceptance. The token is only validated locally for format; if the
+    /// backend later rejects it, the SDK retries it under backoff rather than rolling back, and
+    /// audio processing is eventually disabled if no accepted token arrives in time. Supplying a
+    /// known-good token during that window recovers the session.
+    ///
+    /// Safe to call concurrently with [`Vad::process`] on the originating VAD.
+    ///
+    /// # Arguments
+    ///
+    /// * `token` - The new JWT to install.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an [`AicError`] if the update fails.
+    ///
+    /// # Real-time safety
+    ///
+    /// This function is not real-time safe. It locks a mutex and allocates memory.
+    /// Avoid calling it from audio threads.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Vad};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/vad_model.aicmodel")?;
+    /// let vad = Vad::new(&model, &license_key)?;
+    /// let vad_ctx = vad.context();
+    /// let renewed_jwt = String::from("<JWT_BEARER_TOKEN>");
+    /// vad_ctx.update_bearer_token(&renewed_jwt)?;
+    /// # Ok::<(), aic_sdk::AicError>(())
+    /// ```
+    pub fn update_bearer_token(&self, token: &str) -> Result<(), AicError> {
+        let c_token = CString::new(token).map_err(|_| AicError::LicenseFormatInvalid)?;
+        // SAFETY:
+        // - `self.as_const_ptr()` is a valid pointer to a live VAD context.
+        // - `c_token` is a null-terminated CString that outlives the call.
+        // - This function can be called from any thread.
+        let error_code =
+            unsafe { aic_vad_context_update_bearer_token(self.as_const_ptr(), c_token.as_ptr()) };
+        handle_error(error_code)
     }
 }
 
@@ -268,3 +789,168 @@ impl Drop for VadContext {
 // Safety: The underlying C library should be thread-safe for individual VadContext instances
 unsafe impl Send for VadContext {}
 unsafe impl Sync for VadContext {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+        sync::{Mutex, OnceLock},
+    };
+
+    fn download_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn find_existing_model(target_dir: &Path, name_fragment: &str) -> Option<PathBuf> {
+        let entries = fs::read_dir(target_dir).ok()?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|name| name.contains(name_fragment) && name.ends_with(".aicmodel"))
+                .unwrap_or(false)
+                && path.is_file()
+            {
+                return Some(path);
+            }
+        }
+        None
+    }
+
+    /// Downloads `model_id` into the crate's `target/` directory and returns its path.
+    fn get_model(model_id: &str, name_fragment: &str) -> Result<PathBuf, AicError> {
+        let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
+
+        if let Some(existing) = find_existing_model(&target_dir, name_fragment) {
+            return Ok(existing);
+        }
+
+        let _guard = download_lock().lock().unwrap();
+        if let Some(existing) = find_existing_model(&target_dir, name_fragment) {
+            return Ok(existing);
+        }
+
+        if cfg!(feature = "download-model") {
+            Model::download(model_id, target_dir)
+        } else {
+            panic!(
+                "Model `{model_id}` not found in {} and `download-model` feature is disabled",
+                target_dir.display()
+            );
+        }
+    }
+
+    fn license_key() -> String {
+        std::env::var("AIC_SDK_LICENSE")
+            .expect("AIC_SDK_LICENSE environment variable must be set for tests")
+    }
+
+    fn load_vad_model() -> Model<'static> {
+        let model_path = get_model("vad-2.1-xxs-16khz", "vad_2_1_xxs_16khz").unwrap();
+        Model::from_file(&model_path).unwrap()
+    }
+
+    #[test]
+    fn vad_processes_audio_and_reports_prediction() {
+        let model = load_vad_model();
+        let config = ProcessorConfig::optimal(&model);
+
+        let mut vad = Vad::new(&model, &license_key())
+            .unwrap()
+            .with_config(&config)
+            .unwrap();
+
+        let vad_ctx = vad.context();
+        assert!(vad_ctx.output_delay() > 0);
+
+        let mut audio = vec![0.0f32; config.block_size];
+        vad.process(&mut audio).unwrap();
+
+        // Silence must not be reported as speech.
+        assert!(!vad_ctx.is_speech_detected());
+        assert!((0.0..=1.0).contains(&vad_ctx.raw_vad_probability()));
+
+        vad_ctx.reset().unwrap();
+    }
+
+    #[test]
+    fn vad_rejects_process_before_initialize() {
+        let model = load_vad_model();
+        let mut vad = Vad::new(&model, &license_key()).unwrap();
+
+        let mut audio = vec![0.0f32; 160];
+        assert_eq!(vad.process(&mut audio), Err(AicError::NotInitialized));
+    }
+
+    #[test]
+    fn vad_rejects_enhancement_model() {
+        let model_path = get_model("rook-s-48khz", "rook_s_48khz").unwrap();
+        let model = Model::from_file(&model_path).unwrap();
+
+        assert_eq!(
+            Vad::new(&model, &license_key()).err(),
+            Some(AicError::ModelTypeUnsupported)
+        );
+    }
+
+    #[test]
+    fn vad_parameters_round_trip() {
+        let model = load_vad_model();
+        let vad = Vad::new(&model, &license_key()).unwrap();
+        let vad_ctx = vad.context();
+
+        vad_ctx
+            .set_parameter(VadParameter::Sensitivity, 0.5)
+            .unwrap();
+        assert_eq!(vad_ctx.parameter(VadParameter::Sensitivity).unwrap(), 0.5);
+
+        // The sensitivity of a VAD model is a probability threshold.
+        assert_eq!(
+            vad_ctx.set_parameter(VadParameter::Sensitivity, 7.0),
+            Err(AicError::ParameterOutOfRange)
+        );
+    }
+
+    #[test]
+    fn vad_is_send_and_sync() {
+        // Compile-time check that Vad and VadContext implement Send and Sync.
+        fn assert_send<T: Send>() {}
+        fn assert_sync<T: Sync>() {}
+
+        assert_send::<Vad>();
+        assert_sync::<Vad>();
+        assert_send::<VadContext>();
+        assert_sync::<VadContext>();
+    }
+}
+
+#[doc(hidden)]
+mod _compile_fail_tests {
+    //! Compile-fail regression: a `Vad`'s model buffer must not be dropped before the VAD.
+    //!
+    //! ```rust,compile_fail
+    //! use aic_sdk::{Model, ProcessorConfig, Vad};
+    //!
+    //! fn main() {
+    //!     let buffer = vec![0u8; 64];
+    //!     let model = Model::from_buffer(&buffer).unwrap();
+    //!     let config = ProcessorConfig::optimal(&model);
+    //!
+    //!     let mut vad = Vad::new(&model, "license")
+    //!         .unwrap()
+    //!         .with_config(&config)
+    //!         .unwrap();
+    //!
+    //!     drop(model); // Model can be dropped without issues
+    //!
+    //!     drop(buffer); // This should fail to compile
+    //!
+    //!     let mut audio = vec![0.0f32; config.block_size];
+    //!     vad.process(&mut audio).unwrap();
+    //! }
+    //! ```
+}

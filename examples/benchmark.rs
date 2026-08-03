@@ -220,7 +220,7 @@ fn spawn_session(
                 }
             };
 
-        let mut buffer = vec![0.0f32; config.block_size];
+        let mut audio_block = vec![0.0f32; config.block_size];
 
         let mut max_execution_time = Duration::from_secs(0);
         let mut error = None;
@@ -233,9 +233,9 @@ fn spawn_session(
                 break;
             }
 
-            // Process the audio buffer
+            // Process the audio block
             let process_start = Instant::now();
-            if let Err(err) = processor.process(&mut buffer) {
+            if let Err(err) = processor.process(&mut audio_block) {
                 error = Some(format!("process error: {}", err));
                 break;
             }

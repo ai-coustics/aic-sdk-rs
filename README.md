@@ -135,8 +135,8 @@ processor.initialize(&config)?;
 
 ### OpenTelemetry
 
-By default, processor telemetry follows the SDK environment configuration, such as
-`AIC_SDK_OTEL_ENABLE`. Use `OtelConfig` when a single processor needs an explicit
+By default, telemetry follows the SDK environment configuration, such as
+`AIC_SDK_OTEL_ENABLE`. Use `OtelConfig` when a single processor or VAD needs an explicit
 telemetry setting or session ID.
 
 ```rust,ignore
@@ -164,7 +164,7 @@ lifecycle event. The processor cannot process audio afterwards.
 processor.terminate_session()?;
 ```
 
-The same applies to `Analyzer::terminate_session`.
+The same applies to `Vad::terminate_session` and `Analyzer::terminate_session`.
 
 ### Processor Context
 
@@ -174,7 +174,7 @@ The processor context provides thread-safe access to processor parameters and st
 use aic_sdk::ProcessorParameter;
 
 // Get processor context
-let proc_ctx = processor.processor_context();
+let proc_ctx = processor.context();
 
 // Get output delay in samples
 let delay = proc_ctx.output_delay();
@@ -193,16 +193,34 @@ println!("Enhancement level: {}", level);
 
 ### Voice Activity Detection (VAD)
 
-The VAD context provides thread-safe access to VAD parameters and state. You can create multiple contexts and move them to any thread for concurrent parameter updates.
+Voice activity detection runs on its own `Vad` instance, created from a dedicated VAD model
+(e.g. `vad-2.1-xxs-16khz`). Enhancement models are rejected with
+`AicError::ModelTypeUnsupported`.
+
+```rust,ignore
+use aic_sdk::{Model, ProcessorConfig, Vad};
+
+let model = Model::from_file("path/to/vad_model.aicmodel")?;
+let config = ProcessorConfig::optimal(&model);
+
+let mut vad = Vad::new(&model, &license_key)?.with_config(&config)?;
+
+// Feed mono audio to the detector. The audio block is not modified.
+let mut audio_block = vec![0.0f32; config.block_size];
+vad.process(&mut audio_block)?;
+```
+
+The VAD context provides thread-safe access to the prediction, the VAD parameters and its state.
+You can create multiple contexts and move them to any thread for concurrent parameter updates.
 
 ```rust,ignore
 use aic_sdk::VadParameter;
 
-// Get VAD context from processor
-let vad_ctx = processor.vad_context();
+// Get VAD context from the VAD
+let vad_ctx = vad.context();
 
-// Configure VAD parameters
-vad_ctx.set_parameter(VadParameter::Sensitivity, 6.0)?;
+// Configure VAD parameters. Sensitivity is the probability threshold of the model output.
+vad_ctx.set_parameter(VadParameter::Sensitivity, 0.5)?;
 vad_ctx.set_parameter(VadParameter::SpeechHoldDuration, 0.05)?;
 vad_ctx.set_parameter(VadParameter::MinimumSpeechDuration, 0.0)?;
 
@@ -210,11 +228,19 @@ vad_ctx.set_parameter(VadParameter::MinimumSpeechDuration, 0.0)?;
 let sensitivity = vad_ctx.parameter(VadParameter::Sensitivity)?;
 println!("VAD sensitivity: {}", sensitivity);
 
-// Check for speech (after processing audio through the processor)
+// How many samples the prediction lags behind the input
+let delay = vad_ctx.output_delay();
+
+// Check for speech (after processing audio through the VAD)
 if vad_ctx.is_speech_detected() {
     println!("Speech detected!");
 }
+
+// Clear the prediction and all internal state, e.g. when the stream is interrupted
+vad_ctx.reset()?;
 ```
+
+With the `async` feature, `VadAsync` mirrors `ProcessorAsync` for use in async contexts.
 
 ### Working with the Analyzer
 
@@ -266,7 +292,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_config(&config)
         .await?;
 
-    // The async API takes ownership of the buffer and returns it back.
+    // The async API takes ownership of the audio block and returns it back.
     let audio = vec![0.0f32; config.block_size];
     let audio = processor.process(audio).await?;
     Ok(())
@@ -278,6 +304,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 See the example files for complete working examples:
 
 - [`examples/basic_usage.rs`](examples/basic_usage.rs) - Basic usage example
+- [`examples/vad.rs`](examples/vad.rs) - Voice activity detection with a dedicated VAD model
 - [`examples/build-time-download`](examples/build-time-download) - Download and embed models at compile-time
 - [`examples/benchmark.rs`](examples/benchmark.rs) - Run multiple processor instances concurrently until the real-time requirements are not met
 - [`examples/parallel_async.rs`](examples/parallel_async.rs) - Async processing with `ProcessorAsync` across multiple instances (requires `async`)

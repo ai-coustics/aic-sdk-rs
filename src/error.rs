@@ -10,17 +10,17 @@ pub enum AicError {
     )]
     ParameterOutOfRange,
     #[error(
-        "Processor or collector must be initialized before calling this operation. Call `Processor::initialize` or `Collector::initialize` first."
+        "Handle must be initialized before calling this operation. Call `Processor::initialize`, `Vad::initialize` or `Collector::initialize` first."
     )]
-    ProcessorNotInitialized,
+    NotInitialized,
     #[error("Audio configuration (sample_rate, block_size) is not supported by the model")]
     AudioConfigUnsupported,
     #[error("Audio block configuration differs from the one provided during initialization")]
     AudioConfigMismatch,
     #[error(
-        "SDK key was not authorized or process failed to report usage. Check if you have internet connection."
+        "Processing is not allowed because the SDK key was not authorized or usage reporting failed. Check if you have internet connection."
     )]
-    EnhancementNotAllowed,
+    ProcessingNotAllowed,
     #[error("Internal error occurred. Contact support.")]
     Internal,
     #[error("License key format is invalid or corrupted. Verify the key was copied correctly.")]
@@ -66,10 +66,10 @@ impl From<AicErrorCode::Type> for AicError {
                 );
             }
             AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE => AicError::ParameterOutOfRange,
-            AIC_ERROR_CODE_PROCESSOR_NOT_INITIALIZED => AicError::ProcessorNotInitialized,
+            AIC_ERROR_CODE_NOT_INITIALIZED => AicError::NotInitialized,
             AIC_ERROR_CODE_AUDIO_CONFIG_UNSUPPORTED => AicError::AudioConfigUnsupported,
             AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH => AicError::AudioConfigMismatch,
-            AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED => AicError::EnhancementNotAllowed,
+            AIC_ERROR_CODE_PROCESSING_NOT_ALLOWED => AicError::ProcessingNotAllowed,
             AIC_ERROR_CODE_INTERNAL_ERROR => AicError::Internal,
             AIC_ERROR_CODE_LICENSE_FORMAT_INVALID => AicError::LicenseFormatInvalid,
             AIC_ERROR_CODE_LICENSE_VERSION_UNSUPPORTED => AicError::LicenseVersionUnsupported,
