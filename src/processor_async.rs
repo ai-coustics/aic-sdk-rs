@@ -48,7 +48,7 @@ fn get_global_thread_pool() -> &'static rayon::ThreadPool {
 ///
 ///     let processor = ProcessorAsync::new(&model, &license_key)?.with_config(&config).await?;
 ///
-///     let mut audio = vec![0.0f32; config.num_frames];
+///     let mut audio = vec![0.0f32; config.block_size];
 ///     let audio = processor.process(audio).await?;
 ///     Ok(())
 /// }
@@ -120,6 +120,22 @@ impl ProcessorAsync {
         get_global_thread_pool().spawn(move || {
             let result = processor.process(&mut audio).map(|_| audio);
             let _ = tx.send(result);
+        });
+        rx.await.expect("Rayon worker dropped")
+    }
+
+    /// Terminates the telemetry session associated with this processor.
+    ///
+    /// See [`Processor::terminate_session`] for details.
+    ///
+    /// # Warning
+    /// This may block until the session is terminated, so it runs on the background
+    /// thread pool rather than the calling task.
+    pub async fn terminate_session(&self) -> Result<(), AicError> {
+        let (tx, rx) = oneshot::channel();
+        let mut processor = self.inner.lock_arc().await;
+        get_global_thread_pool().spawn(move || {
+            let _ = tx.send(processor.terminate_session());
         });
         rx.await.expect("Rayon worker dropped")
     }

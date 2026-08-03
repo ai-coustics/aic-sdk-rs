@@ -79,9 +79,14 @@ impl From<AicAnalysisResult> for AnalysisResult {
 ///
 /// # Arguments
 ///
-/// * `model` - The loaded model instance
+/// * `model` - The loaded model instance. Must be an analysis model, otherwise
+///   [`AicError::ModelTypeUnsupported`] is returned.
 /// * `license_key` - license key for the ai-coustics SDK
 ///   (generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com/))
+///
+/// # Warning
+///
+/// This function allocates memory. Do not call it from audio processing threads.
 ///
 /// # Example
 ///
@@ -157,8 +162,8 @@ impl Collector {
     /// Configures the collector for specific audio settings.
     ///
     /// This function must be called before buffering any audio.
-    /// For the lowest delay use the sample rate and frame size returned by
-    /// [`Model::optimal_sample_rate`] and [`Model::optimal_num_frames`].
+    /// Using the sample rate and block size returned by [`Model::optimal_sample_rate`] and
+    /// [`Model::optimal_block_size`] avoids internal resampling and rebuffering.
     ///
     /// # Arguments
     ///
@@ -190,9 +195,8 @@ impl Collector {
             aic_collector_initialize(
                 self.inner,
                 config.sample_rate,
-                1,
-                config.num_frames,
-                config.allow_variable_frames,
+                config.block_size,
+                config.variable_block_size,
             )
         };
 
@@ -205,13 +209,17 @@ impl Collector {
     ///
     /// # Arguments
     ///
-    /// * `audio` - Mono audio buffer to be buffered. Must be exactly of size
-    ///   `num_frames`, or if `allow_variable_frames` was enabled, less than
+    /// * `audio` - Mono audio block to be buffered. Must be exactly of size
+    ///   `block_size`, or if `variable_block_size` was enabled, less than
     ///   the initialization value.
     ///
     /// # Returns
     ///
     /// Returns `Ok(())` on success or an [`AicError`] if buffering fails.
+    ///
+    /// # Real-time safety
+    ///
+    /// Real-time safe. Can be called from audio processing threads.
     ///
     /// # Example
     ///
@@ -222,7 +230,7 @@ impl Collector {
     /// # let (mut collector, _) = aic_sdk::analyzer_pair(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model);
     /// collector.initialize(&config)?;
-    /// let audio = vec![0.0f32; config.num_frames];
+    /// let audio = vec![0.0f32; config.block_size];
     /// collector.buffer(&audio)?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
@@ -231,14 +239,13 @@ impl Collector {
             return Err(AicError::ProcessorNotInitialized);
         }
 
-        let num_frames = audio.len();
+        let audio_len = audio.len();
 
         // SAFETY:
         // - `self.inner` is a valid pointer to a live collector.
-        // - `audio` points to a contiguous, readable f32 slice of length `num_frames`.
+        // - `audio` points to a contiguous, readable f32 slice of length `audio_len`.
         // - This function is not thread-safe, so we borrow `&mut self`.
-        let error_code =
-            unsafe { aic_collector_buffer_interleaved(self.inner, audio.as_ptr(), 1, num_frames) };
+        let error_code = unsafe { aic_collector_buffer(self.inner, audio.as_ptr(), audio_len) };
 
         handle_error(error_code)
     }
@@ -362,15 +369,62 @@ impl<'a> Analyzer<'a> {
         Ok(result.into())
     }
 
+    /// Terminates the telemetry session associated with this analyzer.
+    ///
+    /// Once the request has been handled, the analyzer is no longer allowed to analyze
+    /// buffered audio.
+    ///
+    /// This is meant for lifecycle management events. A telemetry session is stopped
+    /// automatically when the [`Analyzer`] is dropped, so calling this is only necessary when
+    /// the session must end before the analyzer itself goes out of scope.
+    ///
+    /// This blocks until the telemetry session is terminated, unless another session is still
+    /// alive. In that case it returns early and termination happens asynchronously.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an [`AicError`] if termination cannot be requested.
+    ///
+    /// # Real-time safety
+    ///
+    /// This function is not real-time safe. It may block until the session is terminated.
+    /// Avoid calling it from audio threads.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::Model;
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let (_, mut analyzer) = aic_sdk::analyzer_pair(&model, &license_key)?;
+    /// analyzer.terminate_session()?;
+    /// # Ok::<(), aic_sdk::AicError>(())
+    /// ```
+    pub fn terminate_session(&mut self) -> Result<(), AicError> {
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live analyzer.
+        // - This function must not run concurrently with any other call taking the same
+        //   analyzer handle, so we borrow `&mut self`.
+        let error_code = unsafe { aic_analyzer_terminate_session(self.inner) };
+        handle_error(error_code)
+    }
+
     /// Replaces the bearer token on the analyzer.
     ///
     /// Use this when your license key is a JWT and needs to be refreshed before it expires.
-    /// Audio processing continues uninterrupted, the context handle stays valid, and the new
-    /// token is used for all subsequent authentication against the ai-coustics backend.
+    /// The analyzer handle stays valid, buffered spectra stay available, and the new token is
+    /// used for all subsequent authentication against the ai-coustics backend.
     ///
     /// In-place updates are only supported when both the originally configured key and the
     /// new token are JWTs. If either side is not, the call returns
     /// [`AicError::TokenUpdateUnsupported`] and the existing token stays in use.
+    ///
+    /// On any error the call is a no-op: the previously active token stays in use and the
+    /// telemetry session is unaffected. On success the swap is applied immediately and is **not**
+    /// gated on backend acceptance. The token is only validated locally for format; if the
+    /// backend later rejects it, the SDK retries it under backoff rather than rolling back, and
+    /// analysis calls may be rejected if no accepted token arrives in time. Supplying a
+    /// known-good token during that window recovers the session.
     ///
     /// # Arguments
     ///
@@ -573,7 +627,7 @@ mod tests {
         let config = ProcessorConfig::optimal(&model);
         collector.initialize(&config).unwrap();
 
-        let audio = vec![0.0f32; config.num_frames];
+        let audio = vec![0.0f32; config.block_size];
         collector.buffer(&audio).unwrap();
 
         let result = analyzer.analyze_buffered().unwrap();
@@ -581,13 +635,13 @@ mod tests {
     }
 
     #[test]
-    fn collector_buffers_variable_frames_when_enabled() {
+    fn collector_buffers_variable_block_size_when_enabled() {
         let (model, license_key) = load_test_model().unwrap();
         let (mut collector, _analyzer) = test_analyzer_pair(&model, &license_key);
-        let config = ProcessorConfig::optimal(&model).with_allow_variable_frames(true);
+        let config = ProcessorConfig::optimal(&model).with_variable_block_size(true);
         collector.initialize(&config).unwrap();
 
-        let full = vec![0.0f32; config.num_frames];
+        let full = vec![0.0f32; config.block_size];
         collector.buffer(&full).unwrap();
 
         let short = vec![0.0f32; 20];
@@ -595,13 +649,13 @@ mod tests {
     }
 
     #[test]
-    fn collector_rejects_variable_frames_when_disabled() {
+    fn collector_rejects_variable_block_size_when_disabled() {
         let (model, license_key) = load_test_model().unwrap();
         let (mut collector, _analyzer) = test_analyzer_pair(&model, &license_key);
         let config = ProcessorConfig::optimal(&model);
         collector.initialize(&config).unwrap();
 
-        let full = vec![0.0f32; config.num_frames];
+        let full = vec![0.0f32; config.block_size];
         collector.buffer(&full).unwrap();
 
         let short = vec![0.0f32; 20];
@@ -617,7 +671,7 @@ mod tests {
 
         analyzer.reset().unwrap();
 
-        let audio = vec![0.0f32; config.num_frames];
+        let audio = vec![0.0f32; config.block_size];
         collector.buffer(&audio).unwrap();
 
         let result = analyzer.analyze_buffered().unwrap();
@@ -633,7 +687,7 @@ mod tests {
 
         collector.initialize(&config).unwrap();
 
-        let audio = vec![0.0f32; config.num_frames];
+        let audio = vec![0.0f32; config.block_size];
         collector.buffer(&audio).unwrap();
 
         let result = analyzer.analyze_buffered().unwrap();
@@ -672,7 +726,7 @@ mod _compile_fail_tests {
     //!
     //!     drop(buffer); // This should fail to compile
     //!
-    //!     let audio = vec![0.0f32; config.num_frames];
+    //!     let audio = vec![0.0f32; config.block_size];
     //!     collector.buffer(&audio).unwrap();
     //!     analyzer.analyze_buffered().unwrap();
     //! }

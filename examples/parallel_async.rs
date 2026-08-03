@@ -26,8 +26,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = ProcessorConfig::optimal(&model);
     println!(
-        "Config: {} Hz, {} frames/buffer\n",
-        config.sample_rate, config.num_frames
+        "Config: {} Hz, block size {}\n",
+        config.sample_rate, config.block_size
     );
 
     // Build all processors up front
@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         NUM_PROCESSORS, ITERATIONS
     );
 
-    let buf_len = config.num_frames;
+    let buf_len = config.block_size;
 
     // Sequential baseline
     let sequential_start = Instant::now();
@@ -68,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|p| {
             let config = config.clone();
             async move {
-                let mut audio = vec![0.0f32; config.num_frames];
+                let mut audio = vec![0.0f32; config.block_size];
                 let t0 = Instant::now();
                 for _ in 0..ITERATIONS {
                     audio = p.process(audio).await?;

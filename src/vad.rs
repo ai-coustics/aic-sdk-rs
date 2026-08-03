@@ -11,15 +11,15 @@ pub enum VadParameter {
     /// This affects the stability of speech detected -> not detected transitions.
     ///
     /// The VAD reports speech detected if the audio signal contained speech in at least 50%
-    /// of the frames processed in the last `speech_hold_duration * 2` seconds.
+    /// of the blocks processed in the last `speech_hold_duration * 2` seconds.
     ///
     /// For example, if `speech_hold_duration` is set to 0.5 seconds and the VAD stops detecting speech
     /// in the audio signal, the VAD will continue to report speech for 0.5 seconds assuming the
-    /// VAD does not detect speech again during that period. If a few frames of speech are detected
-    /// during that period, those frames will be included in the 50% calculation, which will extend
+    /// VAD does not detect speech again during that period. If a few blocks of speech are detected
+    /// during that period, those blocks will be included in the 50% calculation, which will extend
     /// the speech detection period until the 50% threshold is no longer met.
     ///
-    /// NOTE: The VAD returns a value per processed buffer, so this duration is rounded
+    /// NOTE: The VAD returns a value per processed audio block, so this duration is rounded
     /// to the closest model window length. For example, if the model has a processing window
     /// length of 10 ms, the VAD will round up/down to the closest multiple of 10 ms.
     /// Because of this, this parameter may return a different value than the one it was last set to.
@@ -33,7 +33,7 @@ pub enum VadParameter {
     /// There are two kinds of VADs offered by the SDK:
     ///
     /// - **VAD models** (e.g. Quail VAD): models trained specifically for voice activity
-    ///   detection. They output a probability of speech presence for each processed audio buffer
+    ///   detection. They output a probability of speech presence for each processed audio block
     ///   (1.0 = certain speech, 0.0 = certain no speech). The probability is compared against the
     ///   sensitivity threshold to decide whether speech is detected.
     /// - **Energy-based VADs** of speech enhancement models (e.g. Quail, Rook): these models
@@ -56,7 +56,7 @@ pub enum VadParameter {
     ///
     /// This affects the stability of speech not detected -> detected transitions.
     ///
-    /// NOTE: The VAD returns a value per processed buffer, so this duration is rounded
+    /// NOTE: The VAD returns a value per processed audio block, so this duration is rounded
     /// to the closest model window length. For example, if the model has a processing window
     /// length of 10 ms, the VAD will round up/down to the closest multiple of 10 ms.
     /// Because of this, this parameter may return a different value than the one it was last set to.
@@ -77,13 +77,17 @@ impl From<VadParameter> for AicVadParameter::Type {
     }
 }
 
-/// Voice Activity Detector backed by an ai-coustics speech enhancement model.
+/// Thread-safe Voice Activity Detector handle backed by a [`Processor`](crate::Processor).
 ///
-/// The VAD works automatically using the enhanced audio output of the processor
-/// that created the VAD.
+/// The VAD works automatically from the audio the backing processor is fed: for an enhancement
+/// model it runs on the enhanced output, and for a dedicated VAD model it reads the model's own
+/// prediction. Every method can be called from any thread, so a context can be moved to another
+/// thread while audio is processed elsewhere.
+///
+/// All handles created from a given processor reference the same VAD instance.
 ///
 /// **Important:** If the backing processor is destroyed, the VAD instance will stop
-/// producing new data.
+/// producing new data. Dropping the context does not destroy the processor.
 ///
 /// # Example
 ///
@@ -118,7 +122,7 @@ impl VadContext {
     /// The latency of the VAD prediction is equal to the backing processor's processing latency,
     /// reported by [`ProcessorContext::output_delay`](crate::ProcessorContext::output_delay).
     /// The prediction lags its input by that many samples, even for a dedicated VAD model
-    /// whose audio buffer passes through untouched.
+    /// whose audio block passes through untouched.
     ///
     /// Align speech decisions to the input timeline using that delay.
     ///
@@ -157,7 +161,7 @@ impl VadContext {
     /// The latency of the VAD prediction is equal to the backing processor's processing latency,
     /// reported by [`ProcessorContext::output_delay`](crate::ProcessorContext::output_delay).
     /// The prediction lags its input by that many samples, even for a dedicated VAD model
-    /// whose audio buffer passes through untouched.
+    /// whose audio block passes through untouched.
     ///
     /// Align speech decisions to the input timeline using that delay.
     ///
@@ -177,6 +181,9 @@ impl VadContext {
     }
 
     /// Modifies a VAD parameter.
+    ///
+    /// All parameters can be changed during audio processing.
+    /// This function can be called from any thread.
     ///
     /// # Arguments
     ///
@@ -209,6 +216,8 @@ impl VadContext {
     }
 
     /// Retrieves the current value of a VAD parameter.
+    ///
+    /// This function can be called from any thread.
     ///
     /// # Arguments
     ///

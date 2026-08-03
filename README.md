@@ -37,8 +37,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut processor = Processor::new(&model, &license_key)?.with_config(&config)?;
 
     // Process mono audio
-    let mut audio_buffer = vec![0.0f32; config.num_frames];
-    processor.process(&mut audio_buffer)?;
+    let mut audio_block = vec![0.0f32; config.block_size];
+    processor.process(&mut audio_block)?;
 
     Ok(())
 }
@@ -103,8 +103,8 @@ let model_id = model.id();
 // Get optimal sample rate for the model
 let optimal_rate = model.optimal_sample_rate();
 
-// Get optimal frame count for a specific sample rate
-let optimal_frames = model.optimal_num_frames(48000);
+// Get optimal block size for a specific sample rate
+let optimal_block_size = model.optimal_block_size(48000);
 ```
 
 ### Configuring the Processor
@@ -113,14 +113,14 @@ let optimal_frames = model.optimal_num_frames(48000);
 use aic_sdk::{Processor, ProcessorConfig};
 
 // Get optimal configuration for the model
-let config = ProcessorConfig::optimal(&model).with_allow_variable_frames(false);
-println!("{:?}", config);  // ProcessorConfig { sample_rate: 48000, num_frames: 480, allow_variable_frames: false }
+let config = ProcessorConfig::optimal(&model).with_variable_block_size(false);
+println!("{:?}", config);  // ProcessorConfig { sample_rate: 48000, block_size: 480, variable_block_size: false }
 
 // Or create from scratch
 let config = ProcessorConfig {
     sample_rate: 48000,
-    num_frames: 480,
-    allow_variable_frames: false,
+    block_size: 480,
+    variable_block_size: false,
 };
 
 // Processor needs to be initialized before processing
@@ -150,9 +150,21 @@ let processor = Processor::with_otel_config(&model, &license_key, &otel)?
 ### Processing Audio
 
 ```rust,ignore
-let mut audio_buffer = vec![0.0f32; config.num_frames];
-processor.process(&mut audio_buffer)?;
+let mut audio_block = vec![0.0f32; config.block_size];
+processor.process(&mut audio_block)?;
 ```
+
+### Ending a Session
+
+A telemetry session is closed automatically when the processor is dropped. Call
+`terminate_session` when the session has to end at a specific point instead, for example in a
+lifecycle event. The processor cannot process audio afterwards.
+
+```rust,ignore
+processor.terminate_session()?;
+```
+
+The same applies to `Analyzer::terminate_session`.
 
 ### Processor Context
 
@@ -255,7 +267,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // The async API takes ownership of the buffer and returns it back.
-    let audio = vec![0.0f32; config.num_frames];
+    let audio = vec![0.0f32; config.block_size];
     let audio = processor.process(audio).await?;
     Ok(())
 }

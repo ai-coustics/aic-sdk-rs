@@ -53,7 +53,7 @@ fn load_audio(path: impl AsRef<Path>) -> audio_file::Audio<f32> {
 }
 
 /// Tests audio enhancement by processing an entire mono file containing voice in a single pass.
-/// Uses a non-optimal frame size (full file length) to verify the internal frame adapter handles
+/// Uses a non-optimal block size (full file length) to verify the internal block adapter handles
 /// arbitrary input sizes correctly. Uses a reduced enhancement level (0.9) to exercise
 /// non-default parameter paths. Compares output against a pre-generated reference file.
 #[test]
@@ -63,8 +63,8 @@ fn process_full_file() {
 
     let config = ProcessorConfig {
         sample_rate: audio.sample_rate,
-        num_frames: audio.samples_interleaved.len(),
-        allow_variable_frames: false,
+        block_size: audio.samples_interleaved.len(),
+        variable_block_size: false,
     };
 
     let mut processor = Processor::new(&model, &license_key())
@@ -89,7 +89,7 @@ fn process_full_file() {
 }
 
 /// Tests block-based audio processing with voice activity detection (VAD).
-/// Processes audio in optimal frame-sized blocks and collects per-block speech detection results.
+/// Processes audio in optimal-sized blocks and collects per-block speech detection results.
 /// The processor is set to bypass mode to verify that VAD continues to work even when audio
 /// enhancement is disabled. Compares the VAD output sequence against a pre-generated reference
 /// to ensure deterministic behavior.
@@ -100,8 +100,8 @@ fn process_blocks_with_vad() {
 
     let config = ProcessorConfig {
         sample_rate: audio.sample_rate,
-        num_frames: model.optimal_num_frames(audio.sample_rate),
-        allow_variable_frames: false,
+        block_size: model.optimal_block_size(audio.sample_rate),
+        variable_block_size: false,
     };
 
     let mut processor = Processor::new(&model, &license_key())
@@ -117,7 +117,7 @@ fn process_blocks_with_vad() {
     let vad_ctx = processor.vad_context();
 
     let mut samples = audio.samples_interleaved;
-    let block_size = config.num_frames;
+    let block_size = config.block_size;
     let mut speech_detected_results = Vec::new();
 
     for chunk in samples.chunks_mut(block_size) {
@@ -145,8 +145,8 @@ fn process_blocks_with_vad_and_enhancement() {
 
     let config = ProcessorConfig {
         sample_rate: audio.sample_rate,
-        num_frames: model.optimal_num_frames(audio.sample_rate),
-        allow_variable_frames: false,
+        block_size: model.optimal_block_size(audio.sample_rate),
+        variable_block_size: false,
     };
 
     let mut processor = Processor::new(&model, &license_key())
@@ -162,7 +162,7 @@ fn process_blocks_with_vad_and_enhancement() {
     let vad_ctx = processor.vad_context();
 
     let mut samples = audio.samples_interleaved;
-    let block_size = config.num_frames;
+    let block_size = config.block_size;
     let mut speech_detected_results = Vec::new();
 
     for chunk in samples.chunks_mut(block_size) {

@@ -40,11 +40,11 @@ typedef enum AicErrorCode {
    */
   AIC_ERROR_CODE_PROCESSOR_NOT_INITIALIZED = 3,
   /**
-   * Audio configuration (samplerate, num_channels, num_frames) is not supported by the model
+   * Audio configuration (sample_rate, block_size) is not supported by the model
    */
   AIC_ERROR_CODE_AUDIO_CONFIG_UNSUPPORTED = 4,
   /**
-   * Audio buffer configuration differs from the one provided during initialization
+   * Audio block configuration differs from the one provided during initialization
    */
   AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH = 5,
   /**
@@ -80,9 +80,9 @@ typedef enum AicErrorCode {
    */
   AIC_ERROR_CODE_MODEL_VERSION_UNSUPPORTED = 101,
   /**
-   * The path to the model file is invalid.
+   * The file path is invalid.
    */
-  AIC_ERROR_CODE_MODEL_FILE_PATH_INVALID = 102,
+  AIC_ERROR_CODE_FILE_PATH_INVALID = 102,
   /**
    * The model file cannot be opened due to a filesystem error. Verify that the file exists.
    */
@@ -141,15 +141,15 @@ typedef enum AicVadParameter {
    * This affects the stability of speech detected -> not detected transitions.
    *
    * The VAD reports speech detected if the audio signal contained speech in at least 50%
-   * of the frames processed in the last `speech_hold_duration * 2` seconds.
+   * of the blocks processed in the last `speech_hold_duration * 2` seconds.
    *
    * For example, if `speech_hold_duration` is set to 0.5 seconds and the VAD stops detecting speech
    * in the audio signal, the VAD will continue to report speech for 0.5 seconds assuming the
-   * VAD does not detect speech again during that period. If a few frames of speech are detected
-   * during that period, those frames will be included in the 50% calculation, which will extend
+   * VAD does not detect speech again during that period. If a few blocks of speech are detected
+   * during that period, those blocks will be included in the 50% calculation, which will extend
    * the speech detection period until the 50% threshold is no longer met.
    *
-   * NOTE: The VAD returns a value per processed buffer, so this duration is rounded
+   * NOTE: The VAD returns a value per processed audio block, so this duration is rounded
    * to the closest model window length. For example, if the model has a processing window
    * length of 10 ms, the VAD will round up/down to the closest multiple of 10 ms.
    * Because of this, this parameter may return a different value than the one it was last set to.
@@ -165,17 +165,17 @@ typedef enum AicVadParameter {
    * There are two kinds of VADs offered by the SDK:
    *
    * - VAD models (e.g. Quail VAD): These are models specifically trained for voice activity detection.
-   *   They output a probability of speech presence for each processed audio buffer, 1.0 being the model
+   *   They output a probability of speech presence for each processed audio block, 1.0 being the model
    *   is certain speech is present and 0.0 being the model is certain speech is not present.
    *   The probability is compared against the sensitivity threshold to determine if speech is detected.
    *
    * - Energy-based VAD of speech enhancement models (e.g. Quail, Rook): These models filter out
    *   background noise and enhance speech, but they do not explicitly output a VAD decision.
-   *   To provide VAD functionality, the SDK determines whether of speech is present based on how much
+   *   To provide VAD functionality, the SDK determines whether speech is present based on how much
    *   energy is left in the signal after enhancement, since the model suppresses non-speech components.
    *   For these models, the sensitivity parameter controls the energy threshold for detecting speech presence.
-   *   The formula for the energy threshold is `10 ^ (-sensitivity)`, so higher sensitivity values result in a
-   *   less energy required in the signal, therefore resulting in more aggressive speech detection.
+   *   The formula for the energy threshold is `10 ^ (-sensitivity)`, so higher sensitivity values require
+   *   less energy in the signal, therefore resulting in more aggressive speech detection.
    *
    * A value above the threshold will trigger a speech detected decision.
    *
@@ -341,7 +341,7 @@ uint32_t aic_get_compatible_model_version(void);
  * - `AIC_ERROR_CODE_NULL_POINTER`: `model` or `file_path` is NULL
  * - `AIC_ERROR_CODE_MODEL_INVALID`: Model file is invalid or corrupted.
  * - `AIC_ERROR_CODE_MODEL_VERSION_UNSUPPORTED`: Model version is not compatible with the SDK version.
- * - `AIC_ERROR_CODE_MODEL_FILE_PATH_INVALID`: Path to model file is invalid.
+ * - `AIC_ERROR_CODE_FILE_PATH_INVALID`: Path to model file is invalid.
  * - `AIC_ERROR_CODE_FILE_SYSTEM_ERROR`: Model file could not be opened due to a file system error.
  * - `AIC_ERROR_CODE_MODEL_DATA_UNALIGNED`: Model data is not aligned to 64 bytes.
  *
@@ -453,12 +453,12 @@ const char *aic_model_get_id(const struct AicModel *model);
  * the original, maintaining the full frequency spectrum of your input while adding
  * the model's noise reduction capabilities to the lower frequencies.
  *
- * **Sample rate and optimal frames relationship:**
+ * **Sample rate and optimal block size relationship:**
  *
- * When using different sample rates than the model's native rate, the optimal number
- * of frames (returned by `aic_model_get_optimal_num_frames`) will change. The processor's output
- * delay remains constant regardless of sample rate as long as you use the optimal frame
- * count for that rate.
+ * When using different sample rates than the model's native rate, the optimal samples
+ * per block (returned by `aic_model_get_optimal_block_size`) will change. The processor's output
+ * delay remains constant regardless of sample rate as long as you use the optimal samples
+ * per block for that rate.
  *
  * **Recommendation:**
  *
@@ -481,37 +481,37 @@ enum AicErrorCode aic_model_get_optimal_sample_rate(const struct AicModel *model
                                                     uint32_t *sample_rate);
 
 /**
- * Retrieves the optimal number of frames for the model at a given sample rate.
+ * Retrieves the optimal block size for the model at a given sample rate.
  *
- * Using the optimal number of frames minimizes latency by avoiding internal buffering.
+ * Using the optimal block size minimizes latency by avoiding internal buffering.
  *
- * **When you use a different frame count than the optimal value, the processor will
+ * **When you use a different block size than the optimal value, the processor will
  * introduce additional buffering latency on top of its base processing delay.**
  *
- * The optimal frame count varies based on the sample rate. Each model operates on a
- * fixed time window length, so the required number of frames changes with sample rate.
- * For example, a model designed for 10 ms processing windows requires 480 frames at
- * 48 kHz, but only 160 frames at 16 kHz to capture the same duration of audio.
+ * The optimal block size varies based on the sample rate. Each model operates on a
+ * fixed time window length, so the required number of samples changes with sample rate.
+ * For example, a model designed for 10 ms processing windows requires 480 samples at
+ * 48 kHz, but only 160 samples at 16 kHz to capture the same duration of audio.
  *
  * Call this function with your intended sample rate before calling `aic_processor_initialize`
- * to determine the best frame count for minimal latency.
+ * to determine the best block size for minimal latency.
  *
  * # Parameters
  * - `model`: Model instance. Must not be NULL.
- * - `sample_rate`: The sample rate in Hz for which to calculate the optimal frame count.
- * - `num_frames`: Receives the optimal frame count. Must not be NULL.
+ * - `sample_rate`: The sample rate in Hz for which to calculate the optimal block size.
+ * - `block_size`: Receives the optimal block size. Must not be NULL.
  *
  * # Returns
- * - `AIC_ERROR_CODE_SUCCESS`: Frame count retrieved successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `model` or `num_frames` is NULL
+ * - `AIC_ERROR_CODE_SUCCESS`: Samples per block retrieved successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `model` or `block_size` is NULL
  *
  * # Safety
  * - Real-time safe: Can be called from audio processing threads.
  * - Thread-safe: Can be called from any thread.
  */
-enum AicErrorCode aic_model_get_optimal_num_frames(const struct AicModel *model,
+enum AicErrorCode aic_model_get_optimal_block_size(const struct AicModel *model,
                                                    uint32_t sample_rate,
-                                                   size_t *num_frames);
+                                                   size_t *block_size);
 
 /**
  * Creates a new audio processor instance.
@@ -559,7 +559,7 @@ enum AicErrorCode aic_processor_create(struct AicProcessor **processor,
  * - `processor`: Processor instance to destroy. Can be NULL.
  *
  * # Safety
- * - This function is not thread-safe. Ensure no other threads are using the processor during initialization.
+ * - This function is not thread-safe. Ensure no other threads are using the processor while it is being destroyed.
  * - The `processor` pointer must have been created by `aic_processor_create` when non-NULL.
  */
 void aic_processor_destroy(struct AicProcessor *processor);
@@ -568,24 +568,20 @@ void aic_processor_destroy(struct AicProcessor *processor);
  * Configures the processor for a specific audio format.
  *
  * This function must be called before processing any audio.
- * For the lowest delay use the sample rate and frame size returned by
- * `aic_model_get_optimal_sample_rate` and `aic_model_get_optimal_num_frames`.
+ * For the lowest delay use the sample rate and block size returned by
+ * `aic_model_get_optimal_sample_rate` and `aic_model_get_optimal_block_size`.
  *
  * # Parameters
  * - `processor`: Processor instance to configure. Must not be NULL.
  * - `sample_rate`: Audio sample rate in Hz (8000 - 192000).
- * - `num_channels`: Number of audio channels (1 for mono, 2 for stereo, etc.).
- * - `num_frames`: Number of samples per channel in each process call.
- * - `allow_variable_frames`: Allows varying frame counts per process call (up to `num_frames`), but increases delay.
+ * - `block_size`: Number of samples per process call (the maximum, if `variable_block_size` is `true`).
+ * - `variable_block_size`: If `true`, permits shorter calls at the cost of added delay;
+ *   calls larger than `block_size` are always rejected.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Configuration accepted
  * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` is NULL
- * - `AIC_ERROR_CODE_UNSUPPORTED_AUDIO_CONFIG`: Configuration is not supported
- *
- * # Note
- * All channels are mixed to mono for processing. To process channels
- * independently, create separate processor instances.
+ * - `AIC_ERROR_CODE_AUDIO_CONFIG_UNSUPPORTED`: Configuration is not supported
  *
  * # Safety
  * - This function allocates memory. Avoid calling it from real-time audio threads.
@@ -593,123 +589,64 @@ void aic_processor_destroy(struct AicProcessor *processor);
  */
 enum AicErrorCode aic_processor_initialize(struct AicProcessor *processor,
                                            uint32_t sample_rate,
-                                           uint16_t num_channels,
-                                           size_t num_frames,
-                                           bool allow_variable_frames);
+                                           size_t block_size,
+                                           bool variable_block_size);
 
 /**
- * Processes audio with separate buffers for each channel (planar layout).
- *
- * Enhances speech in the provided audio buffers in-place.
- *
- * **Memory Layout:**
- * - `audio` is an array of pointers, one pointer per channel
- * - Each pointer points to a separate buffer containing `num_frames` samples for that channel
- * - Example for 2 channels, 4 frames:
- *   `audio[0] -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3]`
- *   `audio[1] -> [ch1_f0, ch1_f1, ch1_f2, ch1_f3]`
- *
- * The planar function allows a maximum of 16 channels.
+ * Enhances speech in the provided audio block in-place.
  *
  * # Parameters
  * - `processor`: Initialized processor instance. Must not be NULL.
- * - `audio`: Array of `num_channels` pointers, each pointing to a buffer of `num_frames` floats. Must not be NULL.
- * - `num_channels`: Number of channels (must match initialization).
- * - `num_frames`: Number of samples per channel (must match initialization value, or if `allow_variable_frames` was enabled, must be ≤ initialization value).
- *
- * # Note
- * All channels are mixed to mono for processing. To process channels
- * independently, create separate processor instances.
+ * - `audio_ptr`: Pointer to a mono audio block of `audio_len` samples. Must not be NULL.
+ * - `audio_len`: Number of samples in the block (must match `block_size` from initialization, or if `variable_block_size` was enabled, must be ≤ `block_size`).
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Audio processed successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `audio` is NULL
- * - `AIC_ERROR_CODE_NOT_INITIALIZED`: Processor has not been initialized
- * - `AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH`: Channel or frame count mismatch
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `audio_ptr` is NULL
+ * - `AIC_ERROR_CODE_PROCESSOR_NOT_INITIALIZED`: Processor has not been initialized
+ * - `AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH`: Block size mismatch
  * - `AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED`: SDK key was not authorized or process failed to report usage. Check if you have internet connection.
  *
  * # Safety
  * - Real-time safe: Can be called from audio processing threads.
  * - This function is not thread-safe. Do not call this function from multiple threads.
  */
-enum AicErrorCode aic_processor_process_planar(struct AicProcessor *processor,
-                                               float *const *audio,
-                                               uint16_t num_channels,
-                                               size_t num_frames);
+enum AicErrorCode aic_processor_process(struct AicProcessor *processor,
+                                        float *audio_ptr,
+                                        size_t audio_len);
 
 /**
- * Processes audio with interleaved channels in a single buffer.
+ * Terminates the telemetry session associated with this processor.
  *
- * Enhances speech in the provided audio buffer in-place.
+ * Once the request has been handled, the processor is no longer allowed to
+ * process audio.
  *
- * **Memory Layout:**
- * - Single contiguous buffer with channels interleaved
- * - Buffer size: `num_channels` * `num_frames` floats
- * - Example for 2 channels, 4 frames:
- *   `audio -> [ch0_f0, ch1_f0, ch0_f1, ch1_f1, ch0_f2, ch1_f2, ch0_f3, ch1_f3]`
+ * This function is meant to be used in lifecycle management events.
+ * A telemetry session is automatically stopped when a processor is destroyed.
  *
- * # Parameters
- * - `processor`: Initialized processor instance. Must not be NULL.
- * - `audio`: Single buffer containing interleaved audio data of size `num_channels` * `num_frames`. Must not be NULL.
- * - `num_channels`: Number of channels (must match initialization).
- * - `num_frames`: Number of samples per channel (must match initialization value, or if `allow_variable_frames` was enabled, must be ≤ initialization value).
+ * However, in cases where this SDK is integrated with languages with automatic
+ * memory management, object deallocation could be delayed - for example, until the
+ * garbage collector runs. Use this function to start termination on demand.
  *
- * # Note
- * All channels are mixed to mono for processing. To process channels
- * independently, create separate processor instances.
- *
- * # Returns
- * - `AIC_ERROR_CODE_SUCCESS`: Audio processed successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `audio` is NULL
- * - `AIC_ERROR_CODE_NOT_INITIALIZED`: Processor has not been initialized
- * - `AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH`: Channel or frame count mismatch
- * - `AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED`: SDK key was not authorized or process failed to report usage. Check if you have internet connection.
- *
- * # Safety
- * - Real-time safe: Can be called from audio processing threads.
- * - This function is not thread-safe. Do not call this function from multiple threads.
- */
-enum AicErrorCode aic_processor_process_interleaved(struct AicProcessor *processor,
-                                                    float *audio,
-                                                    uint16_t num_channels,
-                                                    size_t num_frames);
-
-/**
- * Processes audio with sequential channel data in a single buffer.
- *
- * Enhances speech in the provided audio buffer in-place.
- *
- * **Memory Layout:**
- * - Single contiguous buffer with all samples for each channel stored sequentially
- * - Buffer size: `num_channels` * `num_frames` floats
- * - Example for 2 channels, 4 frames:
- *   `audio -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3, ch1_f0, ch1_f1, ch1_f2, ch1_f3]`
+ * This function blocks until the telemetry session is terminated, unless another
+ * session is still alive. In that case, this function returns early and termination
+ * happens asynchronously. This keeps lifecycle management smooth while ensuring
+ * all sessions are closed when the last processor is terminated.
  *
  * # Parameters
- * - `processor`: Initialized processor instance. Must not be NULL.
- * - `audio`: Single buffer containing sequential audio data of size `num_channels` * `num_frames`. Must not be NULL.
- * - `num_channels`: Number of channels (must match initialization).
- * - `num_frames`: Number of samples per channel (must match initialization value, or if `allow_variable_frames` was enabled, must be ≤ initialization value).
- *
- * # Note
- * All channels are mixed to mono for processing. To process channels
- * independently, create separate processor instances.
+ * - `processor`: Processor instance. Must not be NULL.
  *
  * # Returns
- * - `AIC_ERROR_CODE_SUCCESS`: Audio processed successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` or `audio` is NULL
- * - `AIC_ERROR_CODE_NOT_INITIALIZED`: Processor has not been initialized
- * - `AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH`: Channel or frame count mismatch
- * - `AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED`: SDK key was not authorized or process failed to report usage. Check if you have internet connection.
+ * - `AIC_ERROR_CODE_SUCCESS`: Termination requested successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `processor` is NULL
  *
  * # Safety
- * - Real-time safe: Can be called from audio processing threads.
- * - This function is not thread-safe. Do not call this function from multiple threads.
+ * - This function is not real-time safe. It may block until the session is terminated.
+ * - This function is not thread-safe. Do not call it concurrently with any
+ *   other function that takes the same `AicProcessor` handle.
+ * - The `processor` pointer must have been created by `aic_processor_create`.
  */
-enum AicErrorCode aic_processor_process_sequential(struct AicProcessor *processor,
-                                                   float *audio,
-                                                   uint16_t num_channels,
-                                                   size_t num_frames);
+enum AicErrorCode aic_processor_terminate_session(struct AicProcessor *processor);
 
 /**
  * Creates a processor context handle for thread-safe control APIs.
@@ -833,23 +770,23 @@ enum AicErrorCode aic_processor_context_get_parameter(const struct AicProcessorC
  * **Enhancement vs. VAD models:**
  * - For an enhancement model this is the latency of the enhanced audio: the number of
  *   samples by which the processed output lags behind the input.
- * - For a dedicated VAD model, the audio buffer is input-only and passes through unchanged.
+ * - For a dedicated VAD model, the audio block is input-only and passes through unchanged.
  *   This delay is the VAD prediction latency: how many samples a speech decision from
  *   `aic_vad_context_is_speech_detected` lags behind the input it describes.
  *   Use this value to line up VAD decisions with the input timeline.
  *
  * **Delay behavior:**
  * - **Before initialization:** Returns the base processing delay using the processor's
- *   optimal frame size at its native sample rate
+ *   optimal block size at its native sample rate
  * - **After initialization:** Returns the actual delay for your specific configuration,
- *   including any additional buffering introduced by non-optimal frame sizes
+ *   including any additional buffering introduced by a non-optimal block size
  *
  * **Important:** The delay value is always expressed in samples at the sample rate
  * you configured during `aic_processor_initialize`. To convert to time units:
  * `delay_ms = (delay_samples * 1000) / sample_rate`
  *
- * **Note:** Using frame sizes different from the optimal value returned by
- * `aic_model_get_optimal_num_frames` will increase the delay beyond the processor's base latency.
+ * **Note:** Using a block size different from the optimal value returned by
+ * `aic_model_get_optimal_block_size` will increase the delay beyond the processor's base latency.
  *
  * # Parameters
  * - `context`: Processor context instance. Must not be NULL.
@@ -924,14 +861,13 @@ enum AicErrorCode aic_processor_context_update_bearer_token(const struct AicProc
  *
  * # Parameters
  * - `context`: VAD context instance. Must not be NULL.
- * - `processor`: Processor instance to use as data source for the VAD.
+ * - `processor`: Processor instance to use as data source for the VAD. Must not be NULL.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: VAD created successfully
  * - `AIC_ERROR_CODE_NULL_POINTER`: `context` or `processor` is NULL
  *
  * # Safety
- * - Real-time safe: Can be called from audio processing threads.
  * - Thread-safe: Can be called from any thread.
  * - It is safe for the processor handle to be currently in use by other threads.
  */
@@ -948,7 +884,7 @@ enum AicErrorCode aic_vad_context_create(struct AicVadContext **context,
  * This function is safe to call with NULL.
  *
  * # Parameters
- * - `context`: VAD context instance.
+ * - `context`: VAD context instance. Can be NULL.
  *
  * # Safety
  * - Thread-safe: Can be called from any thread.
@@ -962,7 +898,7 @@ void aic_vad_context_destroy(struct AicVadContext *context);
  * # Latency
  * The latency of the VAD prediction is equal to the backing processor's processing latency,
  * reported by `aic_processor_context_get_output_delay`. The prediction lags its input by
- * that many samples, even for a dedicated VAD model whose audio buffer passes through untouched.
+ * that many samples, even for a dedicated VAD model whose audio block passes through untouched.
  * Align speech decisions to the input timeline using that delay.
  *
  * If the backing processor stops being processed, the VAD will not update its prediction.
@@ -1000,7 +936,7 @@ enum AicErrorCode aic_vad_context_is_speech_detected(const struct AicVadContext 
  * # Latency
  * The latency of the VAD prediction is equal to the backing processor's processing latency,
  * reported by `aic_processor_context_get_output_delay`. The prediction lags its input by
- * that many samples, even for a dedicated VAD model whose audio buffer passes through untouched.
+ * that many samples, even for a dedicated VAD model whose audio block passes through untouched.
  * Align speech decisions to the input timeline using that delay.
  *
  * If the backing processor stops being processed, the VAD will not update its prediction.
@@ -1112,25 +1048,22 @@ enum AicErrorCode aic_analyzer_pair_create(struct AicCollector **collector,
 /**
  * Configures the collector for a specific audio format.
  *
- * This function must be called before processing any audio.
- * For the lowest delay use the sample rate and frame size returned by
- * `aic_model_get_optimal_sample_rate` and `aic_model_get_optimal_num_frames`.
+ * This function must be called before buffering any audio.
+ * Using the sample rate and block size returned by
+ * `aic_model_get_optimal_sample_rate` and `aic_model_get_optimal_block_size`
+ * avoids internal resampling and rebuffering.
  *
  * # Parameters
  * - `collector`: Collector instance to configure. Must not be NULL.
  * - `sample_rate`: Audio sample rate in Hz (8000 - 192000).
- * - `num_channels`: Number of audio channels (1 for mono, 2 for stereo, etc.).
- * - `num_frames`: Number of samples per channel in each process call.
- * - `allow_variable_frames`: Allows varying frame counts per process call (up to `num_frames`), but increases delay.
+ * - `block_size`: Number of samples per call to `aic_collector_buffer` (the maximum, if `variable_block_size` is `true`).
+ * - `variable_block_size`: If `true`, permits shorter calls at the cost of added delay;
+ *   calls larger than `block_size` are always rejected.
  *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Configuration accepted
  * - `AIC_ERROR_CODE_NULL_POINTER`: `collector` is NULL
- * - `AIC_ERROR_CODE_UNSUPPORTED_AUDIO_CONFIG`: Configuration is not supported
- *
- * # Note
- * All channels are mixed to mono for buffering. To analyze channels
- * independently, create separate collector/analyzer pairs.
+ * - `AIC_ERROR_CODE_AUDIO_CONFIG_UNSUPPORTED`: Configuration is not supported
  *
  * # Safety
  * - This function allocates memory. Avoid calling it from real-time audio threads.
@@ -1138,120 +1071,52 @@ enum AicErrorCode aic_analyzer_pair_create(struct AicCollector **collector,
  */
 enum AicErrorCode aic_collector_initialize(struct AicCollector *collector,
                                            uint32_t sample_rate,
-                                           uint16_t num_channels,
-                                           size_t num_frames,
-                                           bool allow_variable_frames);
+                                           size_t block_size,
+                                           bool variable_block_size);
 
 /**
- * Buffers audio with separate buffers for each channel (planar layout) for later analysis.
- *
- * **Memory Layout:**
- * - `audio` is an array of pointers, one pointer per channel
- * - Each pointer points to a separate buffer containing `num_frames` samples for that channel
- * - Example for 2 channels, 4 frames:
- *   `audio[0] -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3]`
- *   `audio[1] -> [ch1_f0, ch1_f1, ch1_f2, ch1_f3]`
- *
- * The planar function allows a maximum of 16 channels.
+ * Buffers audio for later offline use.
  *
  * # Parameters
  * - `collector`: Initialized collector instance. Must not be NULL.
- * - `audio`: Array of `num_channels` pointers, each pointing to a buffer of `num_frames` floats. Must not be NULL.
- * - `num_channels`: Number of channels (must match initialization).
- * - `num_frames`: Number of samples per channel (must match initialization value, or if `allow_variable_frames` was enabled, must be ≤ initialization value).
+ * - `audio_ptr`: Pointer to a mono audio block of `audio_len` samples. Must not be NULL.
+ * - `audio_len`: Number of samples in the block (must match `block_size` from initialization, or if `variable_block_size` was enabled, must be ≤ `block_size`).
  *
  * # Note
  * Input audio is read-only and is not modified.
  *
- * All channels are mixed and buffered in mono. To analyze channels
- * independently, create separate collector/analyzer pairs.
- *
  * # Returns
  * - `AIC_ERROR_CODE_SUCCESS`: Audio buffered successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `collector` or `audio` is NULL
- * - `AIC_ERROR_CODE_NOT_INITIALIZED`: Collector has not been initialized
- * - `AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH`: Channel or frame count mismatch
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `collector` or `audio_ptr` is NULL
+ * - `AIC_ERROR_CODE_PROCESSOR_NOT_INITIALIZED`: Collector has not been initialized
+ * - `AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH`: Block size mismatch
  *
  * # Safety
  * - Real-time safe: Can be called from audio processing threads.
  * - This function is not thread-safe. Do not call this function from multiple threads.
  */
-enum AicErrorCode aic_collector_buffer_planar(struct AicCollector *collector,
-                                              const float *const *audio,
-                                              uint16_t num_channels,
-                                              size_t num_frames);
+enum AicErrorCode aic_collector_buffer(struct AicCollector *collector,
+                                       const float *audio_ptr,
+                                       size_t audio_len);
 
 /**
- * Buffers audio with interleaved channels in a single buffer for later analysis.
+ * Releases all resources associated with a collector instance.
  *
- * **Memory Layout:**
- * - Single contiguous buffer with channels interleaved
- * - Buffer size: `num_channels` * `num_frames` floats
- * - Example for 2 channels, 4 frames:
- *   `audio -> [ch0_f0, ch1_f0, ch0_f1, ch1_f1, ch0_f2, ch1_f2, ch0_f3, ch1_f3]`
+ * After calling this function, the collector handle becomes invalid.
+ * This function is safe to call with NULL.
  *
- * # Parameters
- * - `collector`: Initialized collector instance. Must not be NULL.
- * - `audio`: Single buffer containing interleaved audio data of size `num_channels` * `num_frames`. Must not be NULL.
- * - `num_channels`: Number of channels (must match initialization).
- * - `num_frames`: Number of samples per channel (must match initialization value, or if `allow_variable_frames` was enabled, must be ≤ initialization value).
- *
- * # Note
- * Input audio is read-only and is not modified.
- *
- * All channels are mixed and buffered in mono. To analyze channels
- * independently, create separate collector/analyzer pairs.
- *
- * # Returns
- * - `AIC_ERROR_CODE_SUCCESS`: Audio buffered successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `collector` or `audio` is NULL
- * - `AIC_ERROR_CODE_NOT_INITIALIZED`: Collector has not been initialized
- * - `AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH`: Channel or frame count mismatch
- *
- * # Safety
- * - Real-time safe: Can be called from audio processing threads.
- * - This function is not thread-safe. Do not call this function from multiple threads.
- */
-enum AicErrorCode aic_collector_buffer_interleaved(struct AicCollector *collector,
-                                                   const float *audio,
-                                                   uint16_t num_channels,
-                                                   size_t num_frames);
-
-/**
- * Buffers audio with sequential channel data in a single buffer for later analysis.
- *
- * **Memory Layout:**
- * - Single contiguous buffer with all samples for each channel stored sequentially
- * - Buffer size: `num_channels` * `num_frames` floats
- * - Example for 2 channels, 4 frames:
- *   `audio -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3, ch1_f0, ch1_f1, ch1_f2, ch1_f3]`
+ * # Lifetime and ownership
+ * The collector holds no reference to its model, so it can be destroyed
+ * independently of the model and its paired analyzer, in any order.
  *
  * # Parameters
- * - `collector`: Initialized collector instance. Must not be NULL.
- * - `audio`: Single buffer containing sequential audio data of size `num_channels` * `num_frames`. Must not be NULL.
- * - `num_channels`: Number of channels (must match initialization).
- * - `num_frames`: Number of samples per channel (must match initialization value, or if `allow_variable_frames` was enabled, must be ≤ initialization value).
- *
- * # Note
- * Input audio is read-only and is not modified.
- *
- * All channels are mixed and buffered in mono. To analyze channels
- * independently, create separate collector/analyzer pairs.
- *
- * # Returns
- * - `AIC_ERROR_CODE_SUCCESS`: Audio buffered successfully
- * - `AIC_ERROR_CODE_NULL_POINTER`: `collector` or `audio` is NULL
- * - `AIC_ERROR_CODE_NOT_INITIALIZED`: Collector has not been initialized
- * - `AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH`: Channel or frame count mismatch
+ * - `collector`: Collector instance to destroy. Can be NULL.
  *
  * # Safety
- * - Real-time safe: Can be called from audio processing threads.
- * - This function is not thread-safe. Do not call this function from multiple threads.
+ * - This function is not thread-safe. Ensure no other threads are using the collector.
+ * - The `collector` pointer must have been created by `aic_analyzer_pair_create` when non-NULL.
  */
-enum AicErrorCode aic_collector_buffer_sequential(struct AicCollector *collector,
-                                                  const float *audio,
-                                                  uint16_t num_channels,
-                                                  size_t num_frames);
+void aic_collector_destroy(struct AicCollector *collector);
 
 /**
  * Clears all internal state and buffers.
@@ -1285,10 +1150,6 @@ enum AicErrorCode aic_analyzer_reset(const struct AicAnalyzer *analyzer);
  * If this function is called before the collector has buffered that length of audio,
  * the analyzer will run the analysis with silence (zeros) in the tail of the input.
  *
- * # Note
- * When buffering, all channels are mixed down to mono. To analyze channels
- * independently, create separate collector/analyzer pairs.
- *
  * # Parameters
  * - `analyzer`: Analyzer instance. Must not be NULL.
  * - `result`: Receives the analysis scores. Must not be NULL.
@@ -1304,6 +1165,39 @@ enum AicErrorCode aic_analyzer_reset(const struct AicAnalyzer *analyzer);
  */
 enum AicErrorCode aic_analyzer_analyze_buffered(struct AicAnalyzer *analyzer,
                                                 struct AicAnalysisResult *result);
+
+/**
+ * Terminates the telemetry session associated with this analyzer.
+ *
+ * Once the request has been handled, the analyzer is no longer allowed to
+ * analyze buffered audio.
+ *
+ * This function is meant to be used in lifecycle management events.
+ * A telemetry session is automatically stopped when an analyzer is destroyed.
+ *
+ * However, in cases where this SDK is integrated with languages with automatic
+ * memory management, object deallocation could be delayed - for example, until the
+ * garbage collector runs. Use this function to start termination on demand.
+ *
+ * This function blocks until the telemetry session is terminated, unless another
+ * session is still alive. In that case, this function returns early and termination
+ * happens asynchronously. This keeps lifecycle management smooth while ensuring
+ * all sessions are closed when the last telemetry session is terminated.
+ *
+ * # Parameters
+ * - `analyzer`: Analyzer instance. Must not be NULL.
+ *
+ * # Returns
+ * - `AIC_ERROR_CODE_SUCCESS`: Termination requested successfully
+ * - `AIC_ERROR_CODE_NULL_POINTER`: `analyzer` is NULL
+ *
+ * # Safety
+ * - This function is not real-time safe. It may block until the session is terminated.
+ * - This function is not thread-safe. Do not call it concurrently with any
+ *   other function that takes the same `AicAnalyzer` handle.
+ * - The `analyzer` pointer must have been created by `aic_analyzer_pair_create`.
+ */
+enum AicErrorCode aic_analyzer_terminate_session(struct AicAnalyzer *analyzer);
 
 /**
  * Replaces the bearer token on a running analyzer.
@@ -1347,25 +1241,6 @@ enum AicErrorCode aic_analyzer_analyze_buffered(struct AicAnalyzer *analyzer,
  */
 enum AicErrorCode aic_analyzer_update_bearer_token(const struct AicAnalyzer *analyzer,
                                                    const char *token);
-
-/**
- * Releases all resources associated with a collector instance.
- *
- * After calling this function, the collector handle becomes invalid.
- * This function is safe to call with NULL.
- *
- * # Lifetime and ownership
- * The collector holds no reference to its model, so it can be destroyed
- * independently of the model and its paired analyzer, in any order.
- *
- * # Parameters
- * - `collector`: Collector instance to destroy. Can be NULL.
- *
- * # Safety
- * - This function is not thread-safe. Ensure no other threads are using the collector.
- * - The `collector` pointer must have been created by `aic_analyzer_pair_create` when non-NULL.
- */
-void aic_collector_destroy(struct AicCollector *collector);
 
 /**
  * Releases all resources associated with an analyzer instance.

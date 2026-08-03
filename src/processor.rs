@@ -4,7 +4,8 @@ use aic_sdk_sys::{AicProcessorParameter::*, *};
 
 use std::{ffi::CString, marker::PhantomData, ptr};
 
-/// Audio processing configuration passed to [`Processor::initialize`].
+/// Audio processing configuration passed to [`Processor::initialize`] and
+/// [`Collector::initialize`](crate::Collector::initialize).
 ///
 /// Use [`ProcessorConfig::optimal`] as a starting point, then adjust fields
 /// to match your stream layout.
@@ -12,17 +13,20 @@ use std::{ffi::CString, marker::PhantomData, ptr};
 pub struct ProcessorConfig {
     /// Sample rate in Hz (8000 - 192000).
     pub sample_rate: u32,
-    /// Samples provided to each processing call.
-    /// Note that using a non-optimal number of frames increases latency.
-    pub num_frames: usize,
-    /// Allows frame counts below `num_frames` at the cost of added latency.
-    pub allow_variable_frames: bool,
+    /// Number of samples passed to each [`Processor::process`] or
+    /// [`Collector::buffer`](crate::Collector::buffer) call (the maximum, if
+    /// `variable_block_size` is `true`).
+    /// Note that using a non-optimal block size increases latency.
+    pub block_size: usize,
+    /// Permits calls shorter than `block_size` at the cost of added latency.
+    /// Calls larger than `block_size` are always rejected.
+    pub variable_block_size: bool,
 }
 
 impl ProcessorConfig {
-    /// Returns a [`ProcessorConfig`] pre-filled with the model's optimal sample rate and frame size.
+    /// Returns a [`ProcessorConfig`] pre-filled with the model's optimal sample rate and block size.
     ///
-    /// `allow_variable_frames` will be set to `false`. Enable variable frames
+    /// `variable_block_size` will be set to `false`. Enable variable block sizes
     /// by using the builder pattern.
     ///
     /// ```rust,no_run
@@ -30,11 +34,11 @@ impl ProcessorConfig {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// # let processor = Processor::new(&model, &license_key)?;
-    /// let config = ProcessorConfig::optimal(&model).with_allow_variable_frames(true);
+    /// let config = ProcessorConfig::optimal(&model).with_variable_block_size(true);
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     ///
-    /// If you need to configure a non-optimal sample rate or number of frames,
+    /// If you need to configure a non-optimal sample rate or block size,
     /// construct the [`ProcessorConfig`] struct directly. For example:
     /// ```rust,no_run
     /// # use aic_sdk::{Model, ProcessorConfig};
@@ -42,30 +46,31 @@ impl ProcessorConfig {
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// let config = ProcessorConfig {
     ///     sample_rate: 44100,
-    ///     num_frames: model.optimal_num_frames(44100),
-    ///     allow_variable_frames: true,
+    ///     block_size: model.optimal_block_size(44100),
+    ///     variable_block_size: true,
     /// };
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn optimal(model: &Model) -> Self {
         let sample_rate = model.optimal_sample_rate();
-        let num_frames = model.optimal_num_frames(sample_rate);
+        let block_size = model.optimal_block_size(sample_rate);
         ProcessorConfig {
             sample_rate,
-            num_frames,
-            allow_variable_frames: false,
+            block_size,
+            variable_block_size: false,
         }
     }
 
-    /// Enables or disables variable frame size support.
+    /// Enables or disables variable block size support.
     ///
-    /// When enabled, allows processing frame counts below `num_frames` at the cost of added latency.
+    /// When enabled, permits processing calls shorter than `block_size` at the cost of
+    /// added latency.
     ///
     /// # Arguments
     ///
-    /// * `allow_variable_frames` - `true` to enable variable frame sizes, `false` for fixed size
-    pub fn with_allow_variable_frames(mut self, allow_variable_frames: bool) -> Self {
-        self.allow_variable_frames = allow_variable_frames;
+    /// * `variable_block_size` - `true` to enable variable block sizes, `false` for fixed size
+    pub fn with_variable_block_size(mut self, variable_block_size: bool) -> Self {
+        self.variable_block_size = variable_block_size;
         self
     }
 }
@@ -156,6 +161,15 @@ impl OtelConfig {
     }
 }
 
+/// Thread-safe control handle for a [`Processor`].
+///
+/// Create one with [`Processor::processor_context`]. Every method on this type maps to an SDK
+/// function that can be called from any thread, so a context can be moved to another thread to
+/// read and write parameters, query the output delay, or reset the processor while audio is being
+/// processed elsewhere.
+///
+/// Dropping the context does not destroy the processor it came from, and multiple contexts can be
+/// created from the same processor.
 pub struct ProcessorContext {
     /// Raw pointer to the C processor context structure
     inner: *mut AicProcessorContext,
@@ -253,23 +267,23 @@ impl ProcessorContext {
     /// **Enhancement vs. VAD models:**
     /// - For an enhancement model this is the latency of the enhanced audio: the number of
     ///   samples by which the processed output lags behind the input.
-    /// - For a dedicated VAD model, the audio buffer is input-only and passes through unchanged.
+    /// - For a dedicated VAD model, the audio block is input-only and passes through unchanged.
     ///   This delay is the VAD prediction latency: how many samples a speech decision from
     ///   [`VadContext::is_speech_detected`](crate::VadContext::is_speech_detected) lags behind
     ///   the input it describes. Use this value to line up VAD decisions with the input timeline.
     ///
     /// **Delay behavior:**
     /// - **Before initialization:** Returns the base processing delay using the model's
-    ///   optimal frame size at its native sample rate
+    ///   optimal block size at its native sample rate
     /// - **After initialization:** Returns the actual delay for your specific configuration,
-    ///   including any additional buffering introduced by non-optimal frame sizes
+    ///   including any additional buffering introduced by a non-optimal block size
     ///
     /// **Important:** The delay value is always expressed in samples at the sample rate
     /// you configured during `initialize`. To convert to time units:
     /// `delay_ms = (delay_samples * 1000) / sample_rate`
     ///
-    /// **Note:** Using frame sizes different from the optimal value returned by
-    /// `optimal_num_frames` will increase the delay beyond the model's base latency.
+    /// **Note:** Using a block size different from the optimal value returned by
+    /// `optimal_block_size` will increase the delay beyond the model's base latency.
     ///
     /// # Returns
     ///
@@ -297,10 +311,11 @@ impl ProcessorContext {
             unsafe { aic_processor_context_get_output_delay(self.as_const_ptr(), &mut delay) };
 
         // This should never fail. If it does, it's a bug in the SDK.
-        // `aic_get_output_delay` is documented to always succeed if given a valid processor pointer.
+        // `aic_processor_context_get_output_delay` is documented to always succeed if given
+        // valid pointers.
         assert_success(
             error_code,
-            "`aic_get_output_delay` failed. This is a bug, please open an issue on GitHub for further investigation.",
+            "`aic_processor_context_get_output_delay` failed. This is a bug, please open an issue on GitHub for further investigation.",
         );
 
         delay
@@ -350,6 +365,15 @@ impl ProcessorContext {
     /// In-place updates are only supported when both the originally configured key and the
     /// new token are JWTs. If either side is not, the call returns
     /// [`AicError::TokenUpdateUnsupported`] and the existing token stays in use.
+    ///
+    /// On any error the call is a no-op: the previously active token stays in use and the
+    /// telemetry session is unaffected. On success the swap is applied immediately and is **not**
+    /// gated on backend acceptance. The token is only validated locally for format; if the
+    /// backend later rejects it, the SDK retries it under backoff rather than rolling back, and
+    /// audio processing is eventually disabled if no accepted token arrives in time. Supplying a
+    /// known-good token during that window recovers the session.
+    ///
+    /// Safe to call concurrently with [`Processor::process`] on the originating processor.
     ///
     /// # Arguments
     ///
@@ -419,14 +443,14 @@ unsafe impl Sync for ProcessorContext {}
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/model.aicmodel")?;
 /// let config = ProcessorConfig {
-///     num_frames: 1024,
+///     block_size: 1024,
 ///     ..ProcessorConfig::optimal(&model)
 /// };
 ///
 /// let mut processor = Processor::new(&model, &license_key)?.with_config(&config)?;
 ///
-/// let mut audio_buffer = vec![0.0f32; config.num_frames];
-/// processor.process(&mut audio_buffer)?;
+/// let mut audio_block = vec![0.0f32; config.block_size];
+/// processor.process(&mut audio_block)?;
 /// # Ok::<(), aic_sdk::AicError>(())
 /// ```
 pub struct Processor<'a> {
@@ -577,8 +601,8 @@ impl<'a> Processor<'a> {
     /// let mut processor = Processor::new(&model, &license_key)?.with_config(&config)?;
     ///
     /// // Processor is ready to use - no need to call initialize()
-    /// let mut audio = vec![0.0f32; config.num_frames];
-    /// processor.process(&mut audio)?;
+    /// let mut audio_block = vec![0.0f32; config.block_size];
+    /// processor.process(&mut audio_block)?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn with_config(mut self, config: &ProcessorConfig) -> Result<Self, AicError> {
@@ -659,8 +683,8 @@ impl<'a> Processor<'a> {
     /// Configures the processor for specific audio settings.
     ///
     /// This function must be called before processing any audio.
-    /// For the lowest delay use the sample rate and frame size returned by
-    /// [`Model::optimal_sample_rate`] and [`Model::optimal_num_frames`].
+    /// For the lowest delay use the sample rate and block size returned by
+    /// [`Model::optimal_sample_rate`] and [`Model::optimal_block_size`].
     ///
     /// # Arguments
     ///
@@ -692,9 +716,8 @@ impl<'a> Processor<'a> {
             aic_processor_initialize(
                 self.inner,
                 config.sample_rate,
-                1,
-                config.num_frames,
-                config.allow_variable_frames,
+                config.block_size,
+                config.variable_block_size,
             )
         };
 
@@ -709,8 +732,8 @@ impl<'a> Processor<'a> {
     ///
     /// # Arguments
     ///
-    /// * `audio` - Mono audio buffer to be enhanced in-place. Must be exactly
-    ///   of size `num_frames`, or if `allow_variable_frames` was enabled,
+    /// * `audio` - Mono audio block to be enhanced in-place. Must be exactly
+    ///   of size `block_size`, or if `variable_block_size` was enabled,
     ///   less than the initialization value.
     ///
     /// # Returns
@@ -730,7 +753,7 @@ impl<'a> Processor<'a> {
     /// # let mut processor = Processor::new(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model);
     /// processor.initialize(&config)?;
-    /// let mut audio = vec![0.0f32; config.num_frames];
+    /// let mut audio = vec![0.0f32; config.block_size];
     /// processor.process(&mut audio)?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
@@ -739,16 +762,54 @@ impl<'a> Processor<'a> {
             return Err(AicError::ProcessorNotInitialized);
         }
 
-        let num_frames = audio.len();
+        let audio_len = audio.len();
 
         // SAFETY:
         // - `self.inner` is a valid pointer to a live processor.
-        // - `audio` points to a contiguous, writable f32 slice of length `num_frames`.
+        // - `audio` points to a contiguous, writable f32 slice of length `audio_len`.
         // - This function is not thread-safe, so we borrow `&mut self`.
-        let error_code = unsafe {
-            aic_processor_process_interleaved(self.inner, audio.as_mut_ptr(), 1, num_frames)
-        };
+        let error_code =
+            unsafe { aic_processor_process(self.inner, audio.as_mut_ptr(), audio_len) };
 
+        handle_error(error_code)
+    }
+
+    /// Terminates the telemetry session associated with this processor.
+    ///
+    /// Once the request has been handled, the processor is no longer allowed to process audio.
+    ///
+    /// This is meant for lifecycle management events. A telemetry session is stopped
+    /// automatically when the [`Processor`] is dropped, so calling this is only necessary when
+    /// the session must end before the processor itself goes out of scope.
+    ///
+    /// This blocks until the telemetry session is terminated, unless another session is still
+    /// alive. In that case it returns early and termination happens asynchronously.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an [`AicError`] if termination cannot be requested.
+    ///
+    /// # Real-time safety
+    ///
+    /// This function is not real-time safe. It may block until the session is terminated.
+    /// Avoid calling it from audio threads.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::{Model, Processor};
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// let mut processor = Processor::new(&model, &license_key)?;
+    /// processor.terminate_session()?;
+    /// # Ok::<(), aic_sdk::AicError>(())
+    /// ```
+    pub fn terminate_session(&mut self) -> Result<(), AicError> {
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live processor.
+        // - This function must not run concurrently with any other call taking the same
+        //   processor handle, so we borrow `&mut self`.
+        let error_code = unsafe { aic_processor_terminate_session(self.inner) };
         handle_error(error_code)
     }
 
@@ -775,9 +836,13 @@ impl<'a> Drop for Processor<'a> {
 // raw pointer in any of its methods. Therefore, it safe to implement Send for Processor.
 unsafe impl<'a> Send for Processor<'a> {}
 
-// SAFETY: Processor does not expose any interior mutability, and all unsafe APIs that make use of
-// the inner raw pointer are only used in methods that take &mut self, which upholds the thread safety
-// contracts required by the unsafe APIs. Therefore, it is safe to implement Sync for Processor.
+// SAFETY: Processor does not expose any interior mutability. The SDK functions that are documented
+// as not thread-safe (`aic_processor_initialize`, `aic_processor_process`,
+// `aic_processor_terminate_session`, `aic_processor_destroy`) are only reachable through methods
+// that take `&mut self` or through `drop`, so Rust's borrow rules serialize them. The methods that
+// take `&self` (`processor_context`, `vad_context`) only call functions the SDK documents as
+// thread-safe and safe to run while the processor is in use on another thread. Therefore, it is
+// safe to implement Sync for Processor.
 unsafe impl<'a> Sync for Processor<'a> {}
 
 #[cfg(test)]
@@ -858,12 +923,12 @@ mod tests {
             .with_config(&config)
             .unwrap();
 
-        let mut audio = vec![0.0f32; config.num_frames];
+        let mut audio = vec![0.0f32; config.block_size];
         processor.process(&mut audio).unwrap();
     }
 
     #[test]
-    fn process_fixed_frames() {
+    fn process_fixed_block_size() {
         let (model, license_key) = load_test_model().unwrap();
         let config = ProcessorConfig::optimal(&model);
 
@@ -872,21 +937,21 @@ mod tests {
             .with_config(&config)
             .unwrap();
 
-        let mut audio = vec![0.0f32; config.num_frames];
+        let mut audio = vec![0.0f32; config.block_size];
         processor.process(&mut audio).unwrap();
     }
 
     #[test]
-    fn process_variable_frames() {
+    fn process_variable_block_size() {
         let (model, license_key) = load_test_model().unwrap();
-        let config = ProcessorConfig::optimal(&model).with_allow_variable_frames(true);
+        let config = ProcessorConfig::optimal(&model).with_variable_block_size(true);
 
         let mut processor = Processor::new(&model, &license_key)
             .unwrap()
             .with_config(&config)
             .unwrap();
 
-        let mut audio = vec![0.0f32; config.num_frames];
+        let mut audio = vec![0.0f32; config.block_size];
         processor.process(&mut audio).unwrap();
 
         let mut audio = vec![0.0f32; 20];
@@ -894,7 +959,7 @@ mod tests {
     }
 
     #[test]
-    fn process_variable_frames_fails_without_allow_variable_frames() {
+    fn process_variable_block_size_fails_when_disabled() {
         let (model, license_key) = load_test_model().unwrap();
         let config = ProcessorConfig::optimal(&model);
 
@@ -903,7 +968,7 @@ mod tests {
             .with_config(&config)
             .unwrap();
 
-        let mut audio = vec![0.0f32; config.num_frames];
+        let mut audio = vec![0.0f32; config.block_size];
         processor.process(&mut audio).unwrap();
 
         let mut audio = vec![0.0f32; 20];
@@ -922,7 +987,7 @@ mod tests {
             .unwrap();
         drop(model); // Inside of the SDK an Arc-Pointer to `Model` is stored in Processor, so it won't be de-allocated
 
-        let mut audio = vec![0.0f32; config.num_frames];
+        let mut audio = vec![0.0f32; config.block_size];
         processor.process(&mut audio).unwrap();
     }
 
@@ -983,7 +1048,7 @@ mod _compile_fail_tests {
     //!
     //!     drop(buffer); // This should fail to compile
     //!
-    //!     let mut audio = vec![0.0f32; config.num_frames];
+    //!     let mut audio = vec![0.0f32; config.block_size];
     //!     processor.process(&mut audio).unwrap();
     //! }
     //! ```
