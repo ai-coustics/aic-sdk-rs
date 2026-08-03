@@ -1,4 +1,4 @@
-use aic_sdk::{Model, Processor, ProcessorConfig, ProcessorParameter, VadParameter};
+use aic_sdk::{Model, Processor, ProcessorConfig, ProcessorParameter};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     processor.process(&mut audio)?;
 
     // Get processor context for thread safe interaction with parameters
-    let proc_ctx = processor.processor_context();
+    let proc_ctx = processor.context();
 
     // Get output delay
     let delay = proc_ctx.output_delay();
@@ -63,22 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     }
 
-    //  Get VAD context for thread safe interaction with voice activity detection parameters
-    let vad_ctx = processor.vad_context();
-    vad_ctx.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
-    vad_ctx.set_parameter(VadParameter::Sensitivity, 7.0)?;
-
-    let speech_hold_duration = vad_ctx.parameter(VadParameter::SpeechHoldDuration)?;
-    println!("Speech hold duration: {}", speech_hold_duration);
-
-    let sensitivity = vad_ctx.parameter(VadParameter::Sensitivity)?;
-    println!("Sensitivity: {}", sensitivity);
-
-    if vad_ctx.is_speech_detected() {
-        println!("VAD detected speech");
-    } else {
-        println!("VAD did not detect speech");
-    }
+    // Voice activity detection lives in a separate `Vad` instance, see `examples/vad.rs`.
 
     // End the telemetry session on demand instead of waiting for the processor to be dropped.
     // The processor can no longer process audio after this call.

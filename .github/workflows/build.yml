@@ -26,5 +26,6 @@ jobs:
       - name: Build and Run Examples
         run: |
           cargo run --example basic_usage --features "download-lib download-model"
+          cargo run --example vad --features "download-lib download-model"
           cargo run --package build-time-download --features download-lib
           cargo run --example parallel_async --features "async download-lib download-model"
