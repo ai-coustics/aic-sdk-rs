@@ -28,10 +28,12 @@ use std::sync::Arc;
 ///     let vad = VadAsync::new(&model, &license_key)?.with_config(&config).await?;
 ///     let vad_ctx = vad.context().await;
 ///
-///     let audio = vec![0.0f32; config.block_size];
-///     let _audio = vad.process(audio).await?;
-///
-///     println!("Speech detected: {}", vad_ctx.is_speech_detected());
+///     let mut audio = vec![0.0f32; config.block_size];
+///     for _ in 0..2 {
+///         // `process` hands the block back, so the same allocation can be reused.
+///         audio = vad.process(audio).await?;
+///         println!("Speech detected: {}", vad_ctx.is_speech_detected());
+///     }
 ///     Ok(())
 /// }
 /// ```
@@ -93,14 +95,16 @@ impl VadAsync {
     /// Processes mono audio and updates the VAD prediction.
     ///
     /// This method takes ownership of `audio`, moves it to a background processing
-    /// thread, and returns the audio block unmodified.
+    /// thread, and returns the audio block unmodified. Ownership is required because the
+    /// background thread outlives the borrow if this future is cancelled; handing the block
+    /// back lets a streaming loop reuse the same allocation for every block.
     ///
     /// See [`Vad::process`] for details.
-    pub async fn process(&self, mut audio: Vec<f32>) -> Result<Vec<f32>, AicError> {
+    pub async fn process(&self, audio: Vec<f32>) -> Result<Vec<f32>, AicError> {
         let (tx, rx) = oneshot::channel();
         let mut vad = self.inner.lock_arc().await;
         get_global_thread_pool().spawn(move || {
-            let result = vad.process(&mut audio).map(|_| audio);
+            let result = vad.process(&audio).map(|_| audio);
             let _ = tx.send(result);
         });
         rx.await.expect("Rayon worker dropped")

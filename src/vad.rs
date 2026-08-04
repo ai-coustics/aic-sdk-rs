@@ -94,8 +94,8 @@ impl From<VadParameter> for AicVadParameter::Type {
 /// let mut vad = Vad::new(&model, &license_key)?.with_config(&config)?;
 /// let vad_ctx = vad.context();
 ///
-/// let mut audio_block = vec![0.0f32; config.block_size];
-/// vad.process(&mut audio_block)?;
+/// let audio_block = vec![0.0f32; config.block_size];
+/// vad.process(&audio_block)?;
 ///
 /// if vad_ctx.is_speech_detected() {
 ///     println!("Speech detected!");
@@ -249,8 +249,8 @@ impl<'a> Vad<'a> {
     /// let mut vad = Vad::new(&model, &license_key)?.with_config(&config)?;
     ///
     /// // VAD is ready to use - no need to call initialize()
-    /// let mut audio_block = vec![0.0f32; config.block_size];
-    /// vad.process(&mut audio_block)?;
+    /// let audio_block = vec![0.0f32; config.block_size];
+    /// vad.process(&audio_block)?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn with_config(mut self, config: &ProcessorConfig) -> Result<Self, AicError> {
@@ -306,8 +306,8 @@ impl<'a> Vad<'a> {
 
     /// Processes mono audio and updates the VAD prediction.
     ///
-    /// The audio block is not enhanced. Treat it as input to the detector, and read the
-    /// prediction through a [`VadContext`].
+    /// This function does not modify the input audio buffer. Read the prediction through a
+    /// [`VadContext`].
     ///
     /// # Arguments
     ///
@@ -331,11 +331,11 @@ impl<'a> Vad<'a> {
     /// # let mut vad = Vad::new(&model, &license_key)?;
     /// let config = ProcessorConfig::optimal(&model);
     /// vad.initialize(&config)?;
-    /// let mut audio = vec![0.0f32; config.block_size];
-    /// vad.process(&mut audio)?;
+    /// let audio = vec![0.0f32; config.block_size];
+    /// vad.process(&audio)?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
-    pub fn process(&mut self, audio: &mut [f32]) -> Result<(), AicError> {
+    pub fn process(&mut self, audio: &[f32]) -> Result<(), AicError> {
         if !self.initialized {
             return Err(AicError::NotInitialized);
         }
@@ -344,9 +344,10 @@ impl<'a> Vad<'a> {
 
         // SAFETY:
         // - `self.inner` is a valid pointer to a live VAD.
-        // - `audio` points to a contiguous, writable f32 slice of length `audio_len`.
+        // - `audio` points to a contiguous, readable f32 slice of length `audio_len` that the
+        //   C library only reads from.
         // - This function is not thread-safe, so we borrow `&mut self`.
-        let error_code = unsafe { aic_vad_process(self.inner, audio.as_mut_ptr(), audio_len) };
+        let error_code = unsafe { aic_vad_process(self.inner, audio.as_ptr(), audio_len) };
 
         handle_error(error_code)
     }
@@ -868,8 +869,8 @@ mod tests {
         let vad_ctx = vad.context();
         assert!(vad_ctx.output_delay() > 0);
 
-        let mut audio = vec![0.0f32; config.block_size];
-        vad.process(&mut audio).unwrap();
+        let audio = vec![0.0f32; config.block_size];
+        vad.process(&audio).unwrap();
 
         // Silence must not be reported as speech.
         assert!(!vad_ctx.is_speech_detected());
@@ -883,8 +884,8 @@ mod tests {
         let model = load_vad_model();
         let mut vad = Vad::new(&model, &license_key()).unwrap();
 
-        let mut audio = vec![0.0f32; 160];
-        assert_eq!(vad.process(&mut audio), Err(AicError::NotInitialized));
+        let audio = vec![0.0f32; 160];
+        assert_eq!(vad.process(&audio), Err(AicError::NotInitialized));
     }
 
     #[test]
@@ -950,8 +951,8 @@ mod _compile_fail_tests {
     //!
     //!     drop(buffer); // This should fail to compile
     //!
-    //!     let mut audio = vec![0.0f32; config.block_size];
-    //!     vad.process(&mut audio).unwrap();
+    //!     let audio = vec![0.0f32; config.block_size];
+    //!     vad.process(&audio).unwrap();
     //! }
     //! ```
 }
