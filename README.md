@@ -206,8 +206,8 @@ let config = ProcessorConfig::optimal(&model);
 let mut vad = Vad::new(&model, &license_key)?.with_config(&config)?;
 
 // Feed mono audio to the detector. The audio block is not modified.
-let mut audio_block = vec![0.0f32; config.block_size];
-vad.process(&mut audio_block)?;
+let audio_block = vec![0.0f32; config.block_size];
+vad.process(&audio_block)?;
 ```
 
 The VAD context provides thread-safe access to the prediction, the VAD parameters and its state.

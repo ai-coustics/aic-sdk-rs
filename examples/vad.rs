@@ -44,8 +44,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Feed mono audio to the detector. The audio block is not modified, it only updates the
     // prediction. Replace the silence below with your own audio.
-    let mut audio = vec![0.0; config.block_size];
-    vad.process(&mut audio)?;
+    let audio = vec![0.0; config.block_size];
+    vad.process(&audio)?;
 
     if vad_ctx.is_speech_detected() {
         println!("VAD detected speech");

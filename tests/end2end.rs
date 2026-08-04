@@ -120,11 +120,11 @@ fn speech_detection_per_block() -> Vec<bool> {
 
     let vad_ctx = vad.context();
 
-    let mut samples = audio.samples_interleaved;
+    let samples = audio.samples_interleaved;
     let block_size = config.block_size;
     let mut speech_detected_results = Vec::new();
 
-    for chunk in samples.chunks_mut(block_size) {
+    for chunk in samples.chunks(block_size) {
         if chunk.len() == block_size {
             vad.process(chunk).expect("Failed to process block");
             speech_detected_results.push(vad_ctx.is_speech_detected());
@@ -169,11 +169,11 @@ fn vad_reset_clears_published_prediction() {
 
     let vad_ctx = vad.context();
 
-    let mut samples = audio.samples_interleaved;
+    let samples = audio.samples_interleaved;
     let block_size = config.block_size;
 
     let mut speech_was_detected = false;
-    for chunk in samples.chunks_mut(block_size) {
+    for chunk in samples.chunks(block_size) {
         if chunk.len() == block_size {
             vad.process(chunk).expect("Failed to process block");
             if vad_ctx.is_speech_detected() {

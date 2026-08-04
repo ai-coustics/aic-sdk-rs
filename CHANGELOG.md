@@ -21,7 +21,7 @@
   let vad_ctx = vad.context();
 
   // The audio is not modified, it only updates the prediction.
-  vad.process(&mut audio_block)?;
+  vad.process(&audio_block)?;
   println!("Speech detected: {}", vad_ctx.is_speech_detected());
   ```
 

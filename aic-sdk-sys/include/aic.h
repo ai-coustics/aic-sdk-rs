@@ -929,7 +929,7 @@ enum AicErrorCode aic_vad_initialize(struct AicVad *vad,
 /**
  * Processes the provided mono audio block and updates the VAD prediction.
  *
- * The audio buffer is not enhanced. Treat it as input to the detector.
+ * This function does not modify the input audio buffer.
  *
  * # Parameters
  * - `vad`: Initialized VAD instance. Must not be NULL.
@@ -949,7 +949,7 @@ enum AicErrorCode aic_vad_initialize(struct AicVad *vad,
  *   thread while this call is active.
  */
 enum AicErrorCode aic_vad_process(struct AicVad *vad,
-                                  float *audio_ptr,
+                                  const float *audio_ptr,
                                   size_t audio_len);
 
 /**
