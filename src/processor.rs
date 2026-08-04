@@ -167,7 +167,7 @@ impl OtelConfig {
 ///
 /// Create one with [`Processor::context`]. Every method on this type maps to an SDK
 /// function that can be called from any thread, so a context can be moved to another thread to
-/// read and write parameters, query the output delay, or reset the processor while audio is being
+/// read and write parameters, query the audio delay, or reset the processor while audio is being
 /// processed elsewhere.
 ///
 /// Dropping the context does not destroy the processor it came from, and multiple contexts can be
@@ -259,11 +259,11 @@ impl ProcessorContext {
         Ok(value)
     }
 
-    /// Returns the total output delay in samples for the current audio configuration.
+    /// Returns the delay applied to the audio in samples for the current audio configuration.
     ///
     /// This function provides the complete end-to-end latency introduced by the processor,
     /// which includes both algorithmic processing delay and any buffering overhead.
-    /// It is the number of samples by which the enhanced output lags behind the input.
+    /// The processed audio leaves [`Processor::process`] this many samples behind its input.
     /// Use this value to synchronize enhanced audio with other streams or to implement
     /// delay compensation in your application.
     ///
@@ -292,25 +292,25 @@ impl ProcessorContext {
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// # let processor = Processor::new(&model, &license_key)?;
     /// # let processor_context = processor.context();
-    /// let delay = processor_context.output_delay();
-    /// println!("Output delay: {} samples", delay);
+    /// let delay = processor_context.audio_delay();
+    /// println!("Audio delay: {} samples", delay);
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
-    pub fn output_delay(&self) -> usize {
+    pub fn audio_delay(&self) -> usize {
         let mut delay: usize = 0;
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live processor context.
         // - `delay` points to stack storage for output.
         // - This function can be called from any thread, so we only borrow `&self`.
         let error_code =
-            unsafe { aic_processor_context_get_output_delay(self.as_const_ptr(), &mut delay) };
+            unsafe { aic_processor_context_get_audio_delay(self.as_const_ptr(), &mut delay) };
 
         // This should never fail. If it does, it's a bug in the SDK.
-        // `aic_processor_context_get_output_delay` is documented to always succeed if given
+        // `aic_processor_context_get_audio_delay` is documented to always succeed if given
         // valid pointers.
         assert_success(
             error_code,
-            "`aic_processor_context_get_output_delay` failed. This is a bug, please open an issue on GitHub for further investigation.",
+            "`aic_processor_context_get_audio_delay` failed. This is a bug, please open an issue on GitHub for further investigation.",
         );
 
         delay

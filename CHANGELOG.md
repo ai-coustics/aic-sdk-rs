@@ -1,84 +1,217 @@
 # Changelog
 
-## Unreleased
+## 0.22.0
+
+This release contains two breaking changes that affect every integration:
+
+- **All audio APIs are mono only.** The multi-channel process/buffer methods are gone.
+- **The VAD is its own type.** Voice activity detection runs on dedicated VAD models through `Vad`
+  (and `VadAsync`), and can no longer be derived from a processor.
+
+Both migrations are covered step by step below.
+
+### Breaking Changes
+
+#### Multi-channel support removed
+
+The processor and the analyzer's collector now operate on mono audio only.
+
+All models process mono inputs. Previously the processor mixed all input channels down to mono
+internally, which could lead to surprising results. To prevent misunderstandings, all APIs now take
+exclusively mono inputs.
+
+To process multi-channel audio, downmix to mono before calling `Processor::process`, or create a
+separate processor instance per channel.
+
+- `Processor::process_planar`, `process_interleaved` and `process_sequential` are replaced by a
+  single `Processor::process` that takes a plain mono `&mut [f32]`. The same applies to
+  `ProcessorAsync::process` and to `Collector::buffer_planar`, `buffer_interleaved` and
+  `buffer_sequential`, which are replaced by `Collector::buffer`.
+- `ProcessorConfig::num_channels` and `ProcessorConfig::with_num_channels` are removed. The layout
+  choice and channel count added surface area without adding capability, since processing always
+  mixed every channel down to mono internally.
+- Frame terminology is replaced by block-size terminology throughout, matching the mono C API. With
+  mono audio a frame is a single sample, so "number of frames" and "block size" describe the same
+  value:
+  - `ProcessorConfig::num_frames` is now `ProcessorConfig::block_size`.
+  - `ProcessorConfig::allow_variable_frames` is now `ProcessorConfig::variable_block_size`, and
+    `with_allow_variable_frames` is now `with_variable_block_size`.
+  - `Model::optimal_num_frames` is now `Model::optimal_block_size`.
+- The OpenTelemetry `audio.channels` metric has been kept for backwards compatibility, but it now
+  always reports exactly one channel.
+
+Before:
+
+```rust,ignore
+// Stereo in, stereo out. The SDK mixed both channels down to mono internally.
+let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+let mut processor = Processor::new(&model, &license_key)?.with_config(&config)?;
+
+let mut left = vec![0.0f32; config.num_frames];
+let mut right = vec![0.0f32; config.num_frames];
+processor.process_planar(&mut [&mut left, &mut right])?;
+```
+
+After:
+
+```rust,ignore
+let config = ProcessorConfig::optimal(&model);
+let mut processor = Processor::new(&model, &license_key)?.with_config(&config)?;
+
+// Downmix to mono yourself, then process a single buffer in place.
+let mut mono: Vec<f32> = left
+    .iter()
+    .zip(&right)
+    .map(|(l, r)| 0.5 * (l + r))
+    .collect();
+
+processor.process(&mut mono)?;
+```
+
+If you need per-channel output instead of a downmix, create one processor per channel and call
+`Processor::process` once per channel with that channel's buffer.
+
+The same applies to the analyzer: downmix multi-channel audio before calling `Collector::buffer`, or
+create a separate collector/analyzer pair per channel.
+
+#### VAD moved into its own type, energy-based VAD removed
+
+Voice activity detection is no longer a side effect of enhancement. It is now a first-class type,
+`Vad` (plus `VadAsync` with the `async` feature), that runs a dedicated VAD model such as
+`vad-2.1-xxs-16khz`.
+
+Energy-based VADs, which inferred speech activity from the output level of an enhancement model,
+have been removed. They were an approximation and their accuracy depended on the enhancement model
+in use. A dedicated VAD model is trained for the task and is considerably more accurate.
+
+- `Processor::vad_context` and `ProcessorAsync::vad_context` are removed. Create a `Vad` (or
+  `VadAsync`) from a VAD model and read its prediction through `Vad::context` instead.
+- A `Processor` accepts only enhancement and bypass models, and a `Vad` accepts only VAD models.
+  Every other model type is rejected with `AicError::ModelTypeUnsupported`.
+- The VAD advances on `Vad::process` instead of whenever the processor processed audio.
+- The `VadParameter::Sensitivity` range is now always 0.0 to 1.0, the probability threshold of the
+  VAD model output. The 1.0 to 15.0 energy-threshold range of the removed energy-based VAD is gone.
+- `ProcessorContext::reset` no longer resets any VAD state. Use `VadContext::reset` for the VAD.
+- `Processor::processor_context`, `ProcessorAsync::processor_context`, `Vad::vad_context` and
+  `VadAsync::vad_context` are renamed to `context`.
+
+Before:
+
+```rust,ignore
+// One model, one processor: enhancement and VAD were coupled.
+let mut processor = Processor::new(&model, &license_key)?.with_config(&config)?;
+
+let vad_ctx = processor.vad_context();
+vad_ctx.set_parameter(VadParameter::Sensitivity, 5.0)?; // energy threshold
+
+// The VAD updated as a side effect of enhancement.
+processor.process_interleaved(&mut audio)?;
+
+println!("Speech detected: {}", vad_ctx.is_speech_detected());
+```
+
+After:
+
+```rust,ignore
+// Load a dedicated VAD model and create a `Vad` from it.
+let vad_model = Model::from_file("path/to/vad_model.aicmodel")?;
+let vad_config = ProcessorConfig::optimal(&vad_model);
+
+// Returns `AicError::ModelTypeUnsupported` if the model is not a VAD model.
+let mut vad = Vad::new(&vad_model, &license_key)?.with_config(&vad_config)?;
+
+let vad_ctx = vad.context();
+vad_ctx.set_parameter(VadParameter::Sensitivity, 0.8)?; // probability
+
+// The VAD is driven explicitly and does not modify the audio.
+vad.process(&audio)?;
+
+println!("Speech detected: {}", vad_ctx.is_speech_detected());
+```
+
+##### Run the VAD on the original audio
+
+If you use enhancement and VAD together, **feed the VAD the original input audio, not the
+processor's enhanced output.** Run the two side by side on the same mono block rather than chaining
+them:
+
+```rust,ignore
+// Recommended: both see the same original input block.
+vad.process(&audio)?;            // reads the block, does not modify it
+processor.process(&mut audio)?;  // enhances the block in place
+```
+
+`Vad::process` takes an immutable slice and leaves the buffer untouched, so calling it on the same
+buffer before `Processor::process` is all it takes to keep the VAD on the unprocessed signal.
+
+Enhancement is designed to change the signal, so running the VAD on its output means detecting
+speech in audio that no longer matches what the VAD model expects. It also stacks the processor's
+delay on top of the VAD's own prediction delay, which makes speech decisions harder to align.
+
+##### Delay queries renamed
+
+There is no single "output delay" any more. The processor delays audio, the VAD does not, so the two
+queries are now named after what they actually report:
+
+- `ProcessorContext::output_delay` is now `ProcessorContext::audio_delay`. It is an **audio** delay:
+  the enhanced samples leave `Processor::process` that many samples behind their input.
+- `VadContext::prediction_delay` replaces the processor-driven delay query for the VAD. It is a
+  **prediction** delay and is *not* applied to the audio, since `Vad::process` leaves the buffer
+  untouched. It tells you how far behind its own input the published prediction is, so you can line
+  speech decisions up with the audio timeline.
+
+With both fed from the same input block, the two delays are independent of each other:
+
+```rust,ignore
+let audio_delay = proc_ctx.audio_delay();
+let prediction_delay = vad_ctx.prediction_delay();
+
+// The enhanced audio lags the input by `audio_delay`.
+// The VAD prediction lags the same input by `prediction_delay`.
+```
+
+`Vad` mirrors the processor's lifecycle and control surface:
+
+- `Vad::new`, `Vad::with_otel_config`, `Vad::initialize`, `Vad::with_config`, `Vad::process` and
+  `Vad::terminate_session`
+- `Vad::context` for thread-safe control handles
+- `VadContext::reset`, `VadContext::prediction_delay`, `VadContext::update_bearer_token`
+- `VadContext::is_speech_detected`, `VadContext::raw_vad_probability`, `VadContext::set_parameter`,
+  `VadContext::parameter`
+
+See `examples/vad.rs` for a complete example.
+
+#### Renamed error variants
+
+Some error variants are no longer processor-specific, since they are now also returned by the VAD:
+
+- `AicError::ProcessorNotInitialized` is now `AicError::NotInitialized`, since processors, VADs and
+  collectors all report it.
+- `AicError::EnhancementNotAllowed` is now `AicError::ProcessingNotAllowed`.
+- `AicError::ModelFilePathInvalid` is now `AicError::FilePathInvalid`.
+
+The numeric values of the underlying error codes are unchanged, so only source-level references need
+updating.
 
 ### New Features
 
-- Added `Processor::terminate_session`, `ProcessorAsync::terminate_session`, and
-  `Analyzer::terminate_session` to end a telemetry session on demand instead of waiting for the
-  processor or analyzer to be dropped. After termination the processor may no longer process audio
-  and the analyzer may no longer analyze buffered audio.
-
-- Voice activity detection has its own `Vad` type (plus `VadAsync` with the `async` feature),
-  created from a dedicated VAD model:
+- Added `Processor::terminate_session`, `ProcessorAsync::terminate_session`,
+  `Vad::terminate_session`, `VadAsync::terminate_session` and `Analyzer::terminate_session` to end a
+  telemetry session on demand instead of waiting for the processor, VAD or analyzer to be dropped.
+  This is useful in integrations where object deallocation may be delayed. After termination the
+  processor and VAD may no longer process audio and the analyzer may no longer analyze buffered
+  audio.
 
   ```rust,ignore
-  use aic_sdk::{Model, ProcessorConfig, Vad};
-
-  let model = Model::from_file("path/to/vad_model.aicmodel")?;
-  let config = ProcessorConfig::optimal(&model);
-  let mut vad = Vad::new(&model, &license_key)?.with_config(&config)?;
-  let vad_ctx = vad.context();
-
-  // The audio is not modified, it only updates the prediction.
-  vad.process(&audio_block)?;
-  println!("Speech detected: {}", vad_ctx.is_speech_detected());
+  // Ends the telemetry session without waiting for the drop.
+  processor.terminate_session()?;
   ```
-
-  `VadContext` gained `reset`, `output_delay` and `update_bearer_token`, mirroring
-  `ProcessorContext`. `Vad` and `VadAsync` also support `terminate_session` and
-  `with_otel_config`.
 
 ### Bug Fixes
 
 - Resetting the VAD state through `VadContext::reset` now immediately clears the published speech
   detection and raw VAD probability values, so `is_speech_detected` and `raw_vad_probability` no
   longer return stale values from the previous stream after a reset.
-
-### Breaking Changes
-
-- Renamed `Processor::processor_context`, `ProcessorAsync::processor_context`, `Vad::vad_context`,
-  and `VadAsync::vad_context` to `context`.
-
-Energy-based VADs derived from the output of enhancement models have been removed, so voice
-activity detection now always uses a dedicated VAD model (e.g. `vad-2.1-xxs-16khz`):
-
-- `Processor::vad_context` and `ProcessorAsync::vad_context` are removed. Create a `Vad` (or
-  `VadAsync`) from a VAD model and read its prediction through `Vad::context` instead. A
-  `Processor` accepts only enhancement and bypass models; every other model type is rejected with
-  `AicError::ModelTypeUnsupported`.
-- The `VadParameter::Sensitivity` range is now always 0.0 to 1.0, the probability threshold of the
-  VAD model output. The 1.0 to 15.0 energy-threshold range of the removed energy-based VAD is gone.
-- `ProcessorContext::reset` no longer resets any VAD state, and `ProcessorContext::output_delay`
-  only reports the enhancement delay. Use `VadContext::reset` and `VadContext::output_delay` for
-  the VAD.
-
-Two error variants are renamed, following the C API:
-
-- `AicError::ProcessorNotInitialized` is now `AicError::NotInitialized`, since processors, VADs and
-  collectors all report it.
-- `AicError::EnhancementNotAllowed` is now `AicError::ProcessingNotAllowed`.
-
-`Processor::process_planar`, `process_interleaved`, and `process_sequential` (and the matching
-`ProcessorAsync` and `Collector::buffer_*` methods) are replaced by a single `Processor::process` /
-`ProcessorAsync::process` / `Collector::buffer` method that takes a plain mono `f32` buffer.
-
-`ProcessorConfig::num_channels` and `with_num_channels` are removed; processing has always mixed
-every channel down to mono internally, so the layout choice and channel count added surface area
-without adding capability. Callers with multi-channel audio should downmix to mono themselves
-before calling `process`/`buffer`.
-
-Frame terminology is replaced by block-size terminology throughout, matching the mono C API. With
-mono audio a frame is a single sample, so "number of frames" and "block size" describe the same
-value:
-
-- `ProcessorConfig::num_frames` is now `ProcessorConfig::block_size`.
-- `ProcessorConfig::allow_variable_frames` is now `ProcessorConfig::variable_block_size`, and
-  `with_allow_variable_frames` is now `with_variable_block_size`.
-- `Model::optimal_num_frames` is now `Model::optimal_block_size`.
-
-`AicError::ModelFilePathInvalid` is renamed to `AicError::FilePathInvalid`, following the
-`AIC_ERROR_CODE_FILE_PATH_INVALID` rename in the C API.
 
 ## 0.21.4 - 2026-07-08
 

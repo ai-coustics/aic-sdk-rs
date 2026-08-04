@@ -35,9 +35,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get processor context for thread safe interaction with parameters
     let proc_ctx = processor.context();
 
-    // Get output delay
-    let delay = proc_ctx.output_delay();
-    println!("Output delay: {} samples", delay);
+    // Get the delay applied to the audio
+    let delay = proc_ctx.audio_delay();
+    println!("Audio delay: {} samples", delay);
 
     // Test parameter setting and getting
     proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.7)?;
