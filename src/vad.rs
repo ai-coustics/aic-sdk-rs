@@ -169,8 +169,9 @@ impl<'a> Vad<'a> {
         license_key: &str,
         otel_config: Option<&OtelConfig>,
     ) -> Result<Self, AicError> {
-        // Set the wrapper ID as soon as the user attempts to instantiate a VAD
-        crate::set_wrapper_id();
+        // Set the wrapper ID as soon as the user attempts to instantiate a VAD.
+        // SAFETY: `2` is the wrapper ID assigned to this Rust SDK.
+        unsafe { crate::set_sdk_id(2) };
 
         // Session ID must outlive the FFI call so its pointer stays valid.
         let c_session_id = otel_config

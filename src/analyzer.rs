@@ -101,8 +101,9 @@ pub fn analyzer_pair<'a>(
     model: &Model<'a>,
     license_key: &str,
 ) -> Result<(Collector, Analyzer<'a>), AicError> {
-    // Set the wrapper ID as soon as the user attempts to instantiate an analyzer
-    crate::set_wrapper_id();
+    // Set the wrapper ID as soon as the user attempts to instantiate an analyzer.
+    // SAFETY: `2` is the wrapper ID assigned to this Rust SDK.
+    unsafe { crate::set_sdk_id(2) };
 
     let mut collector_ptr: *mut AicCollector = ptr::null_mut();
     let mut analyzer_ptr: *mut AicAnalyzer = ptr::null_mut();
