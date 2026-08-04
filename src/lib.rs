@@ -2,7 +2,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use aic_sdk_sys::{aic_get_compatible_model_version, aic_get_sdk_version, aic_set_sdk_wrapper_id};
-use std::{ffi::CStr, sync::Once};
+use std::ffi::CStr;
 
 #[cfg(feature = "runtime-linking")]
 use std::path::Path;
@@ -36,18 +36,6 @@ pub use vad_async::*;
 #[cfg(feature = "runtime-linking")]
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime-linking")))]
 pub use aic_sdk_sys::DynamicLoadingError;
-
-static SET_WRAPPER_ID: Once = Once::new();
-
-/// Sets the SDK wrapper ID.
-pub(crate) fn set_wrapper_id() {
-    SET_WRAPPER_ID.call_once(|| unsafe {
-        // SAFETY:
-        // - This FFI call has no safety requirements.
-        // - This function can be called from any thread; `Once` serializes this wrapper's call.
-        aic_set_sdk_wrapper_id(2);
-    });
-}
 
 /// Loads the AIC dynamic library from `path` when the `runtime-linking` feature is enabled.
 ///
@@ -112,7 +100,7 @@ pub fn get_compatible_model_version() -> u32 {
 ///
 /// # Safety
 ///
-/// - Don't call this function unless you know what you're doing.
+/// Callers must use the wrapper ID assigned to them by ai-coustics.
 pub unsafe fn set_sdk_id(id: u32) {
     // SAFETY:
     // - This FFI call has no safety requirements.
