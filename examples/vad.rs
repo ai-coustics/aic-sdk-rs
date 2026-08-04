@@ -28,8 +28,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get VAD context for thread safe interaction with the prediction and its parameters
     let vad_ctx = vad.context();
 
-    // How far the prediction lags behind the input
-    println!("Prediction delay: {} samples", vad_ctx.output_delay());
+    // How far the prediction lags behind the input. This delay is not applied to the audio,
+    // `Vad::process` leaves the buffer untouched.
+    println!("Prediction delay: {} samples", vad_ctx.prediction_delay());
 
     // Configure the detector. Sensitivity is the probability threshold of the model output.
     vad_ctx.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
@@ -44,6 +45,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Feed mono audio to the detector. The audio block is not modified, it only updates the
     // prediction. Replace the silence below with your own audio.
+    //
+    // When enhancement and VAD run together, feed the VAD the original input audio rather than
+    // the enhanced output of `Processor::process`.
     let audio = vec![0.0; config.block_size];
     vad.process(&audio)?;
 

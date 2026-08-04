@@ -176,8 +176,8 @@ use aic_sdk::ProcessorParameter;
 // Get processor context
 let proc_ctx = processor.context();
 
-// Get output delay in samples
-let delay = proc_ctx.output_delay();
+// Get the delay applied to the audio in samples
+let delay = proc_ctx.audio_delay();
 
 // Reset processor state (clears internal buffers)
 proc_ctx.reset()?;
@@ -210,6 +210,20 @@ let audio_block = vec![0.0f32; config.block_size];
 vad.process(&audio_block)?;
 ```
 
+When enhancement and VAD run together, feed the VAD the original input audio, not the processor's
+enhanced output. Run both on the same block instead of chaining them:
+
+```rust,ignore
+let mut audio_block = vec![0.0f32; config.block_size];
+
+vad.process(&audio_block)?; // reads the block, does not modify it
+processor.process(&mut audio_block)?; // enhances the block in place
+```
+
+Enhancement is designed to change the signal, so running the VAD on its output means detecting
+speech in audio that no longer matches what the VAD model expects, and it stacks the processor's
+audio delay on top of the VAD's prediction delay.
+
 The VAD context provides thread-safe access to the prediction, the VAD parameters and its state.
 You can create multiple contexts and move them to any thread for concurrent parameter updates.
 
@@ -228,8 +242,9 @@ vad_ctx.set_parameter(VadParameter::MinimumSpeechDuration, 0.0)?;
 let sensitivity = vad_ctx.parameter(VadParameter::Sensitivity)?;
 println!("VAD sensitivity: {}", sensitivity);
 
-// How many samples the prediction lags behind the input
-let delay = vad_ctx.output_delay();
+// How many samples the prediction lags behind the input. This delay is not applied to the
+// audio, `Vad::process` leaves the buffer untouched.
+let delay = vad_ctx.prediction_delay();
 
 // Check for speech (after processing audio through the VAD)
 if vad_ctx.is_speech_detected() {

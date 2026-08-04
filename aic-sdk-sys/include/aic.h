@@ -761,10 +761,11 @@ enum AicErrorCode aic_processor_context_get_parameter(const struct AicProcessorC
                                                       float *value);
 
 /**
- * Returns the total output delay in samples for the current audio configuration.
+ * Returns the delay applied to the audio in samples for the current audio configuration.
  *
  * This function provides the complete end-to-end latency introduced by the processor,
  * which includes both algorithmic processing delay and any buffering overhead.
+ * The processed audio leaves `aic_processor_process` this many samples behind its input.
  * Use this value to synchronize enhanced audio with other streams or to implement
  * delay compensation in your application.
  *
@@ -795,8 +796,8 @@ enum AicErrorCode aic_processor_context_get_parameter(const struct AicProcessorC
  * - Real-time safe: Can be called from audio processing threads.
  * - Thread-safe: Can be called from any thread.
  */
-enum AicErrorCode aic_processor_context_get_output_delay(const struct AicProcessorContext *context,
-                                                         size_t *delay);
+enum AicErrorCode aic_processor_context_get_audio_delay(const struct AicProcessorContext *context,
+                                                        size_t *delay);
 
 /**
  * Replaces the bearer token on a running processor.
@@ -820,7 +821,7 @@ enum AicErrorCode aic_processor_context_get_output_delay(const struct AicProcess
  * accepted token arrives in time. Supplying a known-good token via this call during
  * that window recovers the session.
  *
- * Safe to call concurrently with `aic_processor_process()` on the originating
+ * Safe to call concurrently with `aic_processor_process` on the originating
  * processor.
  *
  * # Parameters
@@ -929,7 +930,14 @@ enum AicErrorCode aic_vad_initialize(struct AicVad *vad,
 /**
  * Processes the provided mono audio block and updates the VAD prediction.
  *
- * This function does not modify the input audio buffer.
+ * This function does not modify the input audio block.
+ *
+ * **Recommendation:** When enhancement and VAD run together, pass the original input audio
+ * here, not the output of `aic_processor_process`. Enhancement is designed to change the
+ * signal, so running the VAD on its output means detecting speech in audio that no longer
+ * matches what the VAD model expects, and it stacks the processor's audio delay on top of the
+ * VAD's prediction delay. Because this function does not modify its input, calling it on the
+ * same buffer before `aic_processor_process` is enough.
  *
  * # Parameters
  * - `vad`: Initialized VAD instance. Must not be NULL.
@@ -1058,6 +1066,13 @@ enum AicErrorCode aic_vad_context_reset(const struct AicVadContext *context);
  * which includes input reblocking, STFT, and model processing delay. Use this value
  * to line up VAD decisions with the input timeline.
  *
+ * This delay is **not** applied to the audio: `aic_vad_process` leaves its input buffer
+ * untouched. The value only describes how far behind its input the published prediction is.
+ *
+ * When enhancement and VAD run together, feed the VAD the original input audio rather than the
+ * processor's output. This value is then the prediction's delay relative to that input, and it is
+ * independent of the processor's `aic_processor_context_get_audio_delay`.
+ *
  * This queries the VAD associated with the provided context handle.
  *
  * **Delay behavior:**
@@ -1088,8 +1103,8 @@ enum AicErrorCode aic_vad_context_reset(const struct AicVadContext *context);
  * - Real-time safe: Can be called from audio processing threads.
  * - Thread-safe: Can be called from any thread.
  */
-enum AicErrorCode aic_vad_context_get_output_delay(const struct AicVadContext *context,
-                                                   size_t *delay);
+enum AicErrorCode aic_vad_context_get_prediction_delay(const struct AicVadContext *context,
+                                                       size_t *delay);
 
 /**
  * Replaces the bearer token on a running VAD.
@@ -1113,7 +1128,7 @@ enum AicErrorCode aic_vad_context_get_output_delay(const struct AicVadContext *c
  * accepted token arrives in time. Supplying a known-good token via this call during
  * that window recovers the session.
  *
- * Safe to call concurrently with `aic_vad_process()` on the originating VAD.
+ * Safe to call concurrently with `aic_vad_process` on the originating VAD.
  *
  * # Parameters
  * - `context`: VAD context instance. Must not be NULL.
@@ -1139,7 +1154,7 @@ enum AicErrorCode aic_vad_context_update_bearer_token(const struct AicVadContext
  *
  * # Latency
  * The latency of the VAD prediction is equal to the backing VAD's processing latency,
- * reported by `aic_vad_context_get_output_delay`. The prediction lags its input by
+ * reported by `aic_vad_context_get_prediction_delay`. The prediction lags its input by
  * that many samples. Align speech decisions to the input timeline using that delay.
  *
  * If the backing VAD stops being processed, the VAD will not update its prediction.
@@ -1171,7 +1186,7 @@ enum AicErrorCode aic_vad_context_is_speech_detected(const struct AicVadContext 
  *
  * # Latency
  * The latency of the VAD prediction is equal to the backing VAD's processing latency,
- * reported by `aic_vad_context_get_output_delay`. The prediction lags its input by
+ * reported by `aic_vad_context_get_prediction_delay`. The prediction lags its input by
  * that many samples. Align speech decisions to the input timeline using that delay.
  *
  * If the backing VAD stops being processed, the VAD will not update its prediction.

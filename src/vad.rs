@@ -309,6 +309,20 @@ impl<'a> Vad<'a> {
     /// This function does not modify the input audio buffer. Read the prediction through a
     /// [`VadContext`].
     ///
+    /// # Recommendation
+    ///
+    /// When enhancement and VAD run together, pass the original input audio here, not the output
+    /// of [`Processor::process`](crate::Processor::process). Enhancement is designed to change the
+    /// signal, so running the VAD on its output means detecting speech in audio that no longer
+    /// matches what the VAD model expects, and it stacks the processor's audio delay on top of the
+    /// VAD's prediction delay. Because this function does not modify its input, calling it on the
+    /// same buffer before `Processor::process` is enough:
+    ///
+    /// ```rust,ignore
+    /// vad.process(&audio)?; // reads the block, does not modify it
+    /// processor.process(&mut audio)?; // enhances the block in-place
+    /// ```
+    ///
     /// # Arguments
     ///
     /// * `audio` - Mono audio block to examine. Must be exactly of size `block_size`, or if
@@ -464,7 +478,7 @@ unsafe impl<'a> Sync for Vad<'a> {}
 ///
 /// Create one with [`Vad::context`]. Every method on this type maps to an SDK function that
 /// can be called from any thread, so a context can be moved to another thread to read the
-/// prediction, read and write parameters, query the output delay, or reset the VAD while audio is
+/// prediction, read and write parameters, query the prediction delay, or reset the VAD while audio is
 /// being processed elsewhere.
 ///
 /// All handles created from a given VAD reference the same VAD instance.
@@ -503,7 +517,7 @@ impl VadContext {
     /// # Latency
     ///
     /// The latency of the VAD prediction is equal to the backing VAD's processing latency,
-    /// reported by [`VadContext::output_delay`]. The prediction lags its input by that many
+    /// reported by [`VadContext::prediction_delay`]. The prediction lags its input by that many
     /// samples.
     ///
     /// Align speech decisions to the input timeline using that delay.
@@ -535,7 +549,7 @@ impl VadContext {
     /// # Latency
     ///
     /// The latency of the VAD prediction is equal to the backing VAD's processing latency,
-    /// reported by [`VadContext::output_delay`]. The prediction lags its input by that many
+    /// reported by [`VadContext::prediction_delay`]. The prediction lags its input by that many
     /// samples.
     ///
     /// Align speech decisions to the input timeline using that delay.
@@ -633,6 +647,14 @@ impl VadContext {
     /// includes input reblocking, STFT, and model processing delay. Use this value to line up
     /// VAD decisions with the input timeline.
     ///
+    /// This delay is **not** applied to the audio: [`Vad::process`] leaves its input buffer
+    /// untouched. The value only describes how far behind its input the published prediction is.
+    ///
+    /// When enhancement and VAD run together, feed the VAD the original input audio rather than
+    /// the processor's output. This value is then the prediction's delay relative to that input,
+    /// and it is independent of the processor's
+    /// [`ProcessorContext::audio_delay`](crate::ProcessorContext::audio_delay).
+    ///
     /// **Delay behavior:**
     /// - **Before initialization:** Returns the base processing delay using the model's
     ///   optimal block size at its native sample rate
@@ -661,25 +683,25 @@ impl VadContext {
     /// # let model = Model::from_file("/path/to/vad_model.aicmodel")?;
     /// # let vad = Vad::new(&model, &license_key)?;
     /// # let vad_ctx = vad.context();
-    /// let delay = vad_ctx.output_delay();
+    /// let delay = vad_ctx.prediction_delay();
     /// println!("VAD prediction delay: {delay} samples");
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
-    pub fn output_delay(&self) -> usize {
+    pub fn prediction_delay(&self) -> usize {
         let mut delay: usize = 0;
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live VAD context.
         // - `delay` points to stack storage for output.
         // - This function can be called from any thread, so we only borrow `&self`.
         let error_code =
-            unsafe { aic_vad_context_get_output_delay(self.as_const_ptr(), &mut delay) };
+            unsafe { aic_vad_context_get_prediction_delay(self.as_const_ptr(), &mut delay) };
 
         // This should never fail. If it does, it's a bug in the SDK.
-        // `aic_vad_context_get_output_delay` is documented to always succeed if given
+        // `aic_vad_context_get_prediction_delay` is documented to always succeed if given
         // valid pointers.
         assert_success(
             error_code,
-            "`aic_vad_context_get_output_delay` failed. This is a bug, please open an issue on GitHub for further investigation.",
+            "`aic_vad_context_get_prediction_delay` failed. This is a bug, please open an issue on GitHub for further investigation.",
         );
 
         delay
@@ -867,7 +889,7 @@ mod tests {
             .unwrap();
 
         let vad_ctx = vad.context();
-        assert!(vad_ctx.output_delay() > 0);
+        assert!(vad_ctx.prediction_delay() > 0);
 
         let audio = vec![0.0f32; config.block_size];
         vad.process(&audio).unwrap();
