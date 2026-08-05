@@ -32,7 +32,7 @@ pub enum VadParameter {
     ///
     /// **Range:** 0.0 to 300x model window length (value in seconds)
     ///
-    /// **Default:** 0.03 (30 ms)
+    /// **Default:** model-specific
     SpeechHoldDuration,
     /// Controls the sensitivity of the VAD.
     ///
@@ -59,7 +59,7 @@ pub enum VadParameter {
     ///
     /// **Range:** 0.0 to 1.0 (value in seconds)
     ///
-    /// **Default:** 0.0
+    /// **Default:** model-specific
     MinimumSpeechDuration,
 }
 

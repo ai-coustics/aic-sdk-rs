@@ -413,7 +413,7 @@ impl<'a> Analyzer<'a> {
     /// Replaces the bearer token on the analyzer.
     ///
     /// Use this when your license key is a JWT and needs to be refreshed before it expires.
-    /// The analyzer handle stays valid, buffered spectra stay available, and the new token is
+    /// The analyzer handle stays valid, buffered audio remains available, and the new token is
     /// used for all subsequent authentication against the ai-coustics backend.
     ///
     /// In-place updates are only supported when both the originally configured key and the
