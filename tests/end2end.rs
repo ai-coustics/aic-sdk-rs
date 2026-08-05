@@ -8,7 +8,7 @@ pub const TEST_AUDIO_ENHANCED_PATH: &str = "tests/data/test_signal_enhanced.wav"
 pub const VAD_RESULTS_PATH: &str = "tests/data/vad_results.json";
 
 /// Enhancement model used for the audio enhancement tests.
-const ENHANCEMENT_MODEL_ID: &str = "quail-vf-2.1-s-16khz";
+const ENHANCEMENT_MODEL_ID: &str = "quail-vf-2.2-s-16khz";
 /// Dedicated VAD model used for the voice activity detection tests. Enhancement models cannot
 /// be used for voice activity detection since the SDK dropped energy-based VADs.
 const VAD_MODEL_ID: &str = "vad-2.1-xxs-16khz";

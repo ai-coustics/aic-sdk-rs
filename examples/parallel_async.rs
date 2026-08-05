@@ -9,7 +9,7 @@
 use aic_sdk::{Model, ProcessorAsync, ProcessorConfig};
 use std::time::Instant;
 
-const MODEL: &str = "quail-vf-2.1-l-16khz";
+const MODEL: &str = "quail-vf-2.2-l-16khz";
 const NUM_PROCESSORS: usize = 4;
 // Number of process calls per processor – enough to make timing visible.
 const ITERATIONS: usize = 50;
