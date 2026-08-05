@@ -244,7 +244,7 @@ impl Collector {
 
         // SAFETY:
         // - `self.inner` is a valid pointer to a live collector.
-        // - `audio` points to a contiguous, readable f32 slice of length `audio_len`.
+        // - `audio` points to a contiguous, f32 slice of length `audio_len`.
         // - This function is not thread-safe, so we borrow `&mut self`.
         let error_code = unsafe { aic_collector_buffer(self.inner, audio.as_ptr(), audio_len) };
 
