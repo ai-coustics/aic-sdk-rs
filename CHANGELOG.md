@@ -101,13 +101,13 @@ Before:
 // One model, one processor: enhancement and VAD were coupled.
 let mut processor = Processor::new(&model, &license_key)?.with_config(&config)?;
 
-let context = processor.vad_context();
-context.set_parameter(VadParameter::Sensitivity, 5.0)?; // energy threshold
+let vad_ctx = processor.vad_context();
+vad_ctx.set_parameter(VadParameter::Sensitivity, 5.0)?; // energy threshold
 
 // The VAD updated as a side effect of enhancement.
 processor.process_interleaved(&mut audio)?;
 
-println!("Speech detected: {}", context.is_speech_detected());
+println!("Speech detected: {}", vad_ctx.is_speech_detected());
 ```
 
 After:
@@ -120,13 +120,13 @@ let vad_config = ProcessorConfig::optimal(&vad_model);
 // Returns `AicError::ModelTypeUnsupported` if the model is not a VAD model.
 let mut vad = Vad::new(&vad_model, &license_key)?.with_config(&vad_config)?;
 
-let context = vad.context();
-context.set_parameter(VadParameter::Sensitivity, 0.8)?; // probability
+let vad_ctx = vad.context();
+vad_ctx.set_parameter(VadParameter::Sensitivity, 0.8)?; // probability
 
 // The VAD is driven explicitly and does not modify the audio.
 vad.process(&audio)?;
 
-println!("Speech detected: {}", context.is_speech_detected());
+println!("Speech detected: {}", vad_ctx.is_speech_detected());
 ```
 
 ##### Run the VAD on the original audio
