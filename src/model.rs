@@ -128,7 +128,7 @@ impl<'a> Model<'a> {
     ///
     /// A single model instance can be used to create multiple processors, VADs or analyzers,
     /// according to the model type.
-    /// 
+    ///
     /// # Lifetime and ownership
     ///
     /// Each processor, VAD or analyzer created with a given model keeps the underlying model
