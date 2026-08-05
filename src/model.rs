@@ -74,12 +74,6 @@ impl<'a> Model<'a> {
     /// A single model instance can be used to create multiple processors, VADs or analyzers,
     /// according to the model type.
     ///
-    /// # Lifetime and ownership
-    ///
-    /// Each processor, VAD or analyzer created with a given model keeps the underlying model
-    /// alive through internal reference counting. When the reference count reaches zero the
-    /// model is destroyed. You may therefore drop the model before those objects, in any order.
-    ///
     /// The model data is memory-mapped from the file, not copied into the process. Make sure
     /// the file is not modified or deleted while the model, or any object created from it, is
     /// alive.
