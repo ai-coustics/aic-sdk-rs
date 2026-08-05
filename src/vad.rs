@@ -41,7 +41,7 @@ pub enum VadParameter {
     /// speech is not present. The probability is compared against the sensitivity threshold
     /// to determine if speech is detected.
     ///
-    /// A value above the threshold triggers a speech-detected decision.
+    /// A value above the threshold will trigger a "speech detected" decision.
     ///
     /// **Range:** 0.0 to 1.0
     ///
@@ -116,6 +116,9 @@ impl<'a> Vad<'a> {
     ///
     /// Multiple VAD instances can be created to process different audio streams simultaneously.
     ///
+    /// The same [`Model`] may be passed to this function more than once: each call creates an
+    /// independent VAD that shares the underlying model data internally.
+    ///
     /// # Arguments
     ///
     /// * `model` - The loaded model instance. Must be a VAD model, otherwise
@@ -141,6 +144,9 @@ impl<'a> Vad<'a> {
     }
 
     /// Creates a new voice activity detector instance with explicit OpenTelemetry configuration.
+    ///
+    /// If provided, telemetry will be sent according to the provided configuration. Otherwise
+    /// it will be configured according to the runtime environment.
     ///
     /// This overrides the SDK's environment-based telemetry defaults (e.g.
     /// `AIC_SDK_OTEL_ENABLE`) for this VAD.
@@ -325,8 +331,8 @@ impl<'a> Vad<'a> {
     ///
     /// # Arguments
     ///
-    /// * `audio` - Mono audio block to examine. Must be exactly of size `block_size`, or if
-    ///   `variable_block_size` was enabled, less than the initialization value.
+    /// * `audio` - Mono audio block to examine. Must match `block_size` from initialization, or
+    ///   if `variable_block_size` was enabled, must be less than or equal to `block_size`.
     ///
     /// # Returns
     ///
@@ -408,12 +414,16 @@ impl<'a> Vad<'a> {
     ///
     /// Once the request has been handled, the VAD is no longer allowed to process audio.
     ///
-    /// This is meant for lifecycle management events. A telemetry session is stopped
-    /// automatically when the [`Vad`] is dropped, so calling this is only necessary when
-    /// the session must end before the VAD itself goes out of scope.
+    /// This function is meant to be used in lifecycle management events.
+    /// A telemetry session is automatically stopped when a VAD is destroyed.
+    /// However, in cases where this SDK is integrated with languages with automatic memory
+    /// management, object deallocation could be delayed. Use this function to terminate
+    /// the session explicitly.
     ///
-    /// This blocks until the telemetry session is terminated, unless another session is still
-    /// alive. In that case it returns early and termination happens asynchronously.
+    /// This function blocks until the telemetry session is terminated, unless another
+    /// session is still alive. In that case, this function returns early and termination
+    /// happens asynchronously. This keeps lifecycle management smooth while ensuring
+    /// all sessions are closed when the last VAD is terminated.
     ///
     /// # Returns
     ///
@@ -744,20 +754,24 @@ impl VadContext {
 
     /// Replaces the bearer token on the running VAD.
     ///
-    /// Use this when your license key is a JWT and needs to be refreshed before it expires.
-    /// Audio processing continues uninterrupted, the context handle stays valid, and the new
-    /// token is used for all subsequent authentication against the ai-coustics backend.
+    /// Use this when your license key is a JWT and needs to be refreshed
+    /// before it expires. Calling this with a renewed token lets you stay authenticated
+    /// without tearing down and recreating the VAD: audio processing continues
+    /// uninterrupted, the context handle stays valid, and the new token is used for all
+    /// subsequent authentication against the ai-coustics backend.
     ///
     /// In-place updates are only supported when both the originally configured key and the
-    /// new token are JWTs. If either side is not, the call returns
-    /// [`AicError::TokenUpdateUnsupported`] and the existing token stays in use.
+    /// new token are JWTs. Other license types cannot be swapped in this way.
     ///
     /// On any error the call is a no-op: the previously active token stays in use and the
-    /// telemetry session is unaffected. On success the swap is applied immediately and is **not**
-    /// gated on backend acceptance. The token is only validated locally for format; if the
-    /// backend later rejects it, the SDK retries it under backoff rather than rolling back, and
-    /// audio processing is eventually disabled if no accepted token arrives in time. Supplying a
-    /// known-good token during that window recovers the session.
+    /// telemetry session is unaffected (no backoff, no interruption to processing).
+    ///
+    /// On success the swap is applied immediately and is **not** gated on backend
+    /// acceptance. The token is validated locally for format only; if the backend later
+    /// rejects it (e.g. expired or revoked), the SDK retries it under backoff rather than
+    /// rolling back to the prior token, and audio processing is eventually disabled if no
+    /// accepted token arrives in time. Supplying a known-good token via this call during
+    /// that window recovers the session.
     ///
     /// Safe to call concurrently with [`Vad::process`] on the originating VAD.
     ///

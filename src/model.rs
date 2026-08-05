@@ -9,11 +9,14 @@ use std::{
     ptr,
 };
 
-/// High-level wrapper for the ai-coustics audio enhancement model.
+/// High-level wrapper for an ai-coustics model.
 ///
-/// This struct provides a safe, Rust-friendly interface to the underlying C library.
-/// It handles memory management automatically and converts C-style error codes
-/// to Rust `Result` types.
+/// A single model instance can be used to create multiple processors, VADs or analyzers,
+/// according to the model type.
+///
+/// Each processor, VAD or analyzer created with a given model keeps the underlying model
+/// alive through internal reference counting. When the reference count reaches zero the
+/// model is destroyed. You may therefore drop the model before those objects, in any order.
 ///
 /// # Sharing and Multi-threading
 ///
@@ -66,10 +69,20 @@ pub struct Model<'a> {
 }
 
 impl<'a> Model<'a> {
-    /// Creates a new audio enhancement model instance.
+    /// Creates a new model instance from a model file.
     ///
-    /// Multiple models can be created to process different audio streams simultaneously
-    /// or to switch between different enhancement algorithms during runtime.
+    /// A single model instance can be used to create multiple processors, VADs or analyzers,
+    /// according to the model type.
+    ///
+    /// # Lifetime and ownership
+    ///
+    /// Each processor, VAD or analyzer created with a given model keeps the underlying model
+    /// alive through internal reference counting. When the reference count reaches zero the
+    /// model is destroyed. You may therefore drop the model before those objects, in any order.
+    ///
+    /// The model data is memory-mapped from the file, not copied into the process. Make sure
+    /// the file is not modified or deleted while the model, or any object created from it, is
+    /// alive.
     ///
     /// # Arguments
     ///
@@ -111,7 +124,16 @@ impl<'a> Model<'a> {
         })
     }
 
-    /// Creates a new model instance from an in-memory buffer.
+    /// Creates a new model instance from a memory buffer.
+    ///
+    /// A single model instance can be used to create multiple processors, VADs or analyzers,
+    /// according to the model type.
+    ///
+    /// # Lifetime and ownership
+    ///
+    /// Each processor, VAD or analyzer created with a given model keeps the underlying model
+    /// alive through internal reference counting. When the reference count reaches zero the
+    /// model is destroyed. You may therefore drop the model before those objects, in any order.
     ///
     /// The buffer must be 64-byte aligned.
     ///
@@ -159,7 +181,9 @@ impl<'a> Model<'a> {
         })
     }
 
-    /// Returns the model identifier string.
+    /// Returns the model identifier.
+    ///
+    /// The returned string is UTF-8 encoded.
     pub fn id(&self) -> &str {
         // SAFETY:
         // - `self` owns a valid model pointer created by the SDK.
@@ -175,7 +199,7 @@ impl<'a> Model<'a> {
         unsafe { CStr::from_ptr(id_ptr).to_str().unwrap_or("unknown") }
     }
 
-    /// Retrieves the native sample rate of the model.
+    /// Retrieves the optimal sample rate of the model.
     ///
     /// Each model is optimized for a specific sample rate, which determines the frequency
     /// range of the enhanced audio output. While you can process audio at any sample rate,
@@ -193,8 +217,8 @@ impl<'a> Model<'a> {
     /// the model's noise reduction capabilities to the lower frequencies.
     ///
     /// **Sample rate and optimal block size relationship:**
-    /// When using different sample rates than the model's native rate, the optimal block size
-    /// (returned by `optimal_block_size`) will change. The model's output delay remains
+    /// When using different sample rates than the model's native rate, the optimal samples
+    /// per block (returned by [`Model::optimal_block_size`]) will change. The processor's output delay remains
     /// constant regardless of sample rate as long as you use the optimal block size for
     /// that rate.
     ///
@@ -236,15 +260,15 @@ impl<'a> Model<'a> {
         sample_rate
     }
 
-    /// Retrieves the optimal block size for the selected model at a given sample rate.
+    /// Retrieves the optimal block size for the model at a given sample rate.
     ///
     /// Using the optimal block size minimizes latency by avoiding internal buffering.
     ///
-    /// **When you use a different block size than the optimal value, the model will
+    /// **When you use a different block size than the optimal value, the processor will
     /// introduce additional buffering latency on top of its base processing delay.**
     ///
     /// The optimal block size varies based on the sample rate. Each model operates on a
-    /// fixed time window duration, so the required number of samples changes with sample rate.
+    /// fixed time window length, so the required number of samples changes with sample rate.
     /// For example, a model designed for 10 ms processing windows requires 480 samples at
     /// 48 kHz, but only 160 samples at 16 kHz to capture the same duration of audio.
     ///

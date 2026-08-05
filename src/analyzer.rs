@@ -160,7 +160,7 @@ impl Collector {
         }
     }
 
-    /// Configures the collector for specific audio settings.
+    /// Configures the collector for a specific audio format.
     ///
     /// This function must be called before buffering any audio.
     /// Using the sample rate and block size returned by [`Model::optimal_sample_rate`] and
@@ -206,13 +206,13 @@ impl Collector {
         Ok(())
     }
 
-    /// Buffers mono audio.
+    /// Buffers audio for later offline use.
     ///
     /// # Arguments
     ///
-    /// * `audio` - Mono audio block to be buffered. Must be exactly of size
-    ///   `block_size`, or if `variable_block_size` was enabled, less than
-    ///   the initialization value.
+    /// * `audio` - Mono audio block to be buffered. Must match `block_size` from
+    ///   initialization, or if `variable_block_size` was enabled, must be less than or equal
+    ///   to `block_size`.
     ///
     /// # Returns
     ///
@@ -375,12 +375,16 @@ impl<'a> Analyzer<'a> {
     /// Once the request has been handled, the analyzer is no longer allowed to analyze
     /// buffered audio.
     ///
-    /// This is meant for lifecycle management events. A telemetry session is stopped
-    /// automatically when the [`Analyzer`] is dropped, so calling this is only necessary when
-    /// the session must end before the analyzer itself goes out of scope.
+    /// This function is meant to be used in lifecycle management events.
+    /// A telemetry session is automatically stopped when an analyzer is destroyed.
+    /// However, in cases where this SDK is integrated with languages with automatic memory
+    /// management, object deallocation could be delayed. Use this function to terminate
+    /// the session explicitly.
     ///
-    /// This blocks until the telemetry session is terminated, unless another session is still
-    /// alive. In that case it returns early and termination happens asynchronously.
+    /// This function blocks until the telemetry session is terminated, unless another
+    /// session is still alive. In that case, this function returns early and termination
+    /// happens asynchronously. This keeps lifecycle management smooth while ensuring
+    /// all sessions are closed when the last telemetry session is terminated.
     ///
     /// # Returns
     ///
@@ -410,22 +414,26 @@ impl<'a> Analyzer<'a> {
         handle_error(error_code)
     }
 
-    /// Replaces the bearer token on the analyzer.
+    /// Replaces the bearer token on a running analyzer.
     ///
-    /// Use this when your license key is a JWT and needs to be refreshed before it expires.
-    /// The analyzer handle stays valid, buffered audio remains available, and the new token is
-    /// used for all subsequent authentication against the ai-coustics backend.
+    /// Use this when your license key is a JWT and needs to be refreshed
+    /// before it expires. Calling this with a renewed token lets you stay authenticated
+    /// without tearing down and recreating the analyzer: the analyzer handle stays valid,
+    /// buffered audio remains available, and the new token is used for all
+    /// subsequent authentication against the ai-coustics backend.
     ///
     /// In-place updates are only supported when both the originally configured key and the
-    /// new token are JWTs. If either side is not, the call returns
-    /// [`AicError::TokenUpdateUnsupported`] and the existing token stays in use.
+    /// new token are JWTs. Other license types cannot be swapped in this way.
     ///
     /// On any error the call is a no-op: the previously active token stays in use and the
-    /// telemetry session is unaffected. On success the swap is applied immediately and is **not**
-    /// gated on backend acceptance. The token is only validated locally for format; if the
-    /// backend later rejects it, the SDK retries it under backoff rather than rolling back, and
-    /// analysis calls may be rejected if no accepted token arrives in time. Supplying a
-    /// known-good token during that window recovers the session.
+    /// telemetry session is unaffected (no backoff, no interruption to processing).
+    ///
+    /// On success the swap is applied immediately and is **not** gated on backend
+    /// acceptance. The token is validated locally for format only; if the backend later
+    /// rejects it (e.g. expired or revoked), the SDK retries it under backoff rather than
+    /// rolling back to the prior token, and analysis calls may be rejected if no
+    /// accepted token arrives in time. Supplying a known-good token via this call
+    /// during that window recovers the session.
     ///
     /// # Arguments
     ///

@@ -61,7 +61,7 @@ pub fn is_library_loaded() -> bool {
     aic_sdk_sys::is_library_loaded()
 }
 
-/// Returns the version of the ai-coustics SDK library.
+/// Returns the version of the SDK.
 ///
 /// # Note
 /// This is not necessarily the same as this crate's version.
@@ -88,7 +88,7 @@ pub fn get_sdk_version() -> &'static str {
     unsafe { CStr::from_ptr(version_ptr).to_str().unwrap_or("unknown") }
 }
 
-/// Returns the model version number compatible with this SDK build.
+/// Returns the model version compatible with the SDK.
 pub fn get_compatible_model_version() -> u32 {
     // SAFETY:
     // - FFI call takes no arguments and returns a plain integer.
