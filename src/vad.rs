@@ -92,12 +92,12 @@ impl From<VadParameter> for AicVadParameter::Type {
 /// let config = ProcessorConfig::optimal(&model);
 ///
 /// let mut vad = Vad::new(&model, &license_key)?.with_config(&config)?;
-/// let context = vad.context();
+/// let vad_ctx = vad.context();
 ///
 /// let audio_block = vec![0.0f32; config.block_size];
 /// vad.process(&audio_block)?;
 ///
-/// if context.is_speech_detected() {
+/// if vad_ctx.is_speech_detected() {
 ///     println!("Speech detected!");
 /// }
 /// # Ok::<(), aic_sdk::AicError>(())
@@ -379,7 +379,7 @@ impl<'a> Vad<'a> {
     /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// let model = Model::from_file("/path/to/vad_model.aicmodel")?;
     /// let vad = Vad::new(&model, &license_key)?;
-    /// let context = vad.context();
+    /// let vad_ctx = vad.context();
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn context(&self) -> VadContext {
@@ -494,7 +494,7 @@ unsafe impl<'a> Sync for Vad<'a> {}
 /// let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/vad_model.aicmodel")?;
 /// let vad = Vad::new(&model, &license_key)?;
-/// let context = vad.context();
+/// let vad_ctx = vad.context();
 /// # Ok::<(), aic_sdk::AicError>(())
 /// ```
 pub struct VadContext {
@@ -590,9 +590,9 @@ impl VadContext {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/vad_model.aicmodel")?;
     /// # let vad = Vad::new(&model, &license_key)?;
-    /// # let context = vad.context();
-    /// context.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
-    /// context.set_parameter(VadParameter::Sensitivity, 0.5)?;
+    /// # let vad_ctx = vad.context();
+    /// vad_ctx.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
+    /// vad_ctx.set_parameter(VadParameter::Sensitivity, 0.5)?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn set_parameter(&self, parameter: VadParameter, value: f32) -> Result<(), AicError> {
@@ -623,8 +623,8 @@ impl VadContext {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/vad_model.aicmodel")?;
     /// # let vad = Vad::new(&model, &license_key)?;
-    /// # let context = vad.context();
-    /// let sensitivity = context.parameter(VadParameter::Sensitivity)?;
+    /// # let vad_ctx = vad.context();
+    /// let sensitivity = vad_ctx.parameter(VadParameter::Sensitivity)?;
     /// println!("Current sensitivity: {sensitivity}");
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
@@ -682,8 +682,8 @@ impl VadContext {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/vad_model.aicmodel")?;
     /// # let vad = Vad::new(&model, &license_key)?;
-    /// # let context = vad.context();
-    /// let delay = context.prediction_delay();
+    /// # let vad_ctx = vad.context();
+    /// let delay = vad_ctx.prediction_delay();
     /// println!("VAD prediction delay: {delay} samples");
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
@@ -730,8 +730,8 @@ impl VadContext {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/vad_model.aicmodel")?;
     /// # let vad = Vad::new(&model, &license_key)?;
-    /// # let context = vad.context();
-    /// context.reset()?;
+    /// # let vad_ctx = vad.context();
+    /// vad_ctx.reset()?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn reset(&self) -> Result<(), AicError> {
@@ -781,9 +781,9 @@ impl VadContext {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/vad_model.aicmodel")?;
     /// let vad = Vad::new(&model, &license_key)?;
-    /// let context = vad.context();
+    /// let vad_ctx = vad.context();
     /// let renewed_jwt = String::from("<JWT_BEARER_TOKEN>");
-    /// context.update_bearer_token(&renewed_jwt)?;
+    /// vad_ctx.update_bearer_token(&renewed_jwt)?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn update_bearer_token(&self, token: &str) -> Result<(), AicError> {
@@ -888,17 +888,17 @@ mod tests {
             .with_config(&config)
             .unwrap();
 
-        let context = vad.context();
-        assert!(context.prediction_delay() > 0);
+        let vad_ctx = vad.context();
+        assert!(vad_ctx.prediction_delay() > 0);
 
         let audio = vec![0.0f32; config.block_size];
         vad.process(&audio).unwrap();
 
         // Silence must not be reported as speech.
-        assert!(!context.is_speech_detected());
-        assert!((0.0..=1.0).contains(&context.raw_vad_probability()));
+        assert!(!vad_ctx.is_speech_detected());
+        assert!((0.0..=1.0).contains(&vad_ctx.raw_vad_probability()));
 
-        context.reset().unwrap();
+        vad_ctx.reset().unwrap();
     }
 
     #[test]
@@ -925,16 +925,16 @@ mod tests {
     fn vad_parameters_round_trip() {
         let model = load_vad_model();
         let vad = Vad::new(&model, &license_key()).unwrap();
-        let context = vad.context();
+        let vad_ctx = vad.context();
 
-        context
+        vad_ctx
             .set_parameter(VadParameter::Sensitivity, 0.5)
             .unwrap();
-        assert_eq!(context.parameter(VadParameter::Sensitivity).unwrap(), 0.5);
+        assert_eq!(vad_ctx.parameter(VadParameter::Sensitivity).unwrap(), 0.5);
 
         // The sensitivity of a VAD model is a probability threshold.
         assert_eq!(
-            context.set_parameter(VadParameter::Sensitivity, 7.0),
+            vad_ctx.set_parameter(VadParameter::Sensitivity, 7.0),
             Err(AicError::ParameterOutOfRange)
         );
     }

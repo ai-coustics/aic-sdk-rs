@@ -26,13 +26,13 @@ use std::sync::Arc;
 ///     let config = ProcessorConfig::optimal(&model);
 ///
 ///     let vad = VadAsync::new(&model, &license_key)?.with_config(&config).await?;
-///     let context = vad.context().await;
+///     let vad_ctx = vad.context().await;
 ///
 ///     let mut audio = vec![0.0f32; config.block_size];
 ///     for _ in 0..2 {
 ///         // `process` hands the block back, so the same allocation can be reused.
 ///         audio = vad.process(audio).await?;
-///         println!("Speech detected: {}", context.is_speech_detected());
+///         println!("Speech detected: {}", vad_ctx.is_speech_detected());
 ///     }
 ///     Ok(())
 /// }
