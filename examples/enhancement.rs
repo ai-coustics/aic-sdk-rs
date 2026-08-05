@@ -33,21 +33,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     processor.process(&mut audio)?;
 
     // Get processor context for thread safe interaction with parameters
-    let proc_ctx = processor.context();
+    let context = processor.context();
 
     // Get the delay applied to the audio
-    let delay = proc_ctx.audio_delay();
+    let delay = context.audio_delay();
     println!("Audio delay: {} samples", delay);
 
     // Test parameter setting and getting
-    proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.7)?;
+    context.set_parameter(ProcessorParameter::EnhancementLevel, 0.7)?;
     println!("Parameter set successfully");
 
-    let enhancement_level = proc_ctx.parameter(ProcessorParameter::EnhancementLevel)?;
+    let enhancement_level = context.parameter(ProcessorParameter::EnhancementLevel)?;
     println!("Enhancement level: {}", enhancement_level);
 
     // Test reset functionality
-    match proc_ctx.reset() {
+    match context.reset() {
         Ok(()) => println!("Processor reset succeeded"),
         Err(e) => println!("Processor reset failed: {}", e),
     }
@@ -55,15 +55,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Exercise the bearer-token refresh path. The license used here is not necessarily a JWT,
     // so an error is acceptable. This call exists mainly to cover the FFI signature (relevant
     // for the hand-maintained runtime-linking symbol table).
-    match proc_ctx.update_bearer_token(&license) {
+    match context.update_bearer_token(&license) {
         Ok(()) => println!("Bearer token updated"),
         Err(e) => println!(
             "Bearer token update returned (expected for non-JWT keys): {}",
             e
         ),
     }
-
-    // Voice activity detection lives in a separate `Vad` instance, see `examples/vad.rs`.
 
     // End the telemetry session on demand instead of waiting for the processor to be dropped.
     // The processor can no longer process audio after this call.

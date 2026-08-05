@@ -62,8 +62,8 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [[example]]
-name = "basic_usage"
-path = "examples/basic_usage.rs"
+name = "enhancement"
+path = "examples/enhancement.rs"
 required-features = ["download-model"]
 
 [[example]]

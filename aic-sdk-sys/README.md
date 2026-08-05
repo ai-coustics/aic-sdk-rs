@@ -39,20 +39,20 @@ At runtime, the operating system dynamic loader must also be able to find the li
 ```bash
 AIC_LIB_PATH=/path/to/aic-sdk/lib \
 LD_LIBRARY_PATH=/path/to/aic-sdk/lib \
-cargo run --example basic_usage --features "dynamic-linking download-model"
+cargo run --example enhancement --features "dynamic-linking download-model"
 ```
 
 If you copy or move the compiled Linux binary, also make `libaic.so` available at runtime:
 
 ```bash
-LD_LIBRARY_PATH=/path/to/aic-sdk/lib ./basic_usage
+LD_LIBRARY_PATH=/path/to/aic-sdk/lib ./enhancement
 ```
 
 On Windows, `LD_LIBRARY_PATH` does not apply. Put `aic.dll` next to the executable or add the directory containing `aic.dll` to `PATH`:
 
 ```powershell
 $env:PATH = "C:\path\to\aic-sdk\lib;$env:PATH"
-.\basic_usage.exe
+.\enhancement.exe
 ```
 
 Depending on the SDK package layout, the import library used at build time (`aic.lib`) and the runtime DLL (`aic.dll`) may be in different directories. `AIC_LIB_PATH` is for the build linker; `PATH` is for the runtime DLL loader.

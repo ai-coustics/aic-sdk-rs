@@ -318,7 +318,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 See the example files for complete working examples:
 
-- [`examples/basic_usage.rs`](examples/basic_usage.rs) - Basic usage example
+- [`examples/enhancement.rs`](examples/enhancement.rs) - Basic usage example
 - [`examples/vad.rs`](examples/vad.rs) - Voice activity detection with a dedicated VAD model
 - [`examples/build-time-download`](examples/build-time-download) - Download and embed models at compile-time
 - [`examples/benchmark.rs`](examples/benchmark.rs) - Run multiple processor instances concurrently until the real-time requirements are not met
@@ -328,7 +328,7 @@ Run examples with:
 
 ```bash
 export AIC_SDK_LICENSE="your_license_key_here"
-cargo run --example basic_usage --features download-lib,download-model
+cargo run --example enhancement --features download-lib,download-model
 ```
 
 ## Documentation
@@ -350,7 +350,7 @@ By default, `aic-sdk-sys` links the native AIC SDK **statically**. Static linkin
 In every mode, point the build at the SDK with `AIC_LIB_PATH=/path/to/aic-sdk/lib`, or enable `download-lib` to fetch it automatically. Prefer the default static link unless you specifically need to ship and load a shared library:
 
 ```bash
-AIC_SDK_LICENSE="…" cargo run --example basic_usage \
+AIC_SDK_LICENSE="…" cargo run --example enhancement \
   --features "download-lib download-model"
 ```
 

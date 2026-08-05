@@ -26,21 +26,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Get VAD context for thread safe interaction with the prediction and its parameters
-    let vad_ctx = vad.context();
+    let context = vad.context();
 
     // How far the prediction lags behind the input. This delay is not applied to the audio,
     // `Vad::process` leaves the buffer untouched.
-    println!("Prediction delay: {} samples", vad_ctx.prediction_delay());
+    println!("Prediction delay: {} samples", context.prediction_delay());
 
     // Configure the detector. Sensitivity is the probability threshold of the model output.
-    vad_ctx.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
-    vad_ctx.set_parameter(VadParameter::Sensitivity, 0.5)?;
-    vad_ctx.set_parameter(VadParameter::MinimumSpeechDuration, 0.0)?;
+    context.set_parameter(VadParameter::SpeechHoldDuration, 0.08)?;
+    context.set_parameter(VadParameter::Sensitivity, 0.5)?;
+    context.set_parameter(VadParameter::MinimumSpeechDuration, 0.0)?;
 
-    let speech_hold_duration = vad_ctx.parameter(VadParameter::SpeechHoldDuration)?;
+    let speech_hold_duration = context.parameter(VadParameter::SpeechHoldDuration)?;
     println!("Speech hold duration: {}", speech_hold_duration);
 
-    let sensitivity = vad_ctx.parameter(VadParameter::Sensitivity)?;
+    let sensitivity = context.parameter(VadParameter::Sensitivity)?;
     println!("Sensitivity: {}", sensitivity);
 
     // Feed mono audio to the detector. The audio block is not modified, it only updates the
@@ -51,20 +51,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let audio = vec![0.0; config.block_size];
     vad.process(&audio)?;
 
-    if vad_ctx.is_speech_detected() {
+    if context.is_speech_detected() {
         println!("VAD detected speech");
     } else {
         println!("VAD did not detect speech");
     }
-    println!("Raw probability: {}", vad_ctx.raw_vad_probability());
+    println!("Raw probability: {}", context.raw_vad_probability());
 
     // Clear the prediction and all internal state, e.g. when the stream is interrupted
-    vad_ctx.reset()?;
+    context.reset()?;
 
     // Exercise the bearer-token refresh path. The license used here is not necessarily a JWT,
     // so an error is acceptable. This call exists mainly to cover the FFI signature (relevant
     // for the generated runtime-linking symbol table).
-    match vad_ctx.update_bearer_token(&license) {
+    match context.update_bearer_token(&license) {
         Ok(()) => println!("Bearer token updated"),
         Err(e) => println!(
             "Bearer token update returned (expected for non-JWT keys): {}",
