@@ -174,20 +174,20 @@ The processor context provides thread-safe access to processor parameters and st
 use aic_sdk::ProcessorParameter;
 
 // Get processor context
-let proc_ctx = processor.context();
+let context = processor.context();
 
 // Get the delay applied to the audio in samples
-let delay = proc_ctx.audio_delay();
+let delay = context.audio_delay();
 
 // Reset processor state (clears internal buffers)
-proc_ctx.reset()?;
+context.reset()?;
 
 // Set enhancement parameters
-proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.8)?;
-proc_ctx.set_parameter(ProcessorParameter::Bypass, 0.0)?;
+context.set_parameter(ProcessorParameter::EnhancementLevel, 0.8)?;
+context.set_parameter(ProcessorParameter::Bypass, 0.0)?;
 
 // Get parameter values
-let level = proc_ctx.parameter(ProcessorParameter::EnhancementLevel)?;
+let level = context.parameter(ProcessorParameter::EnhancementLevel)?;
 println!("Enhancement level: {}", level);
 ```
 
@@ -231,28 +231,28 @@ You can create multiple contexts and move them to any thread for concurrent para
 use aic_sdk::VadParameter;
 
 // Get VAD context from the VAD
-let vad_ctx = vad.context();
+let context = vad.context();
 
 // Configure VAD parameters. Sensitivity is the probability threshold of the model output.
-vad_ctx.set_parameter(VadParameter::Sensitivity, 0.5)?;
-vad_ctx.set_parameter(VadParameter::SpeechHoldDuration, 0.05)?;
-vad_ctx.set_parameter(VadParameter::MinimumSpeechDuration, 0.0)?;
+context.set_parameter(VadParameter::Sensitivity, 0.5)?;
+context.set_parameter(VadParameter::SpeechHoldDuration, 0.05)?;
+context.set_parameter(VadParameter::MinimumSpeechDuration, 0.0)?;
 
 // Get parameter values
-let sensitivity = vad_ctx.parameter(VadParameter::Sensitivity)?;
+let sensitivity = context.parameter(VadParameter::Sensitivity)?;
 println!("VAD sensitivity: {}", sensitivity);
 
 // How many samples the prediction lags behind the input. This delay is not applied to the
 // audio, `Vad::process` leaves the buffer untouched.
-let delay = vad_ctx.prediction_delay();
+let delay = context.prediction_delay();
 
 // Check for speech (after processing audio through the VAD)
-if vad_ctx.is_speech_detected() {
+if context.is_speech_detected() {
     println!("Speech detected!");
 }
 
 // Clear the prediction and all internal state, e.g. when the stream is interrupted
-vad_ctx.reset()?;
+context.reset()?;
 ```
 
 With the `async` feature, `VadAsync` mirrors `ProcessorAsync` for use in async contexts.

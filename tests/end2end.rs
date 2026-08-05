@@ -85,8 +85,8 @@ fn process_full_file() {
         .with_config(&config)
         .expect("Failed to initialize processor");
 
-    let proc_ctx = processor.context();
-    proc_ctx
+    let context = processor.context();
+    context
         .set_parameter(ProcessorParameter::EnhancementLevel, 0.9)
         .expect("Failed to set enhancement level");
 
@@ -118,7 +118,7 @@ fn speech_detection_per_block() -> Vec<bool> {
         .with_config(&config)
         .expect("Failed to initialize VAD");
 
-    let vad_ctx = vad.context();
+    let context = vad.context();
 
     let samples = audio.samples_interleaved;
     let block_size = config.block_size;
@@ -127,7 +127,7 @@ fn speech_detection_per_block() -> Vec<bool> {
     for chunk in samples.chunks(block_size) {
         if chunk.len() == block_size {
             vad.process(chunk).expect("Failed to process block");
-            speech_detected_results.push(vad_ctx.is_speech_detected());
+            speech_detected_results.push(context.is_speech_detected());
         }
     }
 
@@ -167,7 +167,7 @@ fn vad_reset_clears_published_prediction() {
         .with_config(&config)
         .expect("Failed to initialize VAD");
 
-    let vad_ctx = vad.context();
+    let context = vad.context();
 
     let samples = audio.samples_interleaved;
     let block_size = config.block_size;
@@ -176,7 +176,7 @@ fn vad_reset_clears_published_prediction() {
     for chunk in samples.chunks(block_size) {
         if chunk.len() == block_size {
             vad.process(chunk).expect("Failed to process block");
-            if vad_ctx.is_speech_detected() {
+            if context.is_speech_detected() {
                 speech_was_detected = true;
                 break;
             }
@@ -187,8 +187,8 @@ fn vad_reset_clears_published_prediction() {
         "the test signal contains speech, so the VAD should detect it"
     );
 
-    vad_ctx.reset().expect("Failed to reset VAD state");
+    context.reset().expect("Failed to reset VAD state");
 
-    assert!(!vad_ctx.is_speech_detected());
-    assert_eq!(vad_ctx.raw_vad_probability(), 0.0);
+    assert!(!context.is_speech_detected());
+    assert_eq!(context.raw_vad_probability(), 0.0);
 }

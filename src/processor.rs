@@ -208,8 +208,8 @@ impl ProcessorContext {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// # let processor = Processor::new(&model, &license_key)?;
-    /// # let proc_ctx = processor.context();
-    /// proc_ctx.set_parameter(ProcessorParameter::EnhancementLevel, 0.8)?;
+    /// # let context = processor.context();
+    /// context.set_parameter(ProcessorParameter::EnhancementLevel, 0.8)?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
     pub fn set_parameter(&self, parameter: ProcessorParameter, value: f32) -> Result<(), AicError> {
