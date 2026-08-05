@@ -50,7 +50,7 @@ impl Downloader {
         assert_eq!(
             &downloaded_hash, expected_hash,
             "SHA mismatch: {} != {}",
-            &downloaded_hash, expected_hash
+            downloaded_hash, expected_hash
         );
 
         let extracted_path = self.output_path.join(&file_prefix);

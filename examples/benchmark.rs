@@ -37,13 +37,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = ProcessorConfig::optimal(&model);
 
-    let period = config.num_frames as f64 / config.sample_rate as f64;
+    let period = config.block_size as f64 / config.sample_rate as f64;
     let period = Duration::from_secs_f64(period);
     let safety_margin = Duration::from_secs_f64(period.as_secs_f64() * SAFETY_MARGIN);
 
     println!("Model: {}", model.id());
     println!("Sample rate: {} Hz", config.sample_rate);
-    println!("Frames per buffer: {}", config.num_frames);
+    println!("Block size: {}", config.block_size);
     println!("Period: {} ms", period.as_millis());
     println!("Safety margin: {} ms\n", safety_margin.as_millis());
 
@@ -220,7 +220,7 @@ fn spawn_session(
                 }
             };
 
-        let mut buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
+        let mut buffer = vec![0.0f32; config.block_size];
 
         let mut max_execution_time = Duration::from_secs(0);
         let mut error = None;
@@ -235,7 +235,7 @@ fn spawn_session(
 
             // Process the audio buffer
             let process_start = Instant::now();
-            if let Err(err) = processor.process_interleaved(&mut buffer) {
+            if let Err(err) = processor.process(&mut buffer) {
                 error = Some(format!("process error: {}", err));
                 break;
             }

@@ -19,29 +19,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Model loaded from {}", model_path.display());
 
     // Get optimal ProcessorConfig from Model
-    let config = ProcessorConfig::optimal(&model)
-        .with_num_channels(2)
-        .with_allow_variable_frames(true);
+    let config = ProcessorConfig::optimal(&model).with_variable_block_size(true);
 
     // Create processor with license key
     let mut processor = Processor::new(&model, &license)?.with_config(&config)?;
     println!(
-        "Processor created and initialized successfully with: Sample rate: {} Hz, Frames: {}, Channels: {}",
-        config.sample_rate, config.num_frames, config.num_channels
+        "Processor created and initialized successfully with: Sample rate: {} Hz, Block size: {}",
+        config.sample_rate, config.block_size
     );
 
-    // Process Audio in different data layouts (for mono audio, the layout does not matter)
-    // Interleaved = [l, r, l, r, ..]
-    let mut audio_interleaved = vec![0.0; config.num_channels as usize * config.num_frames];
-    processor.process_interleaved(&mut audio_interleaved)?;
-
-    // Planar = [[l, l, ..], [r, r, ..]]
-    let mut audio_planar = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
-    processor.process_planar(&mut audio_planar)?;
-
-    // Sequential = [l, l, .., r, r, ..]
-    let mut audio_sequential = vec![0.0; config.num_channels as usize * config.num_frames];
-    processor.process_sequential(&mut audio_sequential)?;
+    // Process mono audio
+    let mut audio = vec![0.0; config.block_size];
+    processor.process(&mut audio)?;
 
     // Get processor context for thread safe interaction with parameters
     let proc_ctx = processor.processor_context();
@@ -90,6 +79,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         println!("VAD did not detect speech");
     }
+
+    // End the telemetry session on demand instead of waiting for the processor to be dropped.
+    // The processor can no longer process audio after this call.
+    processor.terminate_session()?;
+    println!("Telemetry session terminated");
 
     // Clean up is handled automatically by Rust's Drop trait
     println!("All tests completed");

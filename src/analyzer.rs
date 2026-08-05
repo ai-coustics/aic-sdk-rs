@@ -79,9 +79,14 @@ impl From<AicAnalysisResult> for AnalysisResult {
 ///
 /// # Arguments
 ///
-/// * `model` - The loaded model instance
+/// * `model` - The loaded model instance. Must be an analysis model, otherwise
+///   [`AicError::ModelTypeUnsupported`] is returned.
 /// * `license_key` - license key for the ai-coustics SDK
 ///   (generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com/))
+///
+/// # Warning
+///
+/// This function allocates memory. Do not call it from audio processing threads.
 ///
 /// # Example
 ///
@@ -142,23 +147,23 @@ pub fn analyzer_pair<'a>(
 pub struct Collector {
     /// Raw pointer to the C collector structure.
     inner: *mut AicCollector,
-    /// Configured number of channels.
-    num_channels: Option<u16>,
+    /// Whether `initialize` has been called.
+    initialized: bool,
 }
 
 impl Collector {
     fn new(collector_ptr: *mut AicCollector) -> Self {
         Self {
             inner: collector_ptr,
-            num_channels: None,
+            initialized: false,
         }
     }
 
     /// Configures the collector for specific audio settings.
     ///
     /// This function must be called before buffering any audio.
-    /// For the lowest delay use the sample rate and frame size returned by
-    /// [`Model::optimal_sample_rate`] and [`Model::optimal_num_frames`].
+    /// Using the sample rate and block size returned by [`Model::optimal_sample_rate`] and
+    /// [`Model::optimal_block_size`] avoids internal resampling and rebuffering.
     ///
     /// # Arguments
     ///
@@ -170,10 +175,6 @@ impl Collector {
     ///
     /// # Warning
     /// Do not call from audio processing threads as this allocates memory.
-    ///
-    /// # Note
-    /// All channels are mixed to mono for buffering. To buffer channels
-    /// independently, create separate [`Collector`] instances.
     ///
     /// # Example
     ///
@@ -194,49 +195,31 @@ impl Collector {
             aic_collector_initialize(
                 self.inner,
                 config.sample_rate,
-                config.num_channels,
-                config.num_frames,
-                config.allow_variable_frames,
+                config.block_size,
+                config.variable_block_size,
             )
         };
 
         handle_error(error_code)?;
-        self.num_channels = Some(config.num_channels);
+        self.initialized = true;
         Ok(())
     }
 
-    /// Buffers audio with separate buffers for each channel (planar layout).
-    ///
-    /// **Memory Layout:**
-    /// - Separate buffer for each channel
-    /// - Each buffer contains `num_frames` floats
-    /// - Maximum of 16 channels supported
-    /// - Example for 2 channels, 4 frames:
-    ///   ```text
-    ///   audio[0] -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3]
-    ///   audio[1] -> [ch1_f0, ch1_f1, ch1_f2, ch1_f3]
-    ///   ```
-    ///
-    /// The function accepts any type of collection of `f32` values that implements `as_mut`, e.g.:
-    /// - `[vec![0.0; 128]; 2]`
-    /// - `[[0.0; 128]; 2]`
-    /// - `[&mut ch1, &mut ch2]`
+    /// Buffers mono audio.
     ///
     /// # Arguments
     ///
-    /// * `audio` - Array of mutable channel buffer slices to be buffered.
-    ///             Each channel buffer must be exactly of size `num_frames`,
-    ///             or if `allow_variable_frames` was enabled, less than the initialization value.
-    ///
-    /// # Notes
-    ///
-    /// - All channels are mixed to mono for buffering. To buffer channels
-    ///   independently, create separate [`Collector`] instances.
-    /// - Maximum supported number of channels is 16. Exceeding this will return an error.
+    /// * `audio` - Mono audio block to be buffered. Must be exactly of size
+    ///   `block_size`, or if `variable_block_size` was enabled, less than
+    ///   the initialization value.
     ///
     /// # Returns
     ///
     /// Returns `Ok(())` on success or an [`AicError`] if buffering fails.
+    ///
+    /// # Real-time safety
+    ///
+    /// Real-time safe. Can be called from audio processing threads.
     ///
     /// # Example
     ///
@@ -245,170 +228,24 @@ impl Collector {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// # let (mut collector, _) = aic_sdk::analyzer_pair(&model, &license_key)?;
-    /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+    /// let config = ProcessorConfig::optimal(&model);
     /// collector.initialize(&config)?;
-    /// let audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
-    /// collector.buffer_planar(&audio)?;
+    /// let audio = vec![0.0f32; config.block_size];
+    /// collector.buffer(&audio)?;
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
-    #[allow(clippy::doc_overindented_list_items)]
-    pub fn buffer_planar<V: AsRef<[f32]>>(&mut self, audio: &[V]) -> Result<(), AicError> {
-        const MAX_CHANNELS: u16 = 16;
-
-        let Some(num_channels) = self.num_channels else {
+    pub fn buffer(&mut self, audio: &[f32]) -> Result<(), AicError> {
+        if !self.initialized {
             return Err(AicError::ProcessorNotInitialized);
-        };
-
-        if audio.len() != num_channels as usize {
-            return Err(AicError::AudioConfigMismatch);
         }
 
-        if num_channels > MAX_CHANNELS {
-            return Err(AicError::AudioConfigUnsupported);
-        }
-
-        let num_frames = if audio.is_empty() {
-            0
-        } else {
-            audio[0].as_ref().len()
-        };
-
-        let mut audio_ptrs = [std::ptr::null::<f32>(); MAX_CHANNELS as usize];
-        for (i, channel) in audio.iter().enumerate() {
-            if channel.as_ref().len() != num_frames {
-                return Err(AicError::AudioConfigMismatch);
-            }
-            audio_ptrs[i] = channel.as_ref().as_ptr();
-        }
+        let audio_len = audio.len();
 
         // SAFETY:
         // - `self.inner` is a valid pointer to a live collector.
-        // - `audio_ptrs` holds `num_channels` valid readable pointers with `num_frames` samples each.
+        // - `audio` points to a contiguous f32 slice of length `audio_len`.
         // - This function is not thread-safe, so we borrow `&mut self`.
-        let error_code = unsafe {
-            aic_collector_buffer_planar(self.inner, audio_ptrs.as_ptr(), num_channels, num_frames)
-        };
-
-        handle_error(error_code)
-    }
-
-    /// Buffers audio with interleaved channel data.
-    ///
-    /// **Memory Layout:**
-    /// - Single contiguous buffer with samples alternating between channels
-    /// - Buffer size: `num_channels` * `num_frames` floats
-    /// - Example for 2 channels, 4 frames:
-    ///   ```text
-    ///   audio -> [ch0_f0, ch1_f0, ch0_f1, ch1_f1, ch0_f2, ch1_f2, ch0_f3, ch1_f3]
-    ///   ```
-    ///
-    /// # Arguments
-    ///
-    /// * `audio` - Interleaved audio buffer to be buffered.
-    ///             Must be exactly of size `num_channels` * `num_frames`,
-    ///             or if `allow_variable_frames` was enabled, less than the initialization value per channel.
-    ///
-    /// # Note
-    ///
-    /// All channels are mixed to mono for buffering. To buffer channels
-    /// independently, create separate [`Collector`] instances.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` on success or an [`AicError`] if buffering fails.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use aic_sdk::{Model, ProcessorConfig};
-    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let (mut collector, _) = aic_sdk::analyzer_pair(&model, &license_key)?;
-    /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-    /// collector.initialize(&config)?;
-    /// let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
-    /// collector.buffer_interleaved(&audio)?;
-    /// # Ok::<(), aic_sdk::AicError>(())
-    /// ```
-    #[allow(clippy::doc_overindented_list_items)]
-    pub fn buffer_interleaved(&mut self, audio: &[f32]) -> Result<(), AicError> {
-        let Some(num_channels) = self.num_channels else {
-            return Err(AicError::ProcessorNotInitialized);
-        };
-
-        if !audio.len().is_multiple_of(num_channels as usize) {
-            return Err(AicError::AudioConfigMismatch);
-        }
-
-        let num_frames = audio.len() / num_channels as usize;
-
-        // SAFETY:
-        // - `self.inner` is a valid pointer to a live collector.
-        // - `audio` points to a contiguous f32 slice of length `num_channels * num_frames`.
-        // - This function is not thread-safe, so we borrow `&mut self`.
-        let error_code = unsafe {
-            aic_collector_buffer_interleaved(self.inner, audio.as_ptr(), num_channels, num_frames)
-        };
-
-        handle_error(error_code)
-    }
-
-    /// Buffers audio with sequential channel data.
-    ///
-    /// **Memory Layout:**
-    /// - Single contiguous buffer with all samples for each channel stored sequentially
-    /// - Buffer size: `num_channels` * `num_frames` floats
-    /// - Example for 2 channels, 4 frames:
-    ///   ```text
-    ///   audio -> [ch0_f0, ch0_f1, ch0_f2, ch0_f3, ch1_f0, ch1_f1, ch1_f2, ch1_f3]
-    ///   ```
-    ///
-    /// # Arguments
-    ///
-    /// * `audio` - Sequential audio buffer to be buffered.
-    ///             Must be exactly of size `num_channels` * `num_frames`,
-    ///             or if `allow_variable_frames` was enabled, less than the initialization value per channel.
-    /// # Note
-    ///
-    /// All channels are mixed to mono for buffering. To buffer channels
-    /// independently, create separate [`Collector`] instances.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` on success or an [`AicError`] if buffering fails.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use aic_sdk::{Model, ProcessorConfig};
-    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
-    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
-    /// # let (mut collector, _) = aic_sdk::analyzer_pair(&model, &license_key)?;
-    /// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
-    /// collector.initialize(&config)?;
-    /// let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
-    /// collector.buffer_sequential(&audio)?;
-    /// # Ok::<(), aic_sdk::AicError>(())
-    /// ```
-    #[allow(clippy::doc_overindented_list_items)]
-    pub fn buffer_sequential(&mut self, audio: &[f32]) -> Result<(), AicError> {
-        let Some(num_channels) = self.num_channels else {
-            return Err(AicError::ProcessorNotInitialized);
-        };
-
-        if !audio.len().is_multiple_of(num_channels as usize) {
-            return Err(AicError::AudioConfigMismatch);
-        }
-
-        let num_frames = audio.len() / num_channels as usize;
-
-        // SAFETY:
-        // - `self.inner` is a valid pointer to a live collector.
-        // - `audio` points to a contiguous f32 slice of length `num_channels * num_frames`.
-        // - This function is not thread-safe, so we borrow `&mut self`.
-        let error_code = unsafe {
-            aic_collector_buffer_sequential(self.inner, audio.as_ptr(), num_channels, num_frames)
-        };
+        let error_code = unsafe { aic_collector_buffer(self.inner, audio.as_ptr(), audio_len) };
 
         handle_error(error_code)
     }
@@ -504,10 +341,6 @@ impl<'a> Analyzer<'a> {
     /// If this function is called before the collector has buffered that length of audio,
     /// the analyzer will run the analysis with silence (zeros) in the tail of the input.
     ///
-    /// # Note
-    /// When buffering, all channels are mixed down to mono. To analyze channels
-    /// independently, create separate analyzer pairs.
-    ///
     /// # Returns
     ///
     /// Returns an [`AnalysisResult`] if successful, otherwise an [`AicError`].
@@ -536,15 +369,62 @@ impl<'a> Analyzer<'a> {
         Ok(result.into())
     }
 
+    /// Terminates the telemetry session associated with this analyzer.
+    ///
+    /// Once the request has been handled, the analyzer is no longer allowed to analyze
+    /// buffered audio.
+    ///
+    /// This is meant for lifecycle management events. A telemetry session is stopped
+    /// automatically when the [`Analyzer`] is dropped, so calling this is only necessary when
+    /// the session must end before the analyzer itself goes out of scope.
+    ///
+    /// This blocks until the telemetry session is terminated, unless another session is still
+    /// alive. In that case it returns early and termination happens asynchronously.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success or an [`AicError`] if termination cannot be requested.
+    ///
+    /// # Real-time safety
+    ///
+    /// This function is not real-time safe. It may block until the session is terminated.
+    /// Avoid calling it from audio threads.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use aic_sdk::Model;
+    /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
+    /// # let model = Model::from_file("/path/to/model.aicmodel")?;
+    /// # let (_, mut analyzer) = aic_sdk::analyzer_pair(&model, &license_key)?;
+    /// analyzer.terminate_session()?;
+    /// # Ok::<(), aic_sdk::AicError>(())
+    /// ```
+    pub fn terminate_session(&mut self) -> Result<(), AicError> {
+        // SAFETY:
+        // - `self.inner` is a valid pointer to a live analyzer.
+        // - This function must not run concurrently with any other call taking the same
+        //   analyzer handle, so we borrow `&mut self`.
+        let error_code = unsafe { aic_analyzer_terminate_session(self.inner) };
+        handle_error(error_code)
+    }
+
     /// Replaces the bearer token on the analyzer.
     ///
     /// Use this when your license key is a JWT and needs to be refreshed before it expires.
-    /// Audio processing continues uninterrupted, the context handle stays valid, and the new
-    /// token is used for all subsequent authentication against the ai-coustics backend.
+    /// The analyzer handle stays valid, buffered spectra stay available, and the new token is
+    /// used for all subsequent authentication against the ai-coustics backend.
     ///
     /// In-place updates are only supported when both the originally configured key and the
     /// new token are JWTs. If either side is not, the call returns
     /// [`AicError::TokenUpdateUnsupported`] and the existing token stays in use.
+    ///
+    /// On any error the call is a no-op: the previously active token stays in use and the
+    /// telemetry session is unaffected. On success the swap is applied immediately and is **not**
+    /// gated on backend acceptance. The token is only validated locally for format; if the
+    /// backend later rejects it, the SDK retries it under backoff rather than rolling back, and
+    /// analysis calls may be rejected if no accepted token arrives in time. Supplying a
+    /// known-good token during that window recovers the session.
     ///
     /// # Arguments
     ///
@@ -720,68 +600,14 @@ mod tests {
     fn collector_rejects_buffering_before_initialize() {
         let mut collector = Collector {
             inner: ptr::null_mut(),
-            num_channels: None,
+            initialized: false,
         };
 
-        let planar = [vec![0.0f32; 4]];
-        let contiguous = vec![0.0f32; 4];
+        let audio = vec![0.0f32; 4];
 
         assert_eq!(
-            collector.buffer_planar(&planar),
+            collector.buffer(&audio),
             Err(AicError::ProcessorNotInitialized)
-        );
-        assert_eq!(
-            collector.buffer_interleaved(&contiguous),
-            Err(AicError::ProcessorNotInitialized)
-        );
-        assert_eq!(
-            collector.buffer_sequential(&contiguous),
-            Err(AicError::ProcessorNotInitialized)
-        );
-    }
-
-    #[test]
-    fn collector_validates_planar_layout_before_ffi() {
-        let mut collector = Collector {
-            inner: ptr::null_mut(),
-            num_channels: Some(2),
-        };
-
-        let wrong_channel_count = [vec![0.0f32; 4]];
-        assert_eq!(
-            collector.buffer_planar(&wrong_channel_count),
-            Err(AicError::AudioConfigMismatch)
-        );
-
-        let mismatched_frames = [vec![0.0f32; 4], vec![0.0f32; 3]];
-        assert_eq!(
-            collector.buffer_planar(&mismatched_frames),
-            Err(AicError::AudioConfigMismatch)
-        );
-
-        collector.num_channels = Some(17);
-        let too_many_channels = vec![vec![0.0f32; 4]; 17];
-        assert_eq!(
-            collector.buffer_planar(&too_many_channels),
-            Err(AicError::AudioConfigUnsupported)
-        );
-    }
-
-    #[test]
-    fn collector_validates_contiguous_layout_before_ffi() {
-        let mut collector = Collector {
-            inner: ptr::null_mut(),
-            num_channels: Some(2),
-        };
-        let not_divisible_by_channels = vec![0.0f32; 3];
-
-        assert_eq!(
-            collector.buffer_interleaved(&not_divisible_by_channels),
-            Err(AicError::AudioConfigMismatch)
-        );
-        assert_eq!(
-            collector.buffer_sequential(&not_divisible_by_channels),
-            Err(AicError::AudioConfigMismatch)
         );
     }
 
@@ -795,93 +621,58 @@ mod tests {
     }
 
     #[test]
-    fn collector_buffers_all_layouts_and_analyzer_returns_scores() {
+    fn collector_buffers_audio_and_analyzer_returns_scores() {
         let (model, license_key) = load_test_model().unwrap();
         let (mut collector, mut analyzer) = test_analyzer_pair(&model, &license_key);
-        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+        let config = ProcessorConfig::optimal(&model);
         collector.initialize(&config).unwrap();
 
-        let mut left = vec![0.0f32; config.num_frames];
-        let mut right = vec![0.0f32; config.num_frames];
-        let planar = [left.as_mut_slice(), right.as_mut_slice()];
-        collector.buffer_planar(&planar).unwrap();
-
-        let num_channels = config.num_channels as usize;
-        let contiguous = vec![0.0f32; num_channels * config.num_frames];
-        collector.buffer_interleaved(&contiguous).unwrap();
-        collector.buffer_sequential(&contiguous).unwrap();
+        let audio = vec![0.0f32; config.block_size];
+        collector.buffer(&audio).unwrap();
 
         let result = analyzer.analyze_buffered().unwrap();
         assert_score_range(&result);
     }
 
     #[test]
-    fn collector_buffers_variable_frames_when_enabled() {
+    fn collector_buffers_variable_block_size_when_enabled() {
         let (model, license_key) = load_test_model().unwrap();
         let (mut collector, _analyzer) = test_analyzer_pair(&model, &license_key);
-        let config = ProcessorConfig::optimal(&model)
-            .with_num_channels(2)
-            .with_allow_variable_frames(true);
+        let config = ProcessorConfig::optimal(&model).with_variable_block_size(true);
         collector.initialize(&config).unwrap();
 
-        let num_channels = config.num_channels as usize;
-        let full = vec![0.0f32; num_channels * config.num_frames];
-        collector.buffer_interleaved(&full).unwrap();
-        collector.buffer_sequential(&full).unwrap();
+        let full = vec![0.0f32; config.block_size];
+        collector.buffer(&full).unwrap();
 
-        let short = vec![0.0f32; num_channels * 20];
-        collector.buffer_interleaved(&short).unwrap();
-        collector.buffer_sequential(&short).unwrap();
-
-        let left = vec![0.0f32; 20];
-        let right = vec![0.0f32; 20];
-        let planar = [left.as_slice(), right.as_slice()];
-        collector.buffer_planar(&planar).unwrap();
+        let short = vec![0.0f32; 20];
+        collector.buffer(&short).unwrap();
     }
 
     #[test]
-    fn collector_rejects_variable_frames_when_disabled() {
+    fn collector_rejects_variable_block_size_when_disabled() {
         let (model, license_key) = load_test_model().unwrap();
         let (mut collector, _analyzer) = test_analyzer_pair(&model, &license_key);
-        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+        let config = ProcessorConfig::optimal(&model);
         collector.initialize(&config).unwrap();
 
-        let num_channels = config.num_channels as usize;
-        let full = vec![0.0f32; num_channels * config.num_frames];
-        collector.buffer_interleaved(&full).unwrap();
-        collector.buffer_sequential(&full).unwrap();
+        let full = vec![0.0f32; config.block_size];
+        collector.buffer(&full).unwrap();
 
-        let short = vec![0.0f32; num_channels * 20];
-        assert_eq!(
-            collector.buffer_interleaved(&short),
-            Err(AicError::AudioConfigMismatch)
-        );
-        assert_eq!(
-            collector.buffer_sequential(&short),
-            Err(AicError::AudioConfigMismatch)
-        );
-
-        let left = vec![0.0f32; 20];
-        let right = vec![0.0f32; 20];
-        let planar = [left.as_slice(), right.as_slice()];
-        assert_eq!(
-            collector.buffer_planar(&planar),
-            Err(AicError::AudioConfigMismatch)
-        );
+        let short = vec![0.0f32; 20];
+        assert_eq!(collector.buffer(&short), Err(AicError::AudioConfigMismatch));
     }
 
     #[test]
     fn analyzer_reset_keeps_collector_initialized() {
         let (model, license_key) = load_test_model().unwrap();
         let (mut collector, mut analyzer) = test_analyzer_pair(&model, &license_key);
-        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+        let config = ProcessorConfig::optimal(&model);
         collector.initialize(&config).unwrap();
 
         analyzer.reset().unwrap();
 
-        let num_channels = config.num_channels as usize;
-        let audio = vec![0.0f32; num_channels * config.num_frames];
-        collector.buffer_interleaved(&audio).unwrap();
+        let audio = vec![0.0f32; config.block_size];
+        collector.buffer(&audio).unwrap();
 
         let result = analyzer.analyze_buffered().unwrap();
         assert_score_range(&result);
@@ -890,15 +681,14 @@ mod tests {
     #[test]
     fn model_can_be_dropped_after_creating_analyzer_pair() {
         let (model, license_key) = load_test_model().unwrap();
-        let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+        let config = ProcessorConfig::optimal(&model);
         let (mut collector, mut analyzer) = test_analyzer_pair(&model, &license_key);
         drop(model); // The SDK keeps the model data alive for analyzer instances created from files.
 
         collector.initialize(&config).unwrap();
 
-        let num_channels = config.num_channels as usize;
-        let audio = vec![0.0f32; num_channels * config.num_frames];
-        collector.buffer_interleaved(&audio).unwrap();
+        let audio = vec![0.0f32; config.block_size];
+        collector.buffer(&audio).unwrap();
 
         let result = analyzer.analyze_buffered().unwrap();
         assert_score_range(&result);
@@ -927,7 +717,7 @@ mod _compile_fail_tests {
     //! fn main() {
     //!     let buffer = vec![0u8; 64];
     //!     let model = Model::from_buffer(&buffer).unwrap();
-    //!     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+    //!     let config = ProcessorConfig::optimal(&model);
     //!
     //!     let (mut collector, mut analyzer) = analyzer_pair(&model, "license").unwrap();
     //!     collector.initialize(&config).unwrap();
@@ -936,8 +726,8 @@ mod _compile_fail_tests {
     //!
     //!     drop(buffer); // This should fail to compile
     //!
-    //!     let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
-    //!     collector.buffer_interleaved(&audio).unwrap();
+    //!     let audio = vec![0.0f32; config.block_size];
+    //!     collector.buffer(&audio).unwrap();
     //!     analyzer.analyze_buffered().unwrap();
     //! }
     //! ```

@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased
+
+### New Features
+
+- Added `Processor::terminate_session`, `ProcessorAsync::terminate_session`, and
+  `Analyzer::terminate_session` to end a telemetry session on demand instead of waiting for the
+  processor or analyzer to be dropped. After termination the processor may no longer process audio
+  and the analyzer may no longer analyze buffered audio.
+
+### Breaking Changes
+
+`Processor::process_planar`, `process_interleaved`, and `process_sequential` (and the matching
+`ProcessorAsync` and `Collector::buffer_*` methods) are replaced by a single `Processor::process` /
+`ProcessorAsync::process` / `Collector::buffer` method that takes a plain mono `f32` buffer.
+
+`ProcessorConfig::num_channels` and `with_num_channels` are removed; processing has always mixed
+every channel down to mono internally, so the layout choice and channel count added surface area
+without adding capability. Callers with multi-channel audio should downmix to mono themselves
+before calling `process`/`buffer`.
+
+Frame terminology is replaced by block-size terminology throughout, matching the mono C API. With
+mono audio a frame is a single sample, so "number of frames" and "block size" describe the same
+value:
+
+- `ProcessorConfig::num_frames` is now `ProcessorConfig::block_size`.
+- `ProcessorConfig::allow_variable_frames` is now `ProcessorConfig::variable_block_size`, and
+  `with_allow_variable_frames` is now `with_variable_block_size`.
+- `Model::optimal_num_frames` is now `Model::optimal_block_size`.
+
+`AicError::ModelFilePathInvalid` is renamed to `AicError::FilePathInvalid`, following the
+`AIC_ERROR_CODE_FILE_PATH_INVALID` rename in the C API.
+
 ## 0.21.4 - 2026-07-08
 
 ### Platform Support

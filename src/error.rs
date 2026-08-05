@@ -10,14 +10,12 @@ pub enum AicError {
     )]
     ParameterOutOfRange,
     #[error(
-        "Processor must be initialized before calling this operation. Call `Processor::initialize` first."
+        "Processor or collector must be initialized before calling this operation. Call `Processor::initialize` or `Collector::initialize` first."
     )]
     ProcessorNotInitialized,
-    #[error(
-        "Audio configuration (samplerate, num_channels, num_frames) is not supported by the model"
-    )]
+    #[error("Audio configuration (sample_rate, block_size) is not supported by the model")]
     AudioConfigUnsupported,
-    #[error("Audio buffer configuration differs from the one provided during initialization")]
+    #[error("Audio block configuration differs from the one provided during initialization")]
     AudioConfigMismatch,
     #[error(
         "SDK key was not authorized or process failed to report usage. Check if you have internet connection."
@@ -43,8 +41,8 @@ pub enum AicError {
     ModelVersionUnsupported,
     #[error("The model type is not supported by this operation.")]
     ModelTypeUnsupported,
-    #[error("The path to the model file is invalid")]
-    ModelFilePathInvalid,
+    #[error("The file path is invalid")]
+    FilePathInvalid,
     #[error(
         "The model file cannot be opened due to a filesystem error. Verify that the file exists."
     )]
@@ -80,7 +78,7 @@ impl From<AicErrorCode::Type> for AicError {
             AIC_ERROR_CODE_MODEL_INVALID => AicError::ModelInvalid,
             AIC_ERROR_CODE_MODEL_VERSION_UNSUPPORTED => AicError::ModelVersionUnsupported,
             AIC_ERROR_CODE_MODEL_TYPE_UNSUPPORTED => AicError::ModelTypeUnsupported,
-            AIC_ERROR_CODE_MODEL_FILE_PATH_INVALID => AicError::ModelFilePathInvalid,
+            AIC_ERROR_CODE_FILE_PATH_INVALID => AicError::FilePathInvalid,
             AIC_ERROR_CODE_FILE_SYSTEM_ERROR => AicError::FileSystemError,
             AIC_ERROR_CODE_MODEL_DATA_UNALIGNED => AicError::ModelDataUnaligned,
             code => AicError::Unknown(code),

@@ -31,14 +31,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model = Model::from_buffer(MODEL)?;
 
     // Get optimal configuration based on the selected model
-    let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+    let config = ProcessorConfig::optimal(&model);
 
     // Create a processor and initialize it
     let mut processor = Processor::new(&model, &license_key)?.with_config(&config)?;
 
-    // Process audio (interleaved: channels × frames)
-    let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
-    processor.process_interleaved(&mut audio_buffer)?;
+    // Process mono audio
+    let mut audio_block = vec![0.0f32; config.block_size];
+    processor.process(&mut audio_block)?;
 
     Ok(())
 }
@@ -103,8 +103,8 @@ let model_id = model.id();
 // Get optimal sample rate for the model
 let optimal_rate = model.optimal_sample_rate();
 
-// Get optimal frame count for a specific sample rate
-let optimal_frames = model.optimal_num_frames(48000);
+// Get optimal block size for a specific sample rate
+let optimal_block_size = model.optimal_block_size(48000);
 ```
 
 ### Configuring the Processor
@@ -113,17 +113,14 @@ let optimal_frames = model.optimal_num_frames(48000);
 use aic_sdk::{Processor, ProcessorConfig};
 
 // Get optimal configuration for the model
-let config = ProcessorConfig::optimal(&model)
-    .with_num_channels(1)
-    .with_allow_variable_frames(false);
-println!("{:?}", config);  // ProcessorConfig { sample_rate: 48000, num_channels: 1, num_frames: 480, allow_variable_frames: false }
+let config = ProcessorConfig::optimal(&model).with_variable_block_size(false);
+println!("{:?}", config);  // ProcessorConfig { sample_rate: 48000, block_size: 480, variable_block_size: false }
 
 // Or create from scratch
 let config = ProcessorConfig {
     sample_rate: 48000,
-    num_channels: 2,
-    num_frames: 480,
-    allow_variable_frames: false,
+    block_size: 480,
+    variable_block_size: false,
 };
 
 // Processor needs to be initialized before processing
@@ -153,21 +150,21 @@ let processor = Processor::with_otel_config(&model, &license_key, &otel)?
 ### Processing Audio
 
 ```rust,ignore
-// Interleaved processing (channels interleaved in single buffer)
-// Format: [l, r, l, r, ...]
-let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
-processor.process_interleaved(&mut audio_buffer)?;
-
-// Sequential processing (channels in sequence)
-// Format: [l, l, ..., r, r, ...]
-let mut audio_sequential = vec![0.0f32; config.num_channels as usize * config.num_frames];
-processor.process_sequential(&mut audio_sequential)?;
-
-// Planar processing (separate buffer per channel)
-// Format: [[l, l, ...], [r, r, ...]]
-let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
-processor.process_planar(&mut audio)?;
+let mut audio_block = vec![0.0f32; config.block_size];
+processor.process(&mut audio_block)?;
 ```
+
+### Ending a Session
+
+A telemetry session is closed automatically when the processor is dropped. Call
+`terminate_session` when the session has to end at a specific point instead, for example in a
+lifecycle event. The processor cannot process audio afterwards.
+
+```rust,ignore
+processor.terminate_session()?;
+```
+
+The same applies to `Analyzer::terminate_session`.
 
 ### Processor Context
 
@@ -234,7 +231,7 @@ let config = ProcessorConfig::optimal(&model);
 collector.initialize(&config)?;
 ```
 
-Buffer the audio using the `Collector::buffer_*` APIs. They mirror the `Processor::process_*` APIs.
+Buffer the audio using `Collector::buffer`. It mirrors `Processor::process`.
 See the `Processing Audio` section for more details.
 
 Analyze the buffered audio in a separate thread:
@@ -263,15 +260,15 @@ use aic_sdk::{Model, ProcessorAsync, ProcessorConfig};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let license_key = std::env::var("AIC_SDK_LICENSE")?;
     let model = Model::from_file("path/to/model.aicmodel")?;
-    let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+    let config = ProcessorConfig::optimal(&model);
 
     let processor = ProcessorAsync::new(&model, &license_key)?
         .with_config(&config)
         .await?;
 
     // The async API takes ownership of the buffer and returns it back.
-    let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
-    let audio = processor.process_interleaved(audio).await?;
+    let audio = vec![0.0f32; config.block_size];
+    let audio = processor.process(audio).await?;
     Ok(())
 }
 ```

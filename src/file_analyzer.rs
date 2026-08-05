@@ -6,10 +6,10 @@ use crate::{AicError, AnalysisResult, Analyzer, Collector, Model, ProcessorConfi
 /// non-real-time analysis of audio that is already loaded in memory.
 ///
 /// Each call to [`analyze`](Self::analyze) configures the collector for mono input with the model's
-/// optimal frame size. It analyzes independent five-second windows, advancing the start of each
+/// optimal block size. It analyzes independent five-second windows, advancing the start of each
 /// window by `step_samples`.
 ///
-/// For streaming or multi-channel analysis, use [`analyzer_pair`] directly.
+/// For streaming analysis, use [`analyzer_pair`] directly.
 pub struct FileAnalyzer<'model, 'a> {
     model: &'model Model<'a>,
     collector: Collector,
@@ -111,19 +111,18 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
         }
 
         // The collector only emits fresh spectrogram frames at the model's hop size. Feeding any
-        // other frame size would add buffering inside the collector and shift the analysis timing.
-        let optimal_num_frames = self.model.optimal_num_frames(sample_rate);
-        if optimal_num_frames == 0 {
+        // other block size would add buffering inside the collector and shift the analysis timing.
+        let optimal_block_size = self.model.optimal_block_size(sample_rate);
+        if optimal_block_size == 0 {
             return Err(AicError::AudioConfigUnsupported);
         }
 
         let config = ProcessorConfig {
             sample_rate,
-            num_channels: 1,
             // Collector/STFT output advances at the model hop size, so always feed fixed optimal
-            // frames regardless of the requested analysis step.
-            num_frames: optimal_num_frames,
-            allow_variable_frames: false,
+            // blocks regardless of the requested analysis step.
+            block_size: optimal_block_size,
+            variable_block_size: false,
         };
 
         self.collector.initialize(&config)?;
@@ -145,7 +144,7 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
                 audio,
                 window_start,
                 analysis_window_samples,
-                optimal_num_frames,
+                optimal_block_size,
             )?;
 
             results.push(self.analyzer.analyze_buffered()?);
@@ -169,44 +168,43 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
             .collect()
     }
 
-    // Buffers exactly one analysis window into the collector using fixed-size model-hop frames.
+    // Buffers exactly one analysis window into the collector using fixed-size model-hop blocks.
     // Missing samples are zero-padded so short first windows still reach the model's full context.
     fn buffer_analysis_window(
         &mut self,
         audio: &[f32],
         start: usize,
         window_samples: usize,
-        frame_samples: usize,
+        block_size: usize,
     ) -> Result<(), AicError> {
-        let mut frame = vec![0.0; frame_samples];
+        let mut block = vec![0.0; block_size];
         let mut buffered_samples = 0;
 
         while buffered_samples < window_samples {
-            let Some(frame_start) = start.checked_add(buffered_samples) else {
+            let Some(block_start) = start.checked_add(buffered_samples) else {
                 return Err(AicError::AudioConfigUnsupported);
             };
 
-            let available_samples = audio.len().saturating_sub(frame_start).min(frame_samples);
+            let available_samples = audio.len().saturating_sub(block_start).min(block_size);
 
-            // The collector was initialized with fixed frame size, so every call below must pass
-            // exactly frame_samples samples.
-            if available_samples == frame_samples {
-                // Fast path: the next fixed-size frame is fully available from the source audio.
-                let frame_end = frame_start + frame_samples;
-                self.collector
-                    .buffer_interleaved(&audio[frame_start..frame_end])?;
+            // The collector was initialized with a fixed block size, so every call below must pass
+            // exactly block_size samples.
+            if available_samples == block_size {
+                // Fast path: the next fixed-size block is fully available from the source audio.
+                let block_end = block_start + block_size;
+                self.collector.buffer(&audio[block_start..block_end])?;
             } else {
                 // Pad short windows or non-aligned tails with silence while still feeding the
-                // collector exactly one fixed-size frame.
-                frame.fill(0.0);
+                // collector exactly one fixed-size block.
+                block.fill(0.0);
                 if available_samples > 0 {
-                    let frame_end = frame_start + available_samples;
-                    frame[..available_samples].copy_from_slice(&audio[frame_start..frame_end]);
+                    let block_end = block_start + available_samples;
+                    block[..available_samples].copy_from_slice(&audio[block_start..block_end]);
                 }
-                self.collector.buffer_interleaved(&frame)?;
+                self.collector.buffer(&block)?;
             }
 
-            buffered_samples += frame_samples;
+            buffered_samples += block_size;
         }
 
         Ok(())
@@ -359,7 +357,7 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let mut analyzer = FileAnalyzer::new(&model, &license_key).unwrap();
         let sample_rate = model.optimal_sample_rate();
-        let step_samples = model.optimal_num_frames(sample_rate);
+        let step_samples = model.optimal_block_size(sample_rate);
         let audio = vec![0.0f32; sample_rate as usize];
 
         let results = analyzer
@@ -375,7 +373,7 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let mut analyzer = FileAnalyzer::new(&model, &license_key).unwrap();
         let sample_rate = model.optimal_sample_rate();
-        let step_samples = model.optimal_num_frames(sample_rate);
+        let step_samples = model.optimal_block_size(sample_rate);
         let window_samples = sample_rate as usize * FileAnalyzer::ANALYSIS_WINDOW_SECONDS;
         let audio = vec![0.0f32; window_samples];
 
@@ -406,7 +404,7 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let mut analyzer = FileAnalyzer::new(&model, &license_key).unwrap();
         let sample_rate = model.optimal_sample_rate();
-        let step_samples = model.optimal_num_frames(sample_rate);
+        let step_samples = model.optimal_block_size(sample_rate);
         let window_samples = sample_rate as usize * FileAnalyzer::ANALYSIS_WINDOW_SECONDS;
         let audio = vec![0.0f32; window_samples + 2 * step_samples];
 
@@ -423,7 +421,7 @@ mod tests {
         let (model, license_key) = load_test_model().unwrap();
         let mut analyzer = FileAnalyzer::new(&model, &license_key).unwrap();
         let sample_rate = model.optimal_sample_rate();
-        let step_samples = model.optimal_num_frames(sample_rate);
+        let step_samples = model.optimal_block_size(sample_rate);
         let window_samples = sample_rate as usize * FileAnalyzer::ANALYSIS_WINDOW_SECONDS;
         let audio = vec![0.0f32; window_samples + step_samples - 1];
 
