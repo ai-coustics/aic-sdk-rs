@@ -20,7 +20,7 @@ pub struct ProcessorConfig {
     /// `variable_block_size` is `true`).
     /// Note that using a non-optimal block size increases latency.
     pub block_size: usize,
-    /// Permits calls shorter than `block_size` at the cost of added latency.
+    /// If `true`, permits shorter calls at the cost of added delay.
     /// Calls larger than `block_size` are always rejected.
     pub variable_block_size: bool,
 }
@@ -187,10 +187,12 @@ impl ProcessorContext {
         self.inner as *const AicProcessorContext
     }
 
-    /// Modifies a processor parameter.
+    /// Modifies an enhancement parameter.
     ///
     /// All parameters can be changed during audio processing.
     /// This function can be called from any thread.
+    ///
+    /// This operates on the processor associated with this context handle.
     ///
     /// # Arguments
     ///
@@ -225,6 +227,8 @@ impl ProcessorContext {
     /// Retrieves the current value of a parameter.
     ///
     /// This function can be called from any thread.
+    ///
+    /// This queries the processor associated with this context handle.
     ///
     /// # Arguments
     ///
@@ -321,6 +325,8 @@ impl ProcessorContext {
     /// Call this when the audio stream is interrupted or when seeking
     /// to prevent artifacts from previous audio content.
     ///
+    /// This operates on the processor associated with this context handle.
+    ///
     /// The processor stays initialized to the configured settings.
     ///
     /// # Returns
@@ -352,20 +358,24 @@ impl ProcessorContext {
 
     /// Replaces the bearer token on the running processor.
     ///
-    /// Use this when your license key is a JWT and needs to be refreshed before it expires.
-    /// Audio processing continues uninterrupted, the context handle stays valid, and the new
-    /// token is used for all subsequent authentication against the ai-coustics backend.
+    /// Use this when your license key is a JWT and needs to be refreshed
+    /// before it expires. Calling this with a renewed token lets you stay authenticated
+    /// without tearing down and recreating the processor: audio processing continues
+    /// uninterrupted, the context handle stays valid, and the new token is used for all
+    /// subsequent authentication against the ai-coustics backend.
     ///
     /// In-place updates are only supported when both the originally configured key and the
-    /// new token are JWTs. If either side is not, the call returns
-    /// [`AicError::TokenUpdateUnsupported`] and the existing token stays in use.
+    /// new token are JWTs. Other license types cannot be swapped in this way.
     ///
     /// On any error the call is a no-op: the previously active token stays in use and the
-    /// telemetry session is unaffected. On success the swap is applied immediately and is **not**
-    /// gated on backend acceptance. The token is only validated locally for format; if the
-    /// backend later rejects it, the SDK retries it under backoff rather than rolling back, and
-    /// audio processing is eventually disabled if no accepted token arrives in time. Supplying a
-    /// known-good token during that window recovers the session.
+    /// telemetry session is unaffected (no backoff, no interruption to processing).
+    ///
+    /// On success the swap is applied immediately and is **not** gated on backend
+    /// acceptance. The token is validated locally for format only; if the backend later
+    /// rejects it (e.g. expired or revoked), the SDK retries it under backoff rather than
+    /// rolling back to the prior token, and audio processing is eventually disabled if no
+    /// accepted token arrives in time. Supplying a known-good token via this call during
+    /// that window recovers the session.
     ///
     /// Safe to call concurrently with [`Processor::process`] on the originating processor.
     ///
@@ -465,6 +475,9 @@ impl<'a> Processor<'a> {
     /// Multiple processors can be created to process different audio streams simultaneously
     /// or to switch between different enhancement algorithms during runtime.
     ///
+    /// The same [`Model`] may be passed to this function more than once: each call creates an
+    /// independent processor that shares the underlying model data internally.
+    ///
     /// # Arguments
     ///
     /// * `model` - The loaded model instance. Must be an enhancement or bypass model,
@@ -491,6 +504,9 @@ impl<'a> Processor<'a> {
 
     /// Creates a new audio enhancement processor instance with explicit
     /// OpenTelemetry configuration.
+    ///
+    /// If provided, telemetry will be sent according to the provided configuration. Otherwise
+    /// it will be configured according to the runtime environment.
     ///
     /// This overrides the SDK's environment-based telemetry defaults (e.g.
     /// `AIC_SDK_OTEL_ENABLE`) for this processor.
@@ -696,9 +712,9 @@ impl<'a> Processor<'a> {
     ///
     /// # Arguments
     ///
-    /// * `audio` - Mono audio block to be enhanced in-place. Must be exactly
-    ///   of size `block_size`, or if `variable_block_size` was enabled,
-    ///   less than the initialization value.
+    /// * `audio` - Mono audio block to be enhanced in-place. Must match `block_size` from
+    ///   initialization, or if `variable_block_size` was enabled, must be less than or equal
+    ///   to `block_size`.
     ///
     /// # Returns
     ///
@@ -742,12 +758,17 @@ impl<'a> Processor<'a> {
     ///
     /// Once the request has been handled, the processor is no longer allowed to process audio.
     ///
-    /// This is meant for lifecycle management events. A telemetry session is stopped
-    /// automatically when the [`Processor`] is dropped, so calling this is only necessary when
-    /// the session must end before the processor itself goes out of scope.
+    /// This function is meant to be used in lifecycle management events.
+    /// A telemetry session is automatically stopped when a processor is destroyed.
     ///
-    /// This blocks until the telemetry session is terminated, unless another session is still
-    /// alive. In that case it returns early and termination happens asynchronously.
+    /// However, in cases where this SDK is integrated with languages with automatic memory
+    /// management, object deallocation could be delayed. Use this function to start
+    /// termination on demand.
+    ///
+    /// This function blocks until the telemetry session is terminated, unless another
+    /// session is still alive. In that case, this function returns early and termination
+    /// happens asynchronously. This keeps lifecycle management smooth while ensuring
+    /// all sessions are closed when the last processor is terminated.
     ///
     /// # Returns
     ///
