@@ -21,7 +21,6 @@ This product includes software developed by third parties.
 --- rtsan-standalone-macros 0.3.0: Apache-2.0 ---
 --- rtsan-standalone-sys 0.3.0: Apache-2.0 ---
 --- rtsan-standalone 0.3.0: Apache-2.0 ---
---- safetensors 0.6.2: Apache-2.0 ---
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -440,7 +439,6 @@ limitations under the License.
 --- opentelemetry-otlp 0.32.0: Apache-2.0 ---
 --- opentelemetry 0.32.0: Apache-2.0 ---
 --- opentelemetry_sdk 0.32.1: Apache-2.0 ---
---- ryu 1.0.23: Apache-2.0 ---
 --- sync_wrapper 1.0.2: Apache-2.0 ---
 Apache License
 Version 2.0, January 2004
@@ -548,7 +546,7 @@ TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
 PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
 LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ================================================================================
@@ -1941,37 +1939,6 @@ DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 
---- getrandom 0.4.2: MIT ---
-Copyright (c) 2018-2026 The rust-random Project Developers
-Copyright (c) 2014 The Rust Project Developers
-
-Permission is hereby granted, free of charge, to any
-person obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the
-Software without restriction, including without
-limitation the rights to use, copy, modify, merge,
-publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software
-is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice
-shall be included in all copies or substantial portions
-of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-
-
-================================================================================
-
 --- ringbuf 0.4.8: MIT ---
 Copyright (c) 2019 Alexey Gerasev
 
@@ -2664,36 +2631,6 @@ DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 
---- audio-blocks 0.7.0: MIT ---
-Copyright (c) neodsp
-
-Permission is hereby granted, free of charge, to any
-person obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the
-Software without restriction, including without
-limitation the rights to use, copy, modify, merge,
-publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software
-is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice
-shall be included in all copies or substantial portions
-of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-
-
-================================================================================
-
 --- synstructure 0.13.2: MIT ---
 Copyright 2016 Nika Layzell
 
@@ -3108,10 +3045,8 @@ SOFTWARE.
 --- ouroboros 0.18.5: MIT ---
 --- ouroboros_macro 0.18.5: MIT ---
 --- r-efi 5.3.0: MIT ---
---- r-efi 6.0.0: MIT ---
 --- realfft 3.5.0: MIT ---
 --- rustls-platform-verifier-android 0.1.1: MIT ---
---- wasip3 0.4.0+wasi-0.3.0-rc-2026-01-06: MIT ---
 --- winapi-i686-pc-windows-gnu 0.4.0: MIT ---
 --- winapi-x86_64-pc-windows-gnu 0.4.0: MIT ---
 --- windows-collections 0.2.0: MIT ---
@@ -3128,18 +3063,29 @@ SOFTWARE.
 --- windows-strings 0.4.2: MIT ---
 --- windows-strings 0.5.1: MIT ---
 --- windows-sys 0.52.0: MIT ---
+--- windows-sys 0.59.0: MIT ---
+--- windows-sys 0.60.2: MIT ---
 --- windows-sys 0.61.2: MIT ---
 --- windows-targets 0.52.6: MIT ---
+--- windows-targets 0.53.5: MIT ---
 --- windows-threading 0.1.0: MIT ---
 --- windows 0.61.3: MIT ---
 --- windows_aarch64_gnullvm 0.52.6: MIT ---
+--- windows_aarch64_gnullvm 0.53.1: MIT ---
 --- windows_aarch64_msvc 0.52.6: MIT ---
+--- windows_aarch64_msvc 0.53.1: MIT ---
 --- windows_i686_gnu 0.52.6: MIT ---
+--- windows_i686_gnu 0.53.1: MIT ---
 --- windows_i686_gnullvm 0.52.6: MIT ---
+--- windows_i686_gnullvm 0.53.1: MIT ---
 --- windows_i686_msvc 0.52.6: MIT ---
+--- windows_i686_msvc 0.53.1: MIT ---
 --- windows_x86_64_gnu 0.52.6: MIT ---
+--- windows_x86_64_gnu 0.53.1: MIT ---
 --- windows_x86_64_gnullvm 0.52.6: MIT ---
+--- windows_x86_64_gnullvm 0.53.1: MIT ---
 --- windows_x86_64_msvc 0.52.6: MIT ---
+--- windows_x86_64_msvc 0.53.1: MIT ---
 MIT License
 
 Copyright (c) <year> <copyright holders>
@@ -3286,7 +3232,6 @@ DEALINGS IN THE SOFTWARE.
 --- serde_core 1.0.228: MIT ---
 --- serde_derive 1.0.228: MIT ---
 --- serde_json 1.0.150: MIT ---
---- serde_norway 0.9.42: MIT ---
 --- simd_cesu8 1.1.1: MIT ---
 --- syn 2.0.117: MIT ---
 --- thiserror-impl 1.0.69: MIT ---
@@ -3294,10 +3239,8 @@ DEALINGS IN THE SOFTWARE.
 --- thiserror 1.0.69: MIT ---
 --- thiserror 2.0.18: MIT ---
 --- unicode-ident 1.0.24: MIT ---
---- unsafe-libyaml-norway 0.2.15: MIT ---
 --- wasi 0.11.1+wasi-snapshot-preview1: MIT ---
 --- wasip2 1.0.4+wasi-0.2.12: MIT ---
---- wit-bindgen 0.51.0: MIT ---
 --- wit-bindgen 0.57.1: MIT ---
 --- zmij 1.0.21: MIT ---
 Permission is hereby granted, free of charge, to any
@@ -3343,7 +3286,7 @@ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
 THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
@@ -3928,7 +3871,6 @@ SPDX-License-Identifier: Unicode-3.0
 
 Portions of ICU4X may have been adapted from ICU4C and/or ICU4J.
 ICU 1.8.1 to ICU 57.1 © 1995-2016 International Business Machines Corporation and others.
-
 
 
 ################################################################################
