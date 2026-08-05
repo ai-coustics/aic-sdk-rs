@@ -156,7 +156,7 @@ typedef enum AicVadParameter {
    *
    * **Range:** 0.0 to 300x model window length (value in seconds)
    *
-   * **Default:** 0.03 (30 ms)
+   * **Default:** model-specific
    */
   AIC_VAD_PARAMETER_SPEECH_HOLD_DURATION = 0,
   /**
@@ -187,7 +187,7 @@ typedef enum AicVadParameter {
    *
    * **Range:** 0.0 to 1.0 (value in seconds)
    *
-   * **Default:** 0.0
+   * **Default:** model-specific
    */
   AIC_VAD_PARAMETER_MINIMUM_SPEECH_DURATION = 2,
 } AicVadParameter;
@@ -1463,7 +1463,7 @@ enum AicErrorCode aic_analyzer_terminate_session(struct AicAnalyzer *analyzer);
  * Use this when your license key is a JWT and needs to be refreshed
  * before it expires. Calling this with a renewed token lets you stay authenticated
  * without tearing down and recreating the analyzer: the analyzer handle stays valid,
- * buffered spectra stay available, and the new token is used for all
+ * buffered audio remains available, and the new token is used for all
  * subsequent authentication against the ai-coustics backend.
  *
  * In-place updates are only supported when both the originally configured key and
