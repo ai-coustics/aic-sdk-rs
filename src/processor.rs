@@ -760,7 +760,6 @@ impl<'a> Processor<'a> {
     ///
     /// This function is meant to be used in lifecycle management events.
     /// A telemetry session is automatically stopped when a processor is destroyed.
-    ///
     /// However, in cases where this SDK is integrated with languages with automatic memory
     /// management, object deallocation could be delayed. Use this function to start
     /// termination on demand.

@@ -41,7 +41,7 @@ pub enum VadParameter {
     /// speech is not present. The probability is compared against the sensitivity threshold
     /// to determine if speech is detected.
     ///
-    /// A value above the threshold will trigger a speech detected decision.
+    /// A value above the threshold will trigger a "speech detected" decision.
     ///
     /// **Range:** 0.0 to 1.0
     ///
@@ -416,7 +416,6 @@ impl<'a> Vad<'a> {
     ///
     /// This function is meant to be used in lifecycle management events.
     /// A telemetry session is automatically stopped when a VAD is destroyed.
-    ///
     /// However, in cases where this SDK is integrated with languages with automatic memory
     /// management, object deallocation could be delayed. Use this function to start
     /// termination on demand.
