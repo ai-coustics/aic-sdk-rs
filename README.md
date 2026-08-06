@@ -31,14 +31,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model = Model::from_buffer(MODEL)?;
 
     // Get optimal configuration based on the selected model
-    let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+    let config = ProcessorConfig::optimal(&model);
 
     // Create a processor and initialize it
     let mut processor = Processor::new(&model, &license_key)?.with_config(&config)?;
 
-    // Process audio (interleaved: channels × frames)
-    let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
-    processor.process_interleaved(&mut audio_buffer)?;
+    // Process mono audio
+    let mut audio_block = vec![0.0f32; config.block_size];
+    processor.process(&mut audio_block)?;
 
     Ok(())
 }
@@ -90,7 +90,7 @@ cargo add aic-sdk --features download-lib,download-model
 ```rust,ignore
 use aic_sdk::Model;
 
-let model_path = Model::download("quail-vf-2.1-s-16khz", "./models")?;
+let model_path = Model::download("quail-vf-2.2-s-16khz", "./models")?;
 let model = Model::from_file(&model_path)?;
 ```
 
@@ -103,8 +103,8 @@ let model_id = model.id();
 // Get optimal sample rate for the model
 let optimal_rate = model.optimal_sample_rate();
 
-// Get optimal frame count for a specific sample rate
-let optimal_frames = model.optimal_num_frames(48000);
+// Get optimal block size for a specific sample rate
+let optimal_block_size = model.optimal_block_size(48000);
 ```
 
 ### Configuring the Processor
@@ -113,17 +113,14 @@ let optimal_frames = model.optimal_num_frames(48000);
 use aic_sdk::{Processor, ProcessorConfig};
 
 // Get optimal configuration for the model
-let config = ProcessorConfig::optimal(&model)
-    .with_num_channels(1)
-    .with_allow_variable_frames(false);
-println!("{:?}", config);  // ProcessorConfig { sample_rate: 48000, num_channels: 1, num_frames: 480, allow_variable_frames: false }
+let config = ProcessorConfig::optimal(&model).with_variable_block_size(false);
+println!("{:?}", config);  // ProcessorConfig { sample_rate: 48000, block_size: 480, variable_block_size: false }
 
 // Or create from scratch
 let config = ProcessorConfig {
     sample_rate: 48000,
-    num_channels: 2,
-    num_frames: 480,
-    allow_variable_frames: false,
+    block_size: 480,
+    variable_block_size: false,
 };
 
 // Processor needs to be initialized before processing
@@ -138,8 +135,8 @@ processor.initialize(&config)?;
 
 ### OpenTelemetry
 
-By default, processor telemetry follows the SDK environment configuration, such as
-`AIC_SDK_OTEL_ENABLE`. Use `OtelConfig` when a single processor needs an explicit
+By default, telemetry follows the SDK environment configuration, such as
+`AIC_SDK_OTEL_ENABLE`. Use `OtelConfig` when a single processor or VAD needs an explicit
 telemetry setting or session ID.
 
 ```rust,ignore
@@ -153,21 +150,21 @@ let processor = Processor::with_otel_config(&model, &license_key, &otel)?
 ### Processing Audio
 
 ```rust,ignore
-// Interleaved processing (channels interleaved in single buffer)
-// Format: [l, r, l, r, ...]
-let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
-processor.process_interleaved(&mut audio_buffer)?;
-
-// Sequential processing (channels in sequence)
-// Format: [l, l, ..., r, r, ...]
-let mut audio_sequential = vec![0.0f32; config.num_channels as usize * config.num_frames];
-processor.process_sequential(&mut audio_sequential)?;
-
-// Planar processing (separate buffer per channel)
-// Format: [[l, l, ...], [r, r, ...]]
-let mut audio = vec![vec![0.0f32; config.num_frames]; config.num_channels as usize];
-processor.process_planar(&mut audio)?;
+let mut audio_block = vec![0.0f32; config.block_size];
+processor.process(&mut audio_block)?;
 ```
+
+### Ending a Session
+
+A telemetry session is closed automatically when the processor is dropped. Call
+`terminate_session` when the session has to end at a specific point instead, for example in a
+lifecycle event. The processor cannot process audio afterwards.
+
+```rust,ignore
+processor.terminate_session()?;
+```
+
+The same applies to `Vad::terminate_session` and `Analyzer::terminate_session`.
 
 ### Processor Context
 
@@ -177,10 +174,10 @@ The processor context provides thread-safe access to processor parameters and st
 use aic_sdk::ProcessorParameter;
 
 // Get processor context
-let proc_ctx = processor.processor_context();
+let proc_ctx = processor.context();
 
-// Get output delay in samples
-let delay = proc_ctx.output_delay();
+// Get the delay applied to the audio in samples
+let delay = proc_ctx.audio_delay();
 
 // Reset processor state (clears internal buffers)
 proc_ctx.reset()?;
@@ -196,16 +193,48 @@ println!("Enhancement level: {}", level);
 
 ### Voice Activity Detection (VAD)
 
-The VAD context provides thread-safe access to VAD parameters and state. You can create multiple contexts and move them to any thread for concurrent parameter updates.
+Voice activity detection runs on its own `Vad` instance, created from a dedicated VAD model
+(e.g. `vad-2.1-xxs-16khz`). Enhancement models are rejected with
+`AicError::ModelTypeUnsupported`.
+
+```rust,ignore
+use aic_sdk::{Model, ProcessorConfig, Vad};
+
+let model = Model::from_file("path/to/vad_model.aicmodel")?;
+let config = ProcessorConfig::optimal(&model);
+
+let mut vad = Vad::new(&model, &license_key)?.with_config(&config)?;
+
+// Feed mono audio to the detector. The audio block is not modified.
+let audio_block = vec![0.0f32; config.block_size];
+vad.process(&audio_block)?;
+```
+
+When enhancement and VAD run together, feed the VAD the original input audio, not the processor's
+enhanced output. Run both on the same block instead of chaining them:
+
+```rust,ignore
+let mut audio_block = vec![0.0f32; config.block_size];
+
+vad.process(&audio_block)?; // reads the block, does not modify it
+processor.process(&mut audio_block)?; // enhances the block in place
+```
+
+Enhancement is designed to change the signal, so running the VAD on its output means detecting
+speech in audio that no longer matches what the VAD model expects, and it stacks the processor's
+audio delay on top of the VAD's prediction delay.
+
+The VAD context provides thread-safe access to the prediction, the VAD parameters and its state.
+You can create multiple contexts and move them to any thread for concurrent parameter updates.
 
 ```rust,ignore
 use aic_sdk::VadParameter;
 
-// Get VAD context from processor
-let vad_ctx = processor.vad_context();
+// Get VAD context from the VAD
+let vad_ctx = vad.context();
 
-// Configure VAD parameters
-vad_ctx.set_parameter(VadParameter::Sensitivity, 6.0)?;
+// Configure VAD parameters. Sensitivity is the probability threshold of the model output.
+vad_ctx.set_parameter(VadParameter::Sensitivity, 0.5)?;
 vad_ctx.set_parameter(VadParameter::SpeechHoldDuration, 0.05)?;
 vad_ctx.set_parameter(VadParameter::MinimumSpeechDuration, 0.0)?;
 
@@ -213,11 +242,20 @@ vad_ctx.set_parameter(VadParameter::MinimumSpeechDuration, 0.0)?;
 let sensitivity = vad_ctx.parameter(VadParameter::Sensitivity)?;
 println!("VAD sensitivity: {}", sensitivity);
 
-// Check for speech (after processing audio through the processor)
+// How many samples the prediction lags behind the input. This delay is not applied to the
+// audio, `Vad::process` leaves the buffer untouched.
+let delay = vad_ctx.prediction_delay();
+
+// Check for speech (after processing audio through the VAD)
 if vad_ctx.is_speech_detected() {
     println!("Speech detected!");
 }
+
+// Clear the prediction and all internal state, e.g. when the stream is interrupted
+vad_ctx.reset()?;
 ```
+
+With the `async` feature, `VadAsync` mirrors `ProcessorAsync` for use in async contexts.
 
 ### Working with the Analyzer
 
@@ -234,7 +272,7 @@ let config = ProcessorConfig::optimal(&model);
 collector.initialize(&config)?;
 ```
 
-Buffer the audio using the `Collector::buffer_*` APIs. They mirror the `Processor::process_*` APIs.
+Buffer the audio using `Collector::buffer`. It mirrors `Processor::process`.
 See the `Processing Audio` section for more details.
 
 Analyze the buffered audio in a separate thread:
@@ -263,15 +301,15 @@ use aic_sdk::{Model, ProcessorAsync, ProcessorConfig};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let license_key = std::env::var("AIC_SDK_LICENSE")?;
     let model = Model::from_file("path/to/model.aicmodel")?;
-    let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+    let config = ProcessorConfig::optimal(&model);
 
     let processor = ProcessorAsync::new(&model, &license_key)?
         .with_config(&config)
         .await?;
 
-    // The async API takes ownership of the buffer and returns it back.
-    let audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
-    let audio = processor.process_interleaved(audio).await?;
+    // The async API takes ownership of the audio block and returns it back.
+    let audio = vec![0.0f32; config.block_size];
+    let audio = processor.process(audio).await?;
     Ok(())
 }
 ```
@@ -280,7 +318,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 See the example files for complete working examples:
 
-- [`examples/basic_usage.rs`](examples/basic_usage.rs) - Basic usage example
+- [`examples/enhancement.rs`](examples/enhancement.rs) - Basic usage example
+- [`examples/vad.rs`](examples/vad.rs) - Voice activity detection with a dedicated VAD model
 - [`examples/build-time-download`](examples/build-time-download) - Download and embed models at compile-time
 - [`examples/benchmark.rs`](examples/benchmark.rs) - Run multiple processor instances concurrently until the real-time requirements are not met
 - [`examples/parallel_async.rs`](examples/parallel_async.rs) - Async processing with `ProcessorAsync` across multiple instances (requires `async`)
@@ -289,7 +328,7 @@ Run examples with:
 
 ```bash
 export AIC_SDK_LICENSE="your_license_key_here"
-cargo run --example basic_usage --features download-lib,download-model
+cargo run --example enhancement --features download-lib,download-model
 ```
 
 ## Documentation
@@ -311,7 +350,7 @@ By default, `aic-sdk-sys` links the native AIC SDK **statically**. Static linkin
 In every mode, point the build at the SDK with `AIC_LIB_PATH=/path/to/aic-sdk/lib`, or enable `download-lib` to fetch it automatically. Prefer the default static link unless you specifically need to ship and load a shared library:
 
 ```bash
-AIC_SDK_LICENSE="…" cargo run --example basic_usage \
+AIC_SDK_LICENSE="…" cargo run --example enhancement \
   --features "download-lib download-model"
 ```
 

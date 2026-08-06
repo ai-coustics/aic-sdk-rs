@@ -5,54 +5,68 @@ use aic_sdk_sys::AicErrorCode::{self, *};
 /// Error type for AIC SDK operations.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum AicError {
+    /// Parameter value is outside the acceptable range. Check documentation for valid values.
     #[error(
         "Parameter value is outside the acceptable range. Check documentation for valid values."
     )]
     ParameterOutOfRange,
-    #[error(
-        "Processor must be initialized before calling this operation. Call `Processor::initialize` first."
-    )]
-    ProcessorNotInitialized,
-    #[error(
-        "Audio configuration (samplerate, num_channels, num_frames) is not supported by the model"
-    )]
+    /// Handle must be initialized before calling this operation.
+    #[error("Handle must be initialized before calling this operation.")]
+    NotInitialized,
+    /// Audio configuration (sample_rate, block_size) is not supported by the model
+    #[error("Audio configuration (sample_rate, block_size) is not supported by the model")]
     AudioConfigUnsupported,
-    #[error("Audio buffer configuration differs from the one provided during initialization")]
+    /// Audio block configuration differs from the one provided during initialization
+    #[error("Audio block configuration differs from the one provided during initialization")]
     AudioConfigMismatch,
+    /// Processing is not allowed because the SDK key was not authorized or usage reporting failed.
     #[error(
-        "SDK key was not authorized or process failed to report usage. Check if you have internet connection."
+        "Processing is not allowed because the SDK key was not authorized or usage reporting failed."
     )]
-    EnhancementNotAllowed,
+    ProcessingNotAllowed,
+    /// Internal error occurred. Contact support.
     #[error("Internal error occurred. Contact support.")]
     Internal,
+    /// License key format is invalid or corrupted. Verify the key was copied correctly.
     #[error("License key format is invalid or corrupted. Verify the key was copied correctly.")]
     LicenseFormatInvalid,
+    /// License version is not compatible with the SDK version. Update SDK or contact support.
     #[error(
         "License version is not compatible with the SDK version. Update SDK or contact support."
     )]
     LicenseVersionUnsupported,
+    /// License key has expired. Renew your license to continue.
     #[error("License key has expired. Renew your license to continue.")]
     LicenseExpired,
+    /// Updating the token is only supported when both the original and new keys are JWT-form licenses.
     #[error(
         "Updating the token is only supported when both the original and new keys are JWT-form licenses."
     )]
     TokenUpdateUnsupported,
+    /// The model file is invalid or corrupted. Verify the file is correct.
     #[error("The model file is invalid or corrupted. Verify the file is correct.")]
     ModelInvalid,
+    /// The model file version is not compatible with this SDK version.
     #[error("The model file version is not compatible with this SDK version.")]
     ModelVersionUnsupported,
-    #[error("The model type is not supported by this operation.")]
+    /// The model type is not supported by the requested API.
+    #[error("The model type is not supported by the requested API.")]
     ModelTypeUnsupported,
-    #[error("The path to the model file is invalid")]
-    ModelFilePathInvalid,
+    /// The file path is invalid.
+    #[error("The file path is invalid.")]
+    FilePathInvalid,
+    /// The model file cannot be opened due to a filesystem error. Verify that the file exists.
     #[error(
         "The model file cannot be opened due to a filesystem error. Verify that the file exists."
     )]
     FileSystemError,
+    /// The model data is not aligned to 64 bytes.
     #[error("The model data is not aligned to 64 bytes.")]
     ModelDataUnaligned,
+    /// Model download error.
     #[error("Model download error: {0}")]
     ModelDownload(String),
+    /// Unknown error code.
     #[error("Unknown error code: {0}")]
     Unknown(AicErrorCode::Type),
 }
@@ -68,10 +82,10 @@ impl From<AicErrorCode::Type> for AicError {
                 );
             }
             AIC_ERROR_CODE_PARAMETER_OUT_OF_RANGE => AicError::ParameterOutOfRange,
-            AIC_ERROR_CODE_PROCESSOR_NOT_INITIALIZED => AicError::ProcessorNotInitialized,
+            AIC_ERROR_CODE_NOT_INITIALIZED => AicError::NotInitialized,
             AIC_ERROR_CODE_AUDIO_CONFIG_UNSUPPORTED => AicError::AudioConfigUnsupported,
             AIC_ERROR_CODE_AUDIO_CONFIG_MISMATCH => AicError::AudioConfigMismatch,
-            AIC_ERROR_CODE_ENHANCEMENT_NOT_ALLOWED => AicError::EnhancementNotAllowed,
+            AIC_ERROR_CODE_PROCESSING_NOT_ALLOWED => AicError::ProcessingNotAllowed,
             AIC_ERROR_CODE_INTERNAL_ERROR => AicError::Internal,
             AIC_ERROR_CODE_LICENSE_FORMAT_INVALID => AicError::LicenseFormatInvalid,
             AIC_ERROR_CODE_LICENSE_VERSION_UNSUPPORTED => AicError::LicenseVersionUnsupported,
@@ -80,7 +94,7 @@ impl From<AicErrorCode::Type> for AicError {
             AIC_ERROR_CODE_MODEL_INVALID => AicError::ModelInvalid,
             AIC_ERROR_CODE_MODEL_VERSION_UNSUPPORTED => AicError::ModelVersionUnsupported,
             AIC_ERROR_CODE_MODEL_TYPE_UNSUPPORTED => AicError::ModelTypeUnsupported,
-            AIC_ERROR_CODE_MODEL_FILE_PATH_INVALID => AicError::ModelFilePathInvalid,
+            AIC_ERROR_CODE_FILE_PATH_INVALID => AicError::FilePathInvalid,
             AIC_ERROR_CODE_FILE_SYSTEM_ERROR => AicError::FileSystemError,
             AIC_ERROR_CODE_MODEL_DATA_UNALIGNED => AicError::ModelDataUnaligned,
             code => AicError::Unknown(code),

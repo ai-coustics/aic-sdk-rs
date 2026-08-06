@@ -9,11 +9,14 @@ use std::{
     ptr,
 };
 
-/// High-level wrapper for the ai-coustics audio enhancement model.
+/// High-level wrapper for an ai-coustics model.
 ///
-/// This struct provides a safe, Rust-friendly interface to the underlying C library.
-/// It handles memory management automatically and converts C-style error codes
-/// to Rust `Result` types.
+/// A single model instance can be used to create multiple processors, VADs or analyzers,
+/// according to the model type.
+///
+/// Each processor, VAD or analyzer created with a given model keeps the underlying model
+/// alive through internal reference counting. When the reference count reaches zero the
+/// model is destroyed. You may therefore drop the model before those objects, in any order.
 ///
 /// # Sharing and Multi-threading
 ///
@@ -26,11 +29,11 @@ use std::{
 /// # use aic_sdk::{Model, ProcessorConfig, Processor};
 /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 /// let model = Model::from_file("/path/to/model.aicmodel")?;
-/// let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+/// let config = ProcessorConfig::optimal(&model);
 /// let mut processor = Processor::new(&model, &license_key)?;
 /// processor.initialize(&config)?;
-/// let mut audio_buffer = vec![0.0f32; config.num_channels as usize * config.num_frames];
-/// processor.process_interleaved(&mut audio_buffer)?;
+/// let mut audio_block = vec![0.0f32; config.block_size];
+/// processor.process(&mut audio_block)?;
 /// # Ok::<(), aic_sdk::AicError>(())
 /// ```
 ///
@@ -66,10 +69,20 @@ pub struct Model<'a> {
 }
 
 impl<'a> Model<'a> {
-    /// Creates a new audio enhancement model instance.
+    /// Creates a new model instance from a model file.
     ///
-    /// Multiple models can be created to process different audio streams simultaneously
-    /// or to switch between different enhancement algorithms during runtime.
+    /// A single model instance can be used to create multiple processors, VADs or analyzers,
+    /// according to the model type.
+    ///
+    /// # Lifetime and ownership
+    ///
+    /// Each processor, VAD or analyzer created with a given model keeps the underlying model
+    /// alive through internal reference counting. When the reference count reaches zero the
+    /// model is destroyed. You may therefore drop the model before those objects, in any order.
+    ///
+    /// The model data is memory-mapped from the file, not copied into the process. Make sure
+    /// the file is not modified or deleted while the model, or any object created from it, is
+    /// alive.
     ///
     /// # Arguments
     ///
@@ -111,7 +124,16 @@ impl<'a> Model<'a> {
         })
     }
 
-    /// Creates a new model instance from an in-memory buffer.
+    /// Creates a new model instance from a memory buffer.
+    ///
+    /// A single model instance can be used to create multiple processors, VADs or analyzers,
+    /// according to the model type.
+    ///
+    /// # Lifetime and ownership
+    ///
+    /// Each processor, VAD or analyzer created with a given model keeps the underlying model
+    /// alive through internal reference counting. When the reference count reaches zero the
+    /// model is destroyed. You may therefore drop the model before those objects, in any order.
     ///
     /// The buffer must be 64-byte aligned.
     ///
@@ -159,7 +181,9 @@ impl<'a> Model<'a> {
         })
     }
 
-    /// Returns the model identifier string.
+    /// Returns the model identifier.
+    ///
+    /// The returned string is UTF-8 encoded.
     pub fn id(&self) -> &str {
         // SAFETY:
         // - `self` owns a valid model pointer created by the SDK.
@@ -175,7 +199,7 @@ impl<'a> Model<'a> {
         unsafe { CStr::from_ptr(id_ptr).to_str().unwrap_or("unknown") }
     }
 
-    /// Retrieves the native sample rate of the processor's model.
+    /// Retrieves the optimal sample rate of the model.
     ///
     /// Each model is optimized for a specific sample rate, which determines the frequency
     /// range of the enhanced audio output. While you can process audio at any sample rate,
@@ -192,11 +216,11 @@ impl<'a> Model<'a> {
     /// the original, maintaining the full frequency spectrum of your input while adding
     /// the model's noise reduction capabilities to the lower frequencies.
     ///
-    /// **Sample rate and optimal frames relationship:**
-    /// When using different sample rates than the model's native rate, the optimal number
-    /// of frames (returned by `optimal_num_frames`) will change. The model's output
-    /// delay remains constant regardless of sample rate as long as you use the optimal frame
-    /// count for that rate.
+    /// **Sample rate and optimal block size relationship:**
+    /// When using different sample rates than the model's native rate, the optimal samples
+    /// per block (returned by [`Model::optimal_block_size`]) will change. The processor's output delay remains
+    /// constant regardless of sample rate as long as you use the optimal block size for
+    /// that rate.
     ///
     /// **Recommendation:**
     /// For maximum enhancement quality across the full frequency spectrum, match your
@@ -226,7 +250,7 @@ impl<'a> Model<'a> {
             unsafe { aic_model_get_optimal_sample_rate(self.as_const_ptr(), &mut sample_rate) };
 
         // This should never fail. If it does, it's a bug in the SDK.
-        // `aic_get_optimal_sample_rate` is documented to always succeed if given a valid processor pointer.
+        // `aic_model_get_optimal_sample_rate` is documented to always succeed if given valid pointers.
         assert_success(
             error_code,
             "`aic_model_get_optimal_sample_rate` failed. This is a bug, please open an issue on GitHub for further investigation.",
@@ -236,29 +260,28 @@ impl<'a> Model<'a> {
         sample_rate
     }
 
-    /// Retrieves the optimal number of frames for the selected model at a given sample rate.
+    /// Retrieves the optimal block size for the model at a given sample rate.
     ///
+    /// Using the optimal block size minimizes latency by avoiding internal buffering.
     ///
-    /// Using the optimal number of frames minimizes latency by avoiding internal buffering.
-    ///
-    /// **When you use a different frame count than the optimal value, the model will
+    /// **When you use a different block size than the optimal value, the processor will
     /// introduce additional buffering latency on top of its base processing delay.**
     ///
-    /// The optimal frame count varies based on the sample rate. Each model operates on a
-    /// fixed time window duration, so the required number of frames changes with sample rate.
-    /// For example, a model designed for 10 ms processing windows requires 480 frames at
-    /// 48 kHz, but only 160 frames at 16 kHz to capture the same duration of audio.
+    /// The optimal block size varies based on the sample rate. Each model operates on a
+    /// fixed time window length, so the required number of samples changes with sample rate.
+    /// For example, a model designed for 10 ms processing windows requires 480 samples at
+    /// 48 kHz, but only 160 samples at 16 kHz to capture the same duration of audio.
     ///
     /// Call this function with your intended sample rate before calling
-    /// [`Processor::initialize`](crate::Processor::initialize) to determine the best frame count for minimal latency.
+    /// [`Processor::initialize`](crate::Processor::initialize) to determine the best block size for minimal latency.
     ///
     /// # Arguments
     ///
-    /// * `sample_rate` - The sample rate in Hz for which to calculate the optimal frame count.
+    /// * `sample_rate` - The sample rate in Hz for which to calculate the optimal block size.
     ///
     /// # Returns
     ///
-    /// Returns the optimal frame count.
+    /// Returns the optimal block size.
     ///
     /// # Example
     ///
@@ -267,28 +290,28 @@ impl<'a> Model<'a> {
     /// # let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
     /// # let model = Model::from_file("/path/to/model.aicmodel")?;
     /// # let sample_rate = model.optimal_sample_rate();
-    /// let optimal_frames = model.optimal_num_frames(sample_rate);
-    /// println!("Optimal frame count: {optimal_frames}");
+    /// let optimal_block_size = model.optimal_block_size(sample_rate);
+    /// println!("Optimal block size: {optimal_block_size}");
     /// # Ok::<(), aic_sdk::AicError>(())
     /// ```
-    pub fn optimal_num_frames(&self, sample_rate: u32) -> usize {
-        let mut num_frames: usize = 0;
+    pub fn optimal_block_size(&self, sample_rate: u32) -> usize {
+        let mut block_size: usize = 0;
         // SAFETY:
         // - `self.as_const_ptr()` is a valid pointer to a live model.
-        // - `num_frames` points to stack storage for output.
+        // - `block_size` points to stack storage for output.
         // - This function can be called from any thread, so we only borrow `&self`.
         let error_code = unsafe {
-            aic_model_get_optimal_num_frames(self.as_const_ptr(), sample_rate, &mut num_frames)
+            aic_model_get_optimal_block_size(self.as_const_ptr(), sample_rate, &mut block_size)
         };
 
         // This should never fail. If it does, it's a bug in the SDK.
-        // `aic_get_optimal_num_frames` is documented to always succeed if given valid pointers.
+        // `aic_model_get_optimal_block_size` is documented to always succeed if given valid pointers.
         assert_success(
             error_code,
-            "`aic_model_get_optimal_num_frames` failed. This is a bug, please open an issue on GitHub for further investigation.",
+            "`aic_model_get_optimal_block_size` failed. This is a bug, please open an issue on GitHub for further investigation.",
         );
 
-        num_frames
+        block_size
     }
 
     /// Downloads a model file from the ai-coustics artifact CDN.

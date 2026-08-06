@@ -1,13 +1,11 @@
-use crate::{
-    AicError, Model, OtelConfig, Processor, ProcessorConfig, ProcessorContext, VadContext,
-};
+use crate::{AicError, Model, OtelConfig, Processor, ProcessorConfig, ProcessorContext};
 use async_lock::Mutex;
 use futures_channel::oneshot;
 use std::sync::{Arc, OnceLock};
 
 static RAYON_POOL: OnceLock<rayon::ThreadPool> = OnceLock::new();
 
-fn get_global_thread_pool() -> &'static rayon::ThreadPool {
+pub(crate) fn get_global_thread_pool() -> &'static rayon::ThreadPool {
     RAYON_POOL.get_or_init(|| {
         let num_threads = std::env::var("AIC_NUM_THREADS")
             .ok()
@@ -44,12 +42,12 @@ fn get_global_thread_pool() -> &'static rayon::ThreadPool {
 /// async fn main() -> Result<(), aic_sdk::AicError> {
 ///     let license_key = std::env::var("AIC_SDK_LICENSE").unwrap();
 ///     let model = Model::from_file("/path/to/model.aicmodel")?;
-///     let config = ProcessorConfig::optimal(&model).with_num_channels(2);
+///     let config = ProcessorConfig::optimal(&model);
 ///
 ///     let processor = ProcessorAsync::new(&model, &license_key)?.with_config(&config).await?;
 ///
-///     let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
-///     let audio = processor.process_interleaved(audio).await?;
+///     let mut audio = vec![0.0f32; config.block_size];
+///     let audio = processor.process(audio).await?;
 ///     Ok(())
 /// }
 /// ```
@@ -108,68 +106,42 @@ impl ProcessorAsync {
         rx.await.expect("Rayon worker dropped")
     }
 
-    /// Processes audio with interleaved channel data.
+    /// Processes mono audio.
     ///
     /// This method takes ownership of `audio`, moves it to a background processing
-    /// thread, and returns the processed buffer.
+    /// thread, and returns the processed audio block.
     ///
-    /// See [`Processor::process_interleaved`] for details on the memory layout.
-    pub async fn process_interleaved(&self, mut audio: Vec<f32>) -> Result<Vec<f32>, AicError> {
+    /// See [`Processor::process`] for details.
+    pub async fn process(&self, mut audio: Vec<f32>) -> Result<Vec<f32>, AicError> {
         let (tx, rx) = oneshot::channel();
         let mut processor = self.inner.lock_arc().await;
         get_global_thread_pool().spawn(move || {
-            let result = processor.process_interleaved(&mut audio).map(|_| audio);
+            let result = processor.process(&mut audio).map(|_| audio);
             let _ = tx.send(result);
         });
         rx.await.expect("Rayon worker dropped")
     }
 
-    /// Processes audio with separate buffers for each channel (planar layout).
+    /// Terminates the telemetry session associated with this processor.
     ///
-    /// This method takes ownership of `audio`, moves it to a background processing
-    /// thread, and returns the processed channel buffers.
+    /// See [`Processor::terminate_session`] for details.
     ///
-    /// See [`Processor::process_planar`] for details on the memory layout.
-    pub async fn process_planar(
-        &self,
-        mut audio: Vec<Vec<f32>>,
-    ) -> Result<Vec<Vec<f32>>, AicError> {
+    /// # Warning
+    /// This may block until the session is terminated, so it runs on the background
+    /// thread pool rather than the calling task.
+    pub async fn terminate_session(&self) -> Result<(), AicError> {
         let (tx, rx) = oneshot::channel();
         let mut processor = self.inner.lock_arc().await;
         get_global_thread_pool().spawn(move || {
-            let result = processor.process_planar(&mut audio).map(|_| audio);
-            let _ = tx.send(result);
-        });
-        rx.await.expect("Rayon worker dropped")
-    }
-
-    /// Processes audio with sequential channel data.
-    ///
-    /// This method takes ownership of `audio`, moves it to a background processing
-    /// thread, and returns the processed buffer.
-    ///
-    /// See [`Processor::process_sequential`] for details on the memory layout.
-    pub async fn process_sequential(&self, mut audio: Vec<f32>) -> Result<Vec<f32>, AicError> {
-        let (tx, rx) = oneshot::channel();
-        let mut processor = self.inner.lock_arc().await;
-        get_global_thread_pool().spawn(move || {
-            let result = processor.process_sequential(&mut audio).map(|_| audio);
-            let _ = tx.send(result);
+            let _ = tx.send(processor.terminate_session());
         });
         rx.await.expect("Rayon worker dropped")
     }
 
     /// Returns a [`ProcessorContext`] for real-time parameter control.
     ///
-    /// See [`Processor::processor_context`] for details.
-    pub async fn processor_context(&self) -> ProcessorContext {
-        self.inner.lock().await.processor_context()
-    }
-
-    /// Returns a [`VadContext`] for voice activity detection.
-    ///
-    /// See [`Processor::vad_context`] for details.
-    pub async fn vad_context(&self) -> VadContext {
-        self.inner.lock().await.vad_context()
+    /// See [`Processor::context`] for details.
+    pub async fn context(&self) -> ProcessorContext {
+        self.inner.lock().await.context()
     }
 }

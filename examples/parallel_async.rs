@@ -9,7 +9,7 @@
 use aic_sdk::{Model, ProcessorAsync, ProcessorConfig};
 use std::time::Instant;
 
-const MODEL: &str = "quail-vf-2.1-l-16khz";
+const MODEL: &str = "quail-vf-2.2-l-16khz";
 const NUM_PROCESSORS: usize = 4;
 // Number of process calls per processor – enough to make timing visible.
 const ITERATIONS: usize = 50;
@@ -26,8 +26,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = ProcessorConfig::optimal(&model);
     println!(
-        "Config: {} Hz, {} frames/buffer, {} channel(s)\n",
-        config.sample_rate, config.num_frames, config.num_channels
+        "Config: {} Hz, block size {}\n",
+        config.sample_rate, config.block_size
     );
 
     // Build all processors up front
@@ -43,14 +43,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         NUM_PROCESSORS, ITERATIONS
     );
 
-    let buf_len = config.num_channels as usize * config.num_frames;
+    let buf_len = config.block_size;
 
     // Sequential baseline
     let sequential_start = Instant::now();
     for p in &processors {
         let mut audio = vec![0.0f32; buf_len];
         for _ in 0..ITERATIONS {
-            audio = p.process_interleaved(audio).await?;
+            audio = p.process(audio).await?;
         }
     }
     let sequential_elapsed = sequential_start.elapsed();
@@ -68,10 +68,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|p| {
             let config = config.clone();
             async move {
-                let mut audio = vec![0.0f32; config.num_channels as usize * config.num_frames];
+                let mut audio = vec![0.0f32; config.block_size];
                 let t0 = Instant::now();
                 for _ in 0..ITERATIONS {
-                    audio = p.process_interleaved(audio).await?;
+                    audio = p.process(audio).await?;
                 }
                 Ok::<_, aic_sdk::AicError>(t0.elapsed())
             }
