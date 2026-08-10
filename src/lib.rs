@@ -7,6 +7,11 @@ use std::ffi::CStr;
 #[cfg(feature = "runtime-linking")]
 use std::path::Path;
 
+// `test_support` is shared verbatim with the integration tests, which reach the SDK as `aic_sdk`;
+// the alias lets the same file resolve inside this crate too.
+#[cfg(test)]
+extern crate self as aic_sdk;
+
 mod analyzer;
 mod error;
 mod file_analyzer;
@@ -15,6 +20,8 @@ mod processor;
 #[cfg(feature = "async")]
 #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 mod processor_async;
+#[cfg(test)]
+mod test_support;
 mod vad;
 #[cfg(feature = "async")]
 #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
