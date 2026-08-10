@@ -18,7 +18,7 @@ pub struct FileAnalyzer<'model, 'a> {
 
 impl<'model, 'a> FileAnalyzer<'model, 'a> {
     // TODO: This should be queried from the model, but there are no APIs
-    // for that available yet. `tyto-l-16khz` has a fixed window size of 5 seconds.
+    // for that available yet. `tyto-1.1-l-16khz` has a fixed window size of 5 seconds.
     const ANALYSIS_WINDOW_SECONDS: usize = 5;
 
     /// Creates a new file analyzer.
@@ -232,7 +232,7 @@ mod tests {
             if path
                 .file_name()
                 .and_then(|n| n.to_str())
-                .map(|name| name.contains("tyto_l_16khz") && name.ends_with(".aicmodel"))
+                .map(|name| name.contains("tyto_1_1_l_16khz") && name.ends_with(".aicmodel"))
                 .unwrap_or(false)
                 && path.is_file()
             {
@@ -242,7 +242,7 @@ mod tests {
         None
     }
 
-    fn get_tyto_l_16khz() -> Result<PathBuf, AicError> {
+    fn get_tyto_1_1_l_16khz() -> Result<PathBuf, AicError> {
         let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
 
         if let Some(existing) = find_existing_model(&target_dir) {
@@ -255,10 +255,10 @@ mod tests {
         }
 
         if cfg!(feature = "download-model") {
-            Model::download("tyto-l-16khz", target_dir)
+            Model::download("tyto-1.1-l-16khz", target_dir)
         } else {
             panic!(
-                "Model `tyto-l-16khz` not found in {} and `download-model` feature is disabled",
+                "Model `tyto-1.1-l-16khz` not found in {} and `download-model` feature is disabled",
                 target_dir.display()
             );
         }
@@ -268,7 +268,7 @@ mod tests {
         let license_key = std::env::var("AIC_SDK_LICENSE")
             .expect("AIC_SDK_LICENSE environment variable must be set for tests");
 
-        let model_path = get_tyto_l_16khz()?;
+        let model_path = get_tyto_1_1_l_16khz()?;
         let model = Model::from_file(&model_path)?;
 
         Ok((model, license_key))
@@ -279,8 +279,8 @@ mod tests {
         assert!((0.0..=1.0).contains(&result.speaker_reverb));
         assert!((0.0..=1.0).contains(&result.speaker_loudness));
         assert!((0.0..=1.0).contains(&result.interfering_speech));
-        assert!((0.0..=1.0).contains(&result.media_speech));
         assert!((0.0..=1.0).contains(&result.noise));
+        assert!((0.0..=1.0).contains(&result.codec_degradation));
         assert!((0.0..=1.0).contains(&result.packet_loss));
     }
 

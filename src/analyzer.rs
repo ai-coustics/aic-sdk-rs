@@ -27,22 +27,22 @@ pub struct AnalysisResult {
     ///
     /// **Range:** 0.0 to 1.0
     pub speaker_loudness: f32,
-    /// Measure of interference from additional speakers present in audio.
+    /// Measure of interfering speech from sources other than the main speaker.
     /// Lower indicates less problematic audio.
     ///
     /// **Range:** 0.0 to 1.0
     pub interfering_speech: f32,
-    /// Measure of interfering speech content from media devices,
-    /// e.g. from TVs, radios, phones or else.
-    /// Lower indicates less problematic audio.
-    ///
-    /// **Range:** 0.0 to 1.0
-    pub media_speech: f32,
     /// Measure of ambient or environmental noise.
     /// Lower indicates less problematic audio.
     ///
     /// **Range:** 0.0 to 1.0
     pub noise: f32,
+    /// Measure of artifacts introduced by lossy speech codecs,
+    /// e.g. from a low bitrate or a narrowband codec.
+    /// Lower indicates less problematic audio.
+    ///
+    /// **Range:** 0.0 to 1.0
+    pub codec_degradation: f32,
     /// Measure of audio dropouts or discontinuities in the stream,
     /// e.g. from packet loss, frame erasure, jitter or CPU overload.
     /// Lower indicates less problematic audio.
@@ -58,8 +58,8 @@ impl From<AicAnalysisResult> for AnalysisResult {
             speaker_reverb: value.speaker_reverb,
             speaker_loudness: value.speaker_loudness,
             interfering_speech: value.interfering_speech,
-            media_speech: value.media_speech,
             noise: value.noise,
+            codec_degradation: value.codec_degradation,
             packet_loss: value.packet_loss,
         }
     }
@@ -355,8 +355,8 @@ impl<'a> Analyzer<'a> {
             speaker_reverb: 0.0,
             speaker_loudness: 0.0,
             interfering_speech: 0.0,
-            media_speech: 0.0,
             noise: 0.0,
+            codec_degradation: 0.0,
             packet_loss: 0.0,
         };
 
@@ -517,7 +517,7 @@ mod tests {
             if path
                 .file_name()
                 .and_then(|n| n.to_str())
-                .map(|name| name.contains("tyto_l_16khz") && name.ends_with(".aicmodel"))
+                .map(|name| name.contains("tyto_1_1_l_16khz") && name.ends_with(".aicmodel"))
                 .unwrap_or(false)
                 && path.is_file()
             {
@@ -527,9 +527,9 @@ mod tests {
         None
     }
 
-    /// Downloads the default test model `tyto-l-16khz` into the crate's `target/` directory.
+    /// Downloads the default test model `tyto-1.1-l-16khz` into the crate's `target/` directory.
     /// Returns the path to the downloaded model file.
-    fn get_tyto_l_16khz() -> Result<PathBuf, AicError> {
+    fn get_tyto_1_1_l_16khz() -> Result<PathBuf, AicError> {
         let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
 
         if let Some(existing) = find_existing_model(&target_dir) {
@@ -542,10 +542,10 @@ mod tests {
         }
 
         if cfg!(feature = "download-model") {
-            Model::download("tyto-l-16khz", target_dir)
+            Model::download("tyto-1.1-l-16khz", target_dir)
         } else {
             panic!(
-                "Model `tyto-l-16khz` not found in {} and `download-model` feature is disabled",
+                "Model `tyto-1.1-l-16khz` not found in {} and `download-model` feature is disabled",
                 target_dir.display()
             );
         }
@@ -555,7 +555,7 @@ mod tests {
         let license_key = std::env::var("AIC_SDK_LICENSE")
             .expect("AIC_SDK_LICENSE environment variable must be set for tests");
 
-        let model_path = get_tyto_l_16khz()?;
+        let model_path = get_tyto_1_1_l_16khz()?;
         let model = Model::from_file(&model_path)?;
 
         Ok((model, license_key))
@@ -566,7 +566,7 @@ mod tests {
         license_key: &str,
     ) -> (Collector, Analyzer<'static>) {
         analyzer_pair(model, license_key)
-            .expect("tyto-l-16khz should create a collector/analyzer pair")
+            .expect("tyto-1.1-l-16khz should create a collector/analyzer pair")
     }
 
     fn assert_score_range(result: &AnalysisResult) {
@@ -574,8 +574,8 @@ mod tests {
         assert!((0.0..=1.0).contains(&result.speaker_reverb));
         assert!((0.0..=1.0).contains(&result.speaker_loudness));
         assert!((0.0..=1.0).contains(&result.interfering_speech));
-        assert!((0.0..=1.0).contains(&result.media_speech));
         assert!((0.0..=1.0).contains(&result.noise));
+        assert!((0.0..=1.0).contains(&result.codec_degradation));
         assert!((0.0..=1.0).contains(&result.packet_loss));
     }
 
@@ -586,8 +586,8 @@ mod tests {
             speaker_reverb: 0.2,
             speaker_loudness: 0.3,
             interfering_speech: 0.4,
-            media_speech: 0.5,
-            noise: 0.6,
+            noise: 0.5,
+            codec_degradation: 0.6,
             packet_loss: 0.7,
         };
 
@@ -598,8 +598,8 @@ mod tests {
                 speaker_reverb: 0.2,
                 speaker_loudness: 0.3,
                 interfering_speech: 0.4,
-                media_speech: 0.5,
-                noise: 0.6,
+                noise: 0.5,
+                codec_degradation: 0.6,
                 packet_loss: 0.7,
             }
         );
