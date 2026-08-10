@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-const MODEL: &str = "tyto-l-16khz";
+const MODEL: &str = "tyto-1.1-l-16khz";
 const STEP_SECONDS: usize = 5;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let results = analyzer.analyze(&audio.samples, audio.sample_rate, Some(step_samples))?;
 
     println!();
-    println!(" time | risk  | reverb | loud  | intf  | media | noise | loss");
+    println!(" time | risk  | reverb | loud  | intf  | noise | codec | loss");
     println!("------+-------+--------+-------+-------+-------+-------+------");
     for (index, result) in results.iter().enumerate() {
         println!(
@@ -48,8 +48,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             result.speaker_reverb,
             result.speaker_loudness,
             result.interfering_speech,
-            result.media_speech,
             result.noise,
+            result.codec_degradation,
             result.packet_loss,
         );
     }

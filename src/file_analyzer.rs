@@ -18,7 +18,7 @@ pub struct FileAnalyzer<'model, 'a> {
 
 impl<'model, 'a> FileAnalyzer<'model, 'a> {
     // TODO: This should be queried from the model, but there are no APIs
-    // for that available yet. `tyto-l-16khz` has a fixed window size of 5 seconds.
+    // for that available yet. `tyto-1.1-l-16khz` has a fixed window size of 5 seconds.
     const ANALYSIS_WINDOW_SECONDS: usize = 5;
 
     /// Creates a new file analyzer.
@@ -214,64 +214,15 @@ impl<'model, 'a> FileAnalyzer<'model, 'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        fs,
-        path::{Path, PathBuf},
-        sync::{Mutex, OnceLock},
-    };
+    use crate::test_support::{license_key, test_model_path};
 
-    fn download_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
-
-    fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
-        let entries = fs::read_dir(target_dir).ok()?;
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .map(|name| name.contains("tyto_l_16khz") && name.ends_with(".aicmodel"))
-                .unwrap_or(false)
-                && path.is_file()
-            {
-                return Some(path);
-            }
-        }
-        None
-    }
-
-    fn get_tyto_l_16khz() -> Result<PathBuf, AicError> {
-        let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
-
-        if let Some(existing) = find_existing_model(&target_dir) {
-            return Ok(existing);
-        }
-
-        let _guard = download_lock().lock().unwrap();
-        if let Some(existing) = find_existing_model(&target_dir) {
-            return Ok(existing);
-        }
-
-        if cfg!(feature = "download-model") {
-            Model::download("tyto-l-16khz", target_dir)
-        } else {
-            panic!(
-                "Model `tyto-l-16khz` not found in {} and `download-model` feature is disabled",
-                target_dir.display()
-            );
-        }
-    }
+    /// The only analysis model this SDK version can load.
+    const TEST_MODEL_ID: &str = "tyto-1.1-l-16khz";
 
     fn load_test_model() -> Result<(Model<'static>, String), AicError> {
-        let license_key = std::env::var("AIC_SDK_LICENSE")
-            .expect("AIC_SDK_LICENSE environment variable must be set for tests");
+        let model = Model::from_file(test_model_path(TEST_MODEL_ID))?;
 
-        let model_path = get_tyto_l_16khz()?;
-        let model = Model::from_file(&model_path)?;
-
-        Ok((model, license_key))
+        Ok((model, license_key()))
     }
 
     fn assert_score_range(result: &AnalysisResult) {
@@ -279,8 +230,8 @@ mod tests {
         assert!((0.0..=1.0).contains(&result.speaker_reverb));
         assert!((0.0..=1.0).contains(&result.speaker_loudness));
         assert!((0.0..=1.0).contains(&result.interfering_speech));
-        assert!((0.0..=1.0).contains(&result.media_speech));
         assert!((0.0..=1.0).contains(&result.noise));
+        assert!((0.0..=1.0).contains(&result.codec_degradation));
         assert!((0.0..=1.0).contains(&result.packet_loss));
     }
 

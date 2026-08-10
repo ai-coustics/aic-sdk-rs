@@ -831,65 +831,15 @@ unsafe impl Sync for VadContext {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        fs,
-        path::{Path, PathBuf},
-        sync::{Mutex, OnceLock},
-    };
+    use crate::test_support::{license_key, test_model_path};
 
-    fn download_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
-
-    fn find_existing_model(target_dir: &Path, name_fragment: &str) -> Option<PathBuf> {
-        let entries = fs::read_dir(target_dir).ok()?;
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .map(|name| name.contains(name_fragment) && name.ends_with(".aicmodel"))
-                .unwrap_or(false)
-                && path.is_file()
-            {
-                return Some(path);
-            }
-        }
-        None
-    }
-
-    /// Downloads `model_id` into the crate's `target/` directory and returns its path.
-    fn get_model(model_id: &str, name_fragment: &str) -> Result<PathBuf, AicError> {
-        let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
-
-        if let Some(existing) = find_existing_model(&target_dir, name_fragment) {
-            return Ok(existing);
-        }
-
-        let _guard = download_lock().lock().unwrap();
-        if let Some(existing) = find_existing_model(&target_dir, name_fragment) {
-            return Ok(existing);
-        }
-
-        if cfg!(feature = "download-model") {
-            Model::download(model_id, target_dir)
-        } else {
-            panic!(
-                "Model `{model_id}` not found in {} and `download-model` feature is disabled",
-                target_dir.display()
-            );
-        }
-    }
-
-    fn license_key() -> String {
-        std::env::var("AIC_SDK_LICENSE")
-            .expect("AIC_SDK_LICENSE environment variable must be set for tests")
-    }
+    /// Voice activity detection needs a dedicated VAD model; enhancement models are rejected.
+    const VAD_MODEL_ID: &str = "vad-2.1-xxs-16khz";
+    /// An enhancement model, used to check that `Vad` refuses one.
+    const ENHANCEMENT_MODEL_ID: &str = "rook-s-48khz";
 
     fn load_vad_model() -> Model<'static> {
-        let model_path = get_model("vad-2.1-xxs-16khz", "vad_2_1_xxs_16khz").unwrap();
-        Model::from_file(&model_path).unwrap()
+        Model::from_file(test_model_path(VAD_MODEL_ID)).unwrap()
     }
 
     #[test]
@@ -926,8 +876,7 @@ mod tests {
 
     #[test]
     fn vad_rejects_enhancement_model() {
-        let model_path = get_model("rook-s-48khz", "rook_s_48khz").unwrap();
-        let model = Model::from_file(&model_path).unwrap();
+        let model = Model::from_file(test_model_path(ENHANCEMENT_MODEL_ID)).unwrap();
 
         assert_eq!(
             Vad::new(&model, &license_key()).err(),

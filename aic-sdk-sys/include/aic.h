@@ -249,20 +249,12 @@ typedef struct AicAnalysisResult {
    */
   float speaker_loudness;
   /**
-   * Measure of interference from additional speakers present in audio.
+   * Measure of interfering speech from sources other than the main speaker.
    * Lower indicates less problematic audio.
    *
    * **Range:** 0.0 to 1.0
    */
   float interfering_speech;
-  /**
-   * Measure of interfering speech content from media devices,
-   * e.g. from TVs, radios, phones or else.
-   * Lower indicates less problematic audio.
-   *
-   * **Range:** 0.0 to 1.0
-   */
-  float media_speech;
   /**
    * Measure of ambient or environmental noise.
    * Lower indicates less problematic audio.
@@ -270,6 +262,14 @@ typedef struct AicAnalysisResult {
    * **Range:** 0.0 to 1.0
    */
   float noise;
+  /**
+   * Measure of artifacts introduced by lossy speech codecs,
+   * e.g. from a low bitrate or a narrowband codec.
+   * Lower indicates less problematic audio.
+   *
+   * **Range:** 0.0 to 1.0
+   */
+  float codec_degradation;
   /**
    * Measure of audio dropouts or discontinuities in the stream,
    * e.g. from packet loss, frame erasure, jitter or CPU overload.

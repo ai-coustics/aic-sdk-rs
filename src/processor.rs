@@ -832,66 +832,14 @@ unsafe impl<'a> Sync for Processor<'a> {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        fs,
-        path::{Path, PathBuf},
-        sync::{Mutex, OnceLock},
-    };
+    use crate::test_support::{license_key, test_model_path};
 
-    fn download_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
-
-    fn find_existing_model(target_dir: &Path) -> Option<PathBuf> {
-        let entries = fs::read_dir(target_dir).ok()?;
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .map(|name| name.contains("rook_s_48khz") && name.ends_with(".aicmodel"))
-                .unwrap_or(false)
-                && path.is_file()
-            {
-                return Some(path);
-            }
-        }
-        None
-    }
-
-    /// Downloads the default test model `rook-s-48khz` into the crate's `target/` directory.
-    /// Returns the path to the downloaded model file.
-    fn get_rook_s_48khz() -> Result<PathBuf, AicError> {
-        let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
-
-        if let Some(existing) = find_existing_model(&target_dir) {
-            return Ok(existing);
-        }
-
-        let _guard = download_lock().lock().unwrap();
-        if let Some(existing) = find_existing_model(&target_dir) {
-            return Ok(existing);
-        }
-
-        if cfg!(feature = "download-model") {
-            Model::download("rook-s-48khz", target_dir)
-        } else {
-            panic!(
-                "Model `rook-s-48khz` not found in {} and `download-model` feature is disabled",
-                target_dir.display()
-            );
-        }
-    }
+    const TEST_MODEL_ID: &str = "rook-s-48khz";
 
     fn load_test_model() -> Result<(Model<'static>, String), AicError> {
-        let license_key = std::env::var("AIC_SDK_LICENSE")
-            .expect("AIC_SDK_LICENSE environment variable must be set for tests");
+        let model = Model::from_file(test_model_path(TEST_MODEL_ID))?;
 
-        let model_path = get_rook_s_48khz()?;
-        let model = Model::from_file(&model_path)?;
-
-        Ok((model, license_key))
+        Ok((model, license_key()))
     }
 
     #[test]

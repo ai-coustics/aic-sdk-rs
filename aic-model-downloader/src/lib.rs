@@ -3,6 +3,7 @@ use std::{
     fs::{self, File},
     io::Read,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
 };
 use thiserror::Error;
 
@@ -56,7 +57,7 @@ pub fn download<P: AsRef<Path>>(
     let url = format!("{MODEL_BASE_URL}{}", model.url_path);
     let bytes = download_bytes(&url)?;
 
-    let temp_path = destination.with_extension("download");
+    let temp_path = temp_path_for(&destination);
     fs::write(&temp_path, &bytes).map_err(|err| Error::Io(err.to_string()))?;
 
     if !checksum_matches(&temp_path, &model.checksum)? {
@@ -64,9 +65,46 @@ pub fn download<P: AsRef<Path>>(
         return Err(Error::ChecksumMismatch);
     }
 
-    fs::rename(&temp_path, &destination).map_err(|err| Error::Io(err.to_string()))?;
+    // Another downloader may have finished the same model while we were fetching it. Its file is
+    // byte-identical, so adopt it rather than replacing it: on Windows the rename below would fail
+    // outright if that file is already open, and there is nothing to gain from the write.
+    if destination.exists() && checksum_matches(&destination, &model.checksum)? {
+        let _ = fs::remove_file(&temp_path);
+        return Ok(destination);
+    }
+
+    if let Err(err) = fs::rename(&temp_path, &destination) {
+        // Lost the same race a moment later, between the check above and the rename.
+        if destination.exists() && checksum_matches(&destination, &model.checksum)? {
+            let _ = fs::remove_file(&temp_path);
+            return Ok(destination);
+        }
+        let _ = fs::remove_file(&temp_path);
+        return Err(Error::Io(err.to_string()));
+    }
 
     Ok(destination)
+}
+
+/// Staging path for a download, unique per call.
+///
+/// Concurrent downloads of the same model must not share a staging file: they would interleave
+/// their writes, and whoever renamed second would find the file already gone. The pid keeps
+/// separate processes apart, the counter separate threads, and the suffix is appended rather than
+/// substituted so the model's own extension stays visible in the temporary name.
+fn temp_path_for(destination: &Path) -> PathBuf {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    let file_name = destination
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
+
+    destination.with_file_name(format!(
+        "{file_name}.{}.{unique}.download",
+        std::process::id()
+    ))
 }
 
 fn download_bytes(url: &str) -> Result<Vec<u8>, Error> {
@@ -102,4 +140,38 @@ fn checksum_matches(path: &Path, expected: &str) -> Result<bool, Error> {
         .map(|byte| format!("{byte:02x}"))
         .collect::<String>();
     Ok(checksum.eq_ignore_ascii_case(expected))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn temp_paths_are_unique_per_call() {
+        let destination = Path::new("/models/quail_vf_2_2_s_16khz_abcd1234_v12.aicmodel");
+
+        let first = temp_path_for(destination);
+        let second = temp_path_for(destination);
+
+        assert_ne!(first, second);
+        assert_eq!(first.parent(), destination.parent());
+        assert_eq!(second.parent(), destination.parent());
+    }
+
+    #[test]
+    fn temp_path_keeps_the_model_file_name() {
+        let destination = Path::new("/models/quail_vf_2_2_s_16khz_abcd1234_v12.aicmodel");
+
+        let temp = temp_path_for(destination);
+        let name = temp.file_name().unwrap().to_str().unwrap();
+
+        assert!(
+            name.starts_with("quail_vf_2_2_s_16khz_abcd1234_v12.aicmodel."),
+            "unexpected staging name: {name}"
+        );
+        assert!(
+            name.ends_with(".download"),
+            "unexpected staging name: {name}"
+        );
+    }
 }

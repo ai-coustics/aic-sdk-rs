@@ -1,7 +1,11 @@
-use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::path::Path;
 
 use aic_sdk::{Model, Processor, ProcessorConfig, ProcessorParameter, Vad};
+
+// Shared with the unit tests in `src/`, so both resolve models through the same lock.
+#[path = "../src/test_support.rs"]
+mod test_support;
+use test_support::{license_key, test_model_path};
 
 pub const TEST_AUDIO_PATH: &str = "tests/data/test_signal.wav";
 pub const TEST_AUDIO_ENHANCED_PATH: &str = "tests/data/test_signal_enhanced.wav";
@@ -12,53 +16,6 @@ const ENHANCEMENT_MODEL_ID: &str = "quail-vf-2.2-s-16khz";
 /// Dedicated VAD model used for the voice activity detection tests. Enhancement models cannot
 /// be used for voice activity detection since the SDK dropped energy-based VADs.
 const VAD_MODEL_ID: &str = "vad-2.1-xxs-16khz";
-
-fn download_lock() -> &'static Mutex<()> {
-    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    LOCK.get_or_init(|| Mutex::new(()))
-}
-
-/// Model files are named after their id, with `-` and `.` replaced by `_`.
-fn model_file_prefix(model_id: &str) -> String {
-    model_id.replace(['-', '.'], "_")
-}
-
-fn find_existing_model(target_dir: &Path, model_id: &str) -> Option<PathBuf> {
-    let prefix = model_file_prefix(model_id);
-    let entries = std::fs::read_dir(target_dir).ok()?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().is_some_and(|ext| ext == "aicmodel")
-            && path
-                .file_name()
-                .is_some_and(|name| name.to_string_lossy().starts_with(&prefix))
-        {
-            return Some(path);
-        }
-    }
-    None
-}
-
-/// Downloads `model_id` into the crate's `target/` directory.
-/// Returns the path to the downloaded model file.
-fn get_test_model_path(model_id: &str) -> PathBuf {
-    let target_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
-
-    if let Some(existing) = find_existing_model(&target_dir, model_id) {
-        return existing;
-    }
-
-    let _guard = download_lock().lock().unwrap();
-    if let Some(existing) = find_existing_model(&target_dir, model_id) {
-        return existing;
-    }
-
-    Model::download(model_id, &target_dir).expect("Failed to download test model")
-}
-
-fn license_key() -> String {
-    std::env::var("AIC_SDK_LICENSE").expect("AIC_SDK_LICENSE environment variable not set")
-}
 
 fn load_audio(path: impl AsRef<Path>) -> audio_file::Audio<f32> {
     audio_file::read(path, audio_file::ReadConfig::default()).expect("Failed to read audio file")
@@ -72,7 +29,7 @@ fn load_audio(path: impl AsRef<Path>) -> audio_file::Audio<f32> {
 fn process_full_file() {
     let audio = load_audio(TEST_AUDIO_PATH);
     let model =
-        Model::from_file(get_test_model_path(ENHANCEMENT_MODEL_ID)).expect("Failed to load model");
+        Model::from_file(test_model_path(ENHANCEMENT_MODEL_ID)).expect("Failed to load model");
 
     let config = ProcessorConfig {
         sample_rate: audio.sample_rate,
@@ -105,7 +62,7 @@ fn process_full_file() {
 /// detection result per block.
 fn speech_detection_per_block() -> Vec<bool> {
     let audio = load_audio(TEST_AUDIO_PATH);
-    let model = Model::from_file(get_test_model_path(VAD_MODEL_ID)).expect("Failed to load model");
+    let model = Model::from_file(test_model_path(VAD_MODEL_ID)).expect("Failed to load model");
 
     let config = ProcessorConfig {
         sample_rate: audio.sample_rate,
@@ -154,7 +111,7 @@ fn process_blocks_with_vad() {
 #[test]
 fn vad_reset_clears_published_prediction() {
     let audio = load_audio(TEST_AUDIO_PATH);
-    let model = Model::from_file(get_test_model_path(VAD_MODEL_ID)).expect("Failed to load model");
+    let model = Model::from_file(test_model_path(VAD_MODEL_ID)).expect("Failed to load model");
 
     let config = ProcessorConfig {
         sample_rate: audio.sample_rate,
