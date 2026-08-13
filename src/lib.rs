@@ -26,6 +26,8 @@ mod vad;
 #[cfg(feature = "async")]
 #[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 mod vad_async;
+#[cfg(feature = "async")]
+mod worker_pool;
 
 pub use analyzer::*;
 pub use error::*;

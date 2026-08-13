@@ -1,7 +1,4 @@
-use crate::{
-    AicError, Model, OtelConfig, ProcessorConfig, Vad, VadContext,
-    processor_async::get_global_thread_pool,
-};
+use crate::{AicError, Model, OtelConfig, ProcessorConfig, Vad, VadContext, worker_pool};
 use async_lock::Mutex;
 use futures_channel::oneshot;
 use std::sync::Arc;
@@ -11,9 +8,10 @@ use std::sync::Arc;
 /// # Threading
 ///
 /// Processing runs on the same background thread pool as
-/// [`ProcessorAsync`](crate::ProcessorAsync), shared across all instances. The pool defaults to
-/// one thread per logical CPU. Override with the `AIC_NUM_THREADS` environment variable, which is
-/// read once on first use.
+/// [`ProcessorAsync`](crate::ProcessorAsync), shared across all instances. Any worker runs any
+/// block, and idle workers park rather than search for work. The pool defaults to one thread per
+/// logical CPU. Override with the `AIC_NUM_THREADS` environment variable, which is read once on
+/// first use.
 ///
 /// # Example
 ///
@@ -86,10 +84,10 @@ impl VadAsync {
         let config = config.clone();
         let (tx, rx) = oneshot::channel();
         let mut vad = self.inner.lock_arc().await;
-        get_global_thread_pool().spawn(move || {
+        worker_pool::global().spawn(move || {
             let _ = tx.send(vad.initialize(&config));
         });
-        rx.await.expect("Rayon worker dropped")
+        rx.await.expect("aic worker dropped")
     }
 
     /// Processes mono audio and updates the VAD prediction.
@@ -103,11 +101,11 @@ impl VadAsync {
     pub async fn process(&self, audio: Vec<f32>) -> Result<Vec<f32>, AicError> {
         let (tx, rx) = oneshot::channel();
         let mut vad = self.inner.lock_arc().await;
-        get_global_thread_pool().spawn(move || {
+        worker_pool::global().spawn(move || {
             let result = vad.process(&audio).map(|_| audio);
             let _ = tx.send(result);
         });
-        rx.await.expect("Rayon worker dropped")
+        rx.await.expect("aic worker dropped")
     }
 
     /// Terminates the telemetry session associated with this VAD.
@@ -120,10 +118,10 @@ impl VadAsync {
     pub async fn terminate_session(&self) -> Result<(), AicError> {
         let (tx, rx) = oneshot::channel();
         let mut vad = self.inner.lock_arc().await;
-        get_global_thread_pool().spawn(move || {
+        worker_pool::global().spawn(move || {
             let _ = tx.send(vad.terminate_session());
         });
-        rx.await.expect("Rayon worker dropped")
+        rx.await.expect("aic worker dropped")
     }
 
     /// Returns a [`VadContext`] to read the prediction and control parameters.

@@ -1,36 +1,17 @@
-use crate::{AicError, Model, OtelConfig, Processor, ProcessorConfig, ProcessorContext};
+use crate::{
+    AicError, Model, OtelConfig, Processor, ProcessorConfig, ProcessorContext, worker_pool,
+};
 use async_lock::Mutex;
 use futures_channel::oneshot;
-use std::sync::{Arc, OnceLock};
-
-static RAYON_POOL: OnceLock<rayon::ThreadPool> = OnceLock::new();
-
-pub(crate) fn get_global_thread_pool() -> &'static rayon::ThreadPool {
-    RAYON_POOL.get_or_init(|| {
-        let num_threads = std::env::var("AIC_NUM_THREADS")
-            .ok()
-            .and_then(|s| s.parse::<usize>().ok())
-            .filter(|&n| n > 0)
-            .unwrap_or_else(|| {
-                std::thread::available_parallelism()
-                    .map(|n| n.get())
-                    .unwrap_or(1)
-            });
-
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_threads)
-            .thread_name(|i| format!("aic-processing-thread-{i}"))
-            .build()
-            .expect("failed to build aic thread pool")
-    })
-}
+use std::sync::Arc;
 
 /// A wrapper around [`Processor`] for use in async contexts.
 ///
 /// # Threading
 ///
 /// Processing runs on a background thread pool shared across all
-/// [`ProcessorAsync`] instances. The pool defaults to one thread per logical
+/// [`ProcessorAsync`] instances. Any worker runs any block, and idle workers
+/// park rather than search for work. The pool defaults to one thread per logical
 /// CPU. Override with the `AIC_NUM_THREADS` environment variable, which is
 /// read once on first use.
 ///
@@ -100,10 +81,10 @@ impl ProcessorAsync {
         let config = config.clone();
         let (tx, rx) = oneshot::channel();
         let mut processor = self.inner.lock_arc().await;
-        get_global_thread_pool().spawn(move || {
+        worker_pool::global().spawn(move || {
             let _ = tx.send(processor.initialize(&config));
         });
-        rx.await.expect("Rayon worker dropped")
+        rx.await.expect("aic worker dropped")
     }
 
     /// Processes mono audio.
@@ -115,11 +96,11 @@ impl ProcessorAsync {
     pub async fn process(&self, mut audio: Vec<f32>) -> Result<Vec<f32>, AicError> {
         let (tx, rx) = oneshot::channel();
         let mut processor = self.inner.lock_arc().await;
-        get_global_thread_pool().spawn(move || {
+        worker_pool::global().spawn(move || {
             let result = processor.process(&mut audio).map(|_| audio);
             let _ = tx.send(result);
         });
-        rx.await.expect("Rayon worker dropped")
+        rx.await.expect("aic worker dropped")
     }
 
     /// Terminates the telemetry session associated with this processor.
@@ -132,10 +113,10 @@ impl ProcessorAsync {
     pub async fn terminate_session(&self) -> Result<(), AicError> {
         let (tx, rx) = oneshot::channel();
         let mut processor = self.inner.lock_arc().await;
-        get_global_thread_pool().spawn(move || {
+        worker_pool::global().spawn(move || {
             let _ = tx.send(processor.terminate_session());
         });
-        rx.await.expect("Rayon worker dropped")
+        rx.await.expect("aic worker dropped")
     }
 
     /// Returns a [`ProcessorContext`] for real-time parameter control.
