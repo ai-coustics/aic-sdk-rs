@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.91.0
+      - uses: dtolnay/rust-toolchain@839ed2261f110eedd370cb037b6038e074512c4e # 1.91.0
 
       # The path-deps in [workspace.dependencies] each carry an explicit version requirement
       # (publishing requires it), which must be bumped in lockstep with [workspace.package].version.

@@ -97,7 +97,7 @@ jobs:
       # Pin cargo-about so its output format matches what the file was generated
       # with; a version bump that changes formatting would otherwise look like
       # spurious drift.
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@b20dedce73af6905cdc30d6611090c9b67557c8d # v2.85.12
         with:
           tool: cargo-about@0.9.0
 
