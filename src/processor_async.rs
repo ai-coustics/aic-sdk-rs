@@ -81,7 +81,7 @@ impl ProcessorAsync {
         let config = config.clone();
         let (tx, rx) = oneshot::channel();
         let mut processor = self.inner.lock_arc().await;
-        worker_pool::global().spawn(move || {
+        worker_pool::spawn(move || {
             let _ = tx.send(processor.initialize(&config));
         });
         rx.await.expect("aic worker dropped")
@@ -96,7 +96,7 @@ impl ProcessorAsync {
     pub async fn process(&self, mut audio: Vec<f32>) -> Result<Vec<f32>, AicError> {
         let (tx, rx) = oneshot::channel();
         let mut processor = self.inner.lock_arc().await;
-        worker_pool::global().spawn(move || {
+        worker_pool::spawn(move || {
             let result = processor.process(&mut audio).map(|_| audio);
             let _ = tx.send(result);
         });
@@ -113,7 +113,7 @@ impl ProcessorAsync {
     pub async fn terminate_session(&self) -> Result<(), AicError> {
         let (tx, rx) = oneshot::channel();
         let mut processor = self.inner.lock_arc().await;
-        worker_pool::global().spawn(move || {
+        worker_pool::spawn(move || {
             let _ = tx.send(processor.terminate_session());
         });
         rx.await.expect("aic worker dropped")
