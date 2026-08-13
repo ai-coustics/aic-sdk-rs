@@ -86,9 +86,3 @@ required-features = ["download-model"]
 name = "parallel_async"
 path = "examples/parallel_async.rs"
 required-features = ["async", "download-model"]
-
-[[bench]]
-harness = false
-name = "async_dispatch"
-path = "benches/async_dispatch.rs"
-required-features = ["async", "download-model"]
