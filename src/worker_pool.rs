@@ -15,18 +15,23 @@ type Job = Box<dyn FnOnce() + Send + 'static>;
 pub(crate) fn global() -> &'static WorkerPool {
     static POOL: OnceLock<WorkerPool> = OnceLock::new();
     POOL.get_or_init(|| {
-        let num_threads = std::env::var("AIC_NUM_THREADS")
-            .ok()
-            .and_then(|s| s.parse::<usize>().ok())
-            .filter(|&n| n > 0)
-            .unwrap_or_else(|| {
-                thread::available_parallelism()
-                    .map(|n| n.get())
-                    .unwrap_or(1)
-            });
+        let setting = std::env::var("AIC_NUM_THREADS").ok();
 
-        WorkerPool::start(num_threads)
+        WorkerPool::start(configured_threads(setting.as_deref()))
     })
+}
+
+/// Resolves the worker count from an `AIC_NUM_THREADS` setting, falling back to one thread per
+/// logical CPU. Never returns zero: a pool with no workers would queue every block forever.
+fn configured_threads(setting: Option<&str>) -> usize {
+    setting
+        .and_then(|s| s.parse::<usize>().ok())
+        .filter(|&n| n > 0)
+        .unwrap_or_else(|| {
+            thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1)
+        })
 }
 
 /// A fixed set of worker threads draining one shared queue.
@@ -159,5 +164,228 @@ impl Shared {
 
     fn lock(&self) -> MutexGuard<'_, State> {
         self.state.lock().expect("aic worker pool poisoned")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    /// Generous enough that a loaded CI runner never trips it, short enough that a stuck pool fails
+    /// the run instead of hanging it.
+    const TIMEOUT: Duration = Duration::from_secs(10);
+
+    /// The rendezvous test waits on a latch that the jobs themselves wait on, so the outer wait must
+    /// outlast the inner one to report which of the two actually failed.
+    const OUTER_TIMEOUT: Duration = Duration::from_secs(30);
+
+    /// Counts completions. The pool hands back no handle and has no drain, so a test has no other
+    /// way to join the jobs it submitted.
+    #[derive(Default)]
+    struct Latch {
+        count: Mutex<usize>,
+        changed: Condvar,
+    }
+
+    impl Latch {
+        fn bump(&self) {
+            *self.count.lock().unwrap() += 1;
+            self.changed.notify_all();
+        }
+
+        /// Returns whether `target` was reached. A timeout is reported rather than waited out, so a
+        /// broken pool fails the test instead of blocking the suite forever.
+        fn wait_for(&self, target: usize, timeout: Duration) -> bool {
+            let (count, _) = self
+                .changed
+                .wait_timeout_while(self.count.lock().unwrap(), timeout, |count| *count < target)
+                .unwrap();
+
+            *count >= target
+        }
+    }
+
+    /// Blocks until every worker has parked. A worker still burning its spin budget picks a job off
+    /// the queue on its own, so a test that wants to exercise the wakeup path has to wait for the
+    /// budget to run out first.
+    fn await_parked(pool: &WorkerPool, workers: usize, timeout: Duration) -> bool {
+        let deadline = Instant::now() + timeout;
+        while Instant::now() < deadline {
+            if pool.shared.lock().parked == workers {
+                return true;
+            }
+            thread::sleep(Duration::from_millis(1));
+        }
+
+        false
+    }
+
+    #[test]
+    fn every_job_runs_exactly_once() {
+        const PRODUCERS: usize = 4;
+        const PER_PRODUCER: usize = 50;
+        const TOTAL: usize = PRODUCERS * PER_PRODUCER;
+
+        let pool = WorkerPool::start(4);
+        let done = Arc::new(Latch::default());
+        let runs: Arc<Vec<AtomicUsize>> =
+            Arc::new((0..TOTAL).map(|_| AtomicUsize::new(0)).collect());
+
+        thread::scope(|scope| {
+            for producer in 0..PRODUCERS {
+                let pool = &pool;
+                let done = Arc::clone(&done);
+                let runs = Arc::clone(&runs);
+                scope.spawn(move || {
+                    for slot in 0..PER_PRODUCER {
+                        let index = producer * PER_PRODUCER + slot;
+                        let done = Arc::clone(&done);
+                        let runs = Arc::clone(&runs);
+                        pool.spawn(move || {
+                            runs[index].fetch_add(1, Ordering::Relaxed);
+                            done.bump();
+                        });
+                    }
+                });
+            }
+        });
+
+        assert!(
+            done.wait_for(TOTAL, TIMEOUT),
+            "only {} of {TOTAL} jobs ran",
+            *done.count.lock().unwrap()
+        );
+        for (index, runs) in runs.iter().enumerate() {
+            assert_eq!(
+                runs.load(Ordering::Relaxed),
+                1,
+                "job {index} ran the wrong number of times"
+            );
+        }
+
+        // Every job ran, so every job was popped. A non-zero hint left behind here would keep the
+        // workers spinning on a queue that is empty.
+        assert_eq!(pool.shared.queued.load(Ordering::Acquire), 0);
+    }
+
+    #[test]
+    fn worker_survives_a_panicking_job() {
+        let pool = WorkerPool::start(1);
+        let done = Arc::new(Latch::default());
+
+        pool.spawn(|| panic!("intentional panic: the worker is expected to survive this"));
+
+        let after_panic = Arc::clone(&done);
+        pool.spawn(move || after_panic.bump());
+        assert!(
+            done.wait_for(1, TIMEOUT),
+            "the sole worker did not survive a panicking job"
+        );
+
+        let later = Arc::clone(&done);
+        pool.spawn(move || later.bump());
+        assert!(
+            done.wait_for(2, TIMEOUT),
+            "the panic poisoned the queue mutex"
+        );
+    }
+
+    #[test]
+    fn single_worker_runs_jobs_in_submission_order() {
+        const JOBS: usize = 50;
+
+        let pool = WorkerPool::start(1);
+        let done = Arc::new(Latch::default());
+        let order = Arc::new(Mutex::new(Vec::new()));
+
+        for index in 0..JOBS {
+            let done = Arc::clone(&done);
+            let order = Arc::clone(&order);
+            pool.spawn(move || {
+                order.lock().unwrap().push(index);
+                done.bump();
+            });
+        }
+
+        assert!(done.wait_for(JOBS, TIMEOUT), "not every job ran");
+        assert_eq!(*order.lock().unwrap(), (0..JOBS).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn jobs_run_on_pool_threads() {
+        let pool = WorkerPool::start(2);
+        let done = Arc::new(Latch::default());
+        let name = Arc::new(Mutex::new(String::new()));
+
+        let job_done = Arc::clone(&done);
+        let job_name = Arc::clone(&name);
+        pool.spawn(move || {
+            *job_name.lock().unwrap() = thread::current().name().unwrap_or_default().to_owned();
+            job_done.bump();
+        });
+
+        assert!(done.wait_for(1, TIMEOUT), "the job never ran");
+        let name = name.lock().unwrap();
+        assert!(
+            name.starts_with("aic-processing-thread-"),
+            "the job ran on `{name}`"
+        );
+    }
+
+    #[test]
+    fn all_workers_run_concurrently() {
+        const WORKERS: usize = 4;
+
+        let pool = WorkerPool::start(WORKERS);
+        let started = Arc::new(Latch::default());
+        let finished = Arc::new(Latch::default());
+        let together = Arc::new(AtomicUsize::new(0));
+
+        // Every job below blocks until all of them are running, so none of them can free up a
+        // worker for the next. Each of the four therefore has to be delivered by its own
+        // `notify_one`, which is what makes this a test of the `parked > 0` shortcut in `spawn`.
+        assert!(
+            await_parked(&pool, WORKERS, TIMEOUT),
+            "the workers never parked"
+        );
+
+        for _ in 0..WORKERS {
+            let started = Arc::clone(&started);
+            let finished = Arc::clone(&finished);
+            let together = Arc::clone(&together);
+            pool.spawn(move || {
+                started.bump();
+                if started.wait_for(WORKERS, TIMEOUT) {
+                    together.fetch_add(1, Ordering::Relaxed);
+                }
+                finished.bump();
+            });
+        }
+
+        assert!(
+            finished.wait_for(WORKERS, OUTER_TIMEOUT),
+            "not every job ran"
+        );
+        assert_eq!(
+            together.load(Ordering::Relaxed),
+            WORKERS,
+            "the pool never had all {WORKERS} jobs running at once"
+        );
+    }
+
+    #[test]
+    fn thread_count_honours_env_override() {
+        assert_eq!(configured_threads(Some("4")), 4);
+    }
+
+    #[test]
+    fn thread_count_never_falls_below_one() {
+        for setting in [None, Some("0"), Some(""), Some("abc"), Some("-1")] {
+            assert!(
+                configured_threads(setting) >= 1,
+                "`{setting:?}` resolved to a pool with no workers"
+            );
+        }
     }
 }
