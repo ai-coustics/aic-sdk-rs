@@ -84,7 +84,7 @@ impl VadAsync {
         let config = config.clone();
         let (tx, rx) = oneshot::channel();
         let mut vad = self.inner.lock_arc().await;
-        worker_pool::spawn(move || {
+        worker_pool::global().spawn(move || {
             let _ = tx.send(vad.initialize(&config));
         });
         rx.await.expect("aic worker dropped")
@@ -101,7 +101,7 @@ impl VadAsync {
     pub async fn process(&self, audio: Vec<f32>) -> Result<Vec<f32>, AicError> {
         let (tx, rx) = oneshot::channel();
         let mut vad = self.inner.lock_arc().await;
-        worker_pool::spawn(move || {
+        worker_pool::global().spawn(move || {
             let result = vad.process(&audio).map(|_| audio);
             let _ = tx.send(result);
         });
@@ -118,7 +118,7 @@ impl VadAsync {
     pub async fn terminate_session(&self) -> Result<(), AicError> {
         let (tx, rx) = oneshot::channel();
         let mut vad = self.inner.lock_arc().await;
-        worker_pool::spawn(move || {
+        worker_pool::global().spawn(move || {
             let _ = tx.send(vad.terminate_session());
         });
         rx.await.expect("aic worker dropped")

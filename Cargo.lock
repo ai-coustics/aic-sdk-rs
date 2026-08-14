@@ -50,7 +50,6 @@ dependencies = [
  "audio-file",
  "futures",
  "futures-channel",
- "futures-executor",
  "rayon",
  "serde_json",
  "thiserror",
