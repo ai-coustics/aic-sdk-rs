@@ -1,0 +1,20 @@
+name: Publish release notes
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish the release notes
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: gh release create "$TAG" --title "$TAG" --notes-file release-notes.md
