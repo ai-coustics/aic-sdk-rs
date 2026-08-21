@@ -481,7 +481,7 @@ Call `Analyzer::analyze_buffered` in a separate thread to obtain an analysis of 
 
 This release integrates ai-coustics C library version 0.13.0, which comes with a number of new features and several breaking changes.
 
-Most notably, the C library no longer includes any models, which significantly reduces the library's binary size. The models are now available separately for download at https://artifacts.ai-coustics.io.
+Most notably, the C library no longer includes any models, which significantly reduces the library's binary size. The models are now available separately for download at <https://artifacts.ai-coustics.io>.
 
 **New license keys required**: License keys previously generated in the [developer portal](https://developers.ai-coustics.io) will no longer work. New license keys must be generated.
 
