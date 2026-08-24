@@ -1,5 +1,7 @@
-Third-party software notices for the ai-coustics Rust SDK
-=========================================================
+Third-party software notices
+============================
+
+For the aic-sdk crate of the ai-coustics Rust SDK.
 
 This distribution includes third-party software in two layers:
 

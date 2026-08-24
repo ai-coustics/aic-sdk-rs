@@ -1,3 +1,5 @@
+# Copied here from bindings/rust/mirror in ai-coustics/aic-sdk on every release.
+# Edit it there; an edit made here is overwritten by the next one.
 name: Publish release notes
 
 on:

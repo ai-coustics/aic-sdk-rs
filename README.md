@@ -62,6 +62,14 @@ The core C SDK is distributed under the proprietary AIC-SDK license.
 
 `NOTICE.txt` lists the third-party software distributed with the SDK.
 
+## Crates
+
+| Crate | crates.io | Documentation |
+| --- | --- | --- |
+| `aic-sdk` | <https://crates.io/crates/aic-sdk/0.23.0> | <https://docs.rs/aic-sdk/0.23.0> |
+| `aic-sdk-sys` | <https://crates.io/crates/aic-sdk-sys/0.23.0> | <https://docs.rs/aic-sdk-sys/0.23.0> |
+| `aic-model-downloader` | <https://crates.io/crates/aic-model-downloader/0.23.0> | <https://docs.rs/aic-model-downloader/0.23.0> |
+
 ## Source Code
 
 The full source of these bindings ships inside the published crates. Read it online:
