@@ -1,6 +1,6 @@
 # aic-sdk - Rust Bindings for ai-coustics SDK
 
-Rust wrapper for the ai-coustics Audio Intelligence SDK.
+Rust wrapper for the ai-coustics SDK.
 
 > [!NOTE]
 > This SDK requires a license key. Generate your key at [developers.ai-coustics.com](https://developers.ai-coustics.com).
