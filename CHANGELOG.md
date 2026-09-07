@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.23.1 - 2026-09-07
+
+### New Features
+
+#### Model downloads reuse the manifest
+
+`Model::download` no longer fetches the artifact manifest on every call.
+A cached manifest is now stored next to the models `.manifest-cache.json` and serves every model until the validity window returned by the artifact server expires.
+
+Manifest requests now give up after 30 seconds. They previously had no timeout and could hang for
+as long as the operating system kept retrying the connection.
+
 ## 0.23.0 - 2026-08-10
 
 ### Breaking Changes
@@ -481,7 +493,7 @@ Call `Analyzer::analyze_buffered` in a separate thread to obtain an analysis of 
 
 This release integrates ai-coustics C library version 0.13.0, which comes with a number of new features and several breaking changes.
 
-Most notably, the C library no longer includes any models, which significantly reduces the library's binary size. The models are now available separately for download at https://artifacts.ai-coustics.io.
+Most notably, the C library no longer includes any models, which significantly reduces the library's binary size. The models are now available separately for download at <https://artifacts.ai-coustics.io>.
 
 **New license keys required**: License keys previously generated in the [developer portal](https://developers.ai-coustics.io) will no longer work. New license keys must be generated.
 

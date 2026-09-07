@@ -1,0 +1,32 @@
+# Generated file; local edits may be overwritten.
+name: Publish release notes
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish the release notes
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      # Retrying a failed release recreates and pushes the same tag. If the first
+      # run creates the release before the retry arrives, update that release
+      # instead of failing because it already exists. The checkout and its notes
+      # come from the tagged commit in either case.
+      - run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TAG" --notes-file release-notes.md
+            echo "Updated the release notes of $TAG"
+          else
+            gh release create "$TAG" --title "$TAG" --notes-file release-notes.md
+          fi
