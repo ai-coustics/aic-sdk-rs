@@ -66,22 +66,22 @@ The core C SDK is distributed under the proprietary AIC-SDK license.
 
 | Crate | crates.io | Documentation |
 | --- | --- | --- |
-| `aic-sdk` | <https://crates.io/crates/aic-sdk/0.23.1> | <https://docs.rs/aic-sdk/0.23.1> |
-| `aic-sdk-sys` | <https://crates.io/crates/aic-sdk-sys/0.23.1> | <https://docs.rs/aic-sdk-sys/0.23.1> |
-| `aic-model-downloader` | <https://crates.io/crates/aic-model-downloader/0.23.1> | <https://docs.rs/aic-model-downloader/0.23.1> |
+| `aic-sdk` | <https://crates.io/crates/aic-sdk/0.24.0> | <https://docs.rs/aic-sdk/0.24.0> |
+| `aic-sdk-sys` | <https://crates.io/crates/aic-sdk-sys/0.24.0> | <https://docs.rs/aic-sdk-sys/0.24.0> |
+| `aic-model-downloader` | <https://crates.io/crates/aic-model-downloader/0.24.0> | <https://docs.rs/aic-model-downloader/0.24.0> |
 
 ## Source Code
 
 The full source of these bindings ships inside the published crates. Read it online:
 
-- <https://docs.rs/crate/aic-sdk/0.23.1/source/>
-- <https://docs.rs/crate/aic-sdk-sys/0.23.1/source/>
-- <https://docs.rs/crate/aic-model-downloader/0.23.1/source/>
+- <https://docs.rs/crate/aic-sdk/0.24.0/source/>
+- <https://docs.rs/crate/aic-sdk-sys/0.24.0/source/>
+- <https://docs.rs/crate/aic-model-downloader/0.24.0/source/>
 
 Or download and unpack it:
 
 ```bash
-curl -L https://static.crates.io/crates/aic-sdk/aic-sdk-0.23.1.crate | tar -xz
-curl -L https://static.crates.io/crates/aic-sdk-sys/aic-sdk-sys-0.23.1.crate | tar -xz
-curl -L https://static.crates.io/crates/aic-model-downloader/aic-model-downloader-0.23.1.crate | tar -xz
+curl -L https://static.crates.io/crates/aic-sdk/aic-sdk-0.24.0.crate | tar -xz
+curl -L https://static.crates.io/crates/aic-sdk-sys/aic-sdk-sys-0.24.0.crate | tar -xz
+curl -L https://static.crates.io/crates/aic-model-downloader/aic-model-downloader-0.24.0.crate | tar -xz
 ```

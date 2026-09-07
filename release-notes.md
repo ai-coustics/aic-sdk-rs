@@ -1,9 +1,14 @@
 ### New Features
 
-#### Model downloads reuse the manifest
+#### SDK-internal error reporting
 
-`Model::download` no longer fetches the artifact manifest on every call.
-A cached manifest is now stored next to the models `.manifest-cache.json` and serves every model until the validity window returned by the artifact server expires.
+The SDK reports its own backend failures to ai-coustics error tracking. Covered are failed session
+activations, failed usage reports, and bearer token refreshes rejected by
+`Processor::update_bearer_token`, `Vad::update_bearer_token` and `Analyzer::update_bearer_token`.
 
-Manifest requests now give up after 30 seconds. They previously had no timeout and could hang for
-as long as the operating system kept retrying the connection.
+A report contains the error class and message, the SDK version and wrapper, the model ID, the
+operating system, the CPU architecture, and the account the license was issued to. It contains no
+audio, no license key and no bearer token.
+
+Disable reporting with `DO_NOT_TRACK=1`. The variable is read once per process. Licenses with an
+offline entitlement and `wasm32` builds never report.
