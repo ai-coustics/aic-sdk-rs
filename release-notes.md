@@ -1,14 +1,30 @@
+### Breaking Changes
+
+- Removed unnecessary `Result` returns from methods whose native errors are prevented by the Rust bindings:
+  - `ProcessorContext::parameter`, `VadContext::parameter`, and `EnergyVadContext::parameter` now return `f32` directly.
+  - `ProcessorContext::reset`, `VadContext::reset`, `EnergyVadContext::reset`, and `Analyzer::reset` now return `()`.
+  - `Processor::terminate_session`, `Vad::terminate_session`, and `Analyzer::terminate_session` now return `()`; the async methods on `ProcessorAsync` and `VadAsync` also return `()` when awaited.
+
 ### New Features
 
-#### SDK-internal error reporting
+- Added `EnergyVadContext`, created through `Processor::energy_vad_context` or `ProcessorAsync::energy_vad_context`, for energy-based voice activity
+detection using enhancement output. This is the same energy-based VAD available in pre-0.22 SDK versions. It behaves differently from the previous version.
+It now picks up quiet and distant speech much more reliably, so you'll miss fewer words on speakerphones and in far-field setups.
+It also triggers more often on background noise and background voices. If you see too many false activations, lower the sensitivity parameter (default 6.0).
+A value around 4.0 gives a false-activation rate close to the previous version while still detecting more distant speech.
 
-The SDK reports its own backend failures to ai-coustics error tracking. Covered are failed session
-activations, failed usage reports, and bearer token refreshes rejected by
-`Processor::update_bearer_token`, `Vad::update_bearer_token` and `Analyzer::update_bearer_token`.
+### Improvements
 
-A report contains the error class and message, the SDK version and wrapper, the model ID, the
-operating system, the CPU architecture, and the account the license was issued to. It contains no
-audio, no license key and no bearer token.
+- Added new SIMD-enabled operations in AirTen, yielding better inference performance.
 
-Disable reporting with `DO_NOT_TRACK=1`. The variable is read once per process. Licenses with an
-offline entitlement and `wasm32` builds never report.
+### Improvements
+
+- SDK-internal error reports now include more detail on why a backend request failed.
+
+### Bug Fixes
+
+- Fixed `experimental.audio.output_clipping_samples` to count clipping in the final mixed output.
+
+### Platform Support
+
+- Added the Linux musl release targets `x86_64-unknown-linux-musl` and `aarch64-unknown-linux-musl`. The published `libaic.a` supports the default static linking only; the `dynamic-linking` and `runtime-linking` features have no musl `libaic.so` to bind against.

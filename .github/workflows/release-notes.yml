@@ -7,10 +7,12 @@ on:
       - "*.*.*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release:
+    permissions:
+      contents: write # Create or update this tag's GitHub release notes.
     name: Publish the release notes
     runs-on: ubuntu-latest
     env:
