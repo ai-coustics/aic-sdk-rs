@@ -1,2 +1,1 @@
-# Preserve NOTICE line endings and mark the file as generated.
 NOTICE.txt -text linguist-generated=true

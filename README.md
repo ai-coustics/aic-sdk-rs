@@ -62,47 +62,26 @@ The core C SDK is distributed under the proprietary AIC-SDK license.
 
 `NOTICE.txt` lists the third-party software distributed with the SDK.
 
-## Energy-based Voice Activity Detection
-
-An enhancement processor can report speech activity without running a separate VAD model.
-Create a context before processing and read its prediction after each audio block:
-
-```rust,ignore
-use aic_sdk::VadParameter;
-
-let vad = processor.energy_vad_context();
-vad.set_parameter(VadParameter::Sensitivity, 6.0)?;
-processor.process(&mut audio)?;
-let speech_detected = vad.is_speech_detected();
-```
-
-`EnergyVadContext` also provides `parameter`, `prediction_delay`, and `reset`.
-It can be shared across threads and outlive the processor. Resetting it retains its
-settings without resetting enhancement; resetting the processor also resets its energy VAD.
-Sensitivity ranges from 1 to 15, with higher values detecting quieter signals.
-Creating a context keeps inference active even while bypassed or fully dry.
-With the `async` feature, use `processor.energy_vad_context().await` on `ProcessorAsync`.
-
 ## Crates
 
 | Crate | crates.io | Documentation |
 | --- | --- | --- |
-| `aic-sdk` | <https://crates.io/crates/aic-sdk/0.25.0> | <https://docs.rs/aic-sdk/0.25.0> |
-| `aic-sdk-sys` | <https://crates.io/crates/aic-sdk-sys/0.25.0> | <https://docs.rs/aic-sdk-sys/0.25.0> |
-| `aic-model-downloader` | <https://crates.io/crates/aic-model-downloader/0.25.0> | <https://docs.rs/aic-model-downloader/0.25.0> |
+| `aic-sdk` | <https://crates.io/crates/aic-sdk/0.25.1> | <https://docs.rs/aic-sdk/0.25.1> |
+| `aic-sdk-sys` | <https://crates.io/crates/aic-sdk-sys/0.25.1> | <https://docs.rs/aic-sdk-sys/0.25.1> |
+| `aic-model-downloader` | <https://crates.io/crates/aic-model-downloader/0.25.1> | <https://docs.rs/aic-model-downloader/0.25.1> |
 
 ## Source Code
 
 The full source of these bindings ships inside the published crates. Read it online:
 
-- <https://docs.rs/crate/aic-sdk/0.25.0/source/>
-- <https://docs.rs/crate/aic-sdk-sys/0.25.0/source/>
-- <https://docs.rs/crate/aic-model-downloader/0.25.0/source/>
+- <https://docs.rs/crate/aic-sdk/0.25.1/source/>
+- <https://docs.rs/crate/aic-sdk-sys/0.25.1/source/>
+- <https://docs.rs/crate/aic-model-downloader/0.25.1/source/>
 
 Or download and unpack it:
 
 ```bash
-curl -L https://static.crates.io/crates/aic-sdk/aic-sdk-0.25.0.crate | tar -xz
-curl -L https://static.crates.io/crates/aic-sdk-sys/aic-sdk-sys-0.25.0.crate | tar -xz
-curl -L https://static.crates.io/crates/aic-model-downloader/aic-model-downloader-0.25.0.crate | tar -xz
+curl -L https://static.crates.io/crates/aic-sdk/aic-sdk-0.25.1.crate | tar -xz
+curl -L https://static.crates.io/crates/aic-sdk-sys/aic-sdk-sys-0.25.1.crate | tar -xz
+curl -L https://static.crates.io/crates/aic-model-downloader/aic-model-downloader-0.25.1.crate | tar -xz
 ```
