@@ -830,8 +830,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
 
---- webpki-root-certs 1.0.9: CDLA-Permissive-2.0 ---
---- webpki-roots 1.0.9: CDLA-Permissive-2.0 ---
+--- webpki-root-certs 1.0.10: CDLA-Permissive-2.0 ---
+--- webpki-roots 1.0.10: CDLA-Permissive-2.0 ---
 # Community Data License Agreement - Permissive - Version 2.0
 
 This is the Community Data License Agreement - Permissive, Version
@@ -1387,7 +1387,7 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ================================================================================
 
---- rustls-webpki 0.103.15: ISC ---
+--- rustls-webpki 0.103.16: ISC ---
 Except as otherwise noted, this project is licensed under the following
 (ISC-style) terms:
 
@@ -2165,7 +2165,7 @@ DEALINGS IN THE SOFTWARE.
 
 --- hyper-rustls 0.27.9: MIT ---
 --- rustls-native-certs 0.8.4: MIT ---
---- rustls 0.23.44: MIT ---
+--- rustls 0.23.46: MIT ---
 Copyright (c) 2016 Joseph Birr-Pixton <jpixton@gmail.com>
 
 Permission is hereby granted, free of charge, to any
@@ -2752,7 +2752,7 @@ DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 
---- ringbuf 0.4.8: MIT ---
+--- ringbuf 0.5.3: MIT ---
 Copyright (c) 2019 Alexey Gerasev
 
 Permission is hereby granted, free of charge, to any
@@ -4003,7 +4003,7 @@ DEALINGS IN THE SOFTWARE.
 --- serde 1.0.229: MIT ---
 --- serde_core 1.0.229: MIT ---
 --- serde_derive 1.0.229: MIT ---
---- serde_json 1.0.151: MIT ---
+--- serde_json 1.0.154: MIT ---
 --- simd_cesu8 1.2.0: MIT ---
 --- syn 2.0.119: MIT ---
 --- syn 3.0.5: MIT ---
@@ -5223,7 +5223,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
 
---- webpki-roots 1.0.9: CDLA-Permissive-2.0 ---
+--- webpki-roots 1.0.10: CDLA-Permissive-2.0 ---
 # Community Data License Agreement - Permissive - Version 2.0
 
 This is the Community Data License Agreement - Permissive, Version
@@ -5796,7 +5796,7 @@ THIS SOFTWARE.
 
 ================================================================================
 
---- rustls-webpki 0.103.15: ISC ---
+--- rustls-webpki 0.103.16: ISC ---
 Except as otherwise noted, this project is licensed under the following
 (ISC-style) terms:
 
@@ -6060,7 +6060,7 @@ DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 
---- rustls 0.23.44: MIT ---
+--- rustls 0.23.46: MIT ---
 Copyright (c) 2016 Joseph Birr-Pixton <jpixton@gmail.com>
 
 Permission is hereby granted, free of charge, to any
